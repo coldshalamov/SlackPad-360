@@ -1,0 +1,181 @@
+{
+  "catalogVersion": 1,
+  "accessedDate": "2026-07-10",
+  "sprint": "followup-attribution-tricks-ergonomics-reuse",
+  "decisions": [
+    {
+      "id": "FU-CLICK-ATTRIBUTION",
+      "title": "Click-to-foot attribution",
+      "status": "proposed-committed",
+      "decision": "Attribute Button 1 using planted-contact state machine (tail-only→ollie, nose-only→nollie, both→push) plus click-centered motion windows. Do not require pressure or mechanical force. Optional spatial/pressure heuristics only after capability probe.",
+      "confidence": 0.86,
+      "evidence": [
+        "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-buttons-report-level-usages",
+        "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection"
+      ],
+      "alternatives": [
+        "Assume hardware per-finger click (impossible on PTP Button 1)",
+        "Pressure-only attribution",
+        "Always assign click to rear foot"
+      ],
+      "unresolvedQuestions": [
+        "Exact lookback/lookahead ms",
+        "Whether advanced difficulty allows both+click ollie"
+      ]
+    },
+    {
+      "id": "FU-FOOT-TRACKING",
+      "title": "Post dual-lift reassignment",
+      "status": "proposed-committed",
+      "decision": "Deterministic bipartite match of HID contacts to logical padLeft/padRight using predicted position, velocity, and pad-X prior; dual-lift timeout falls back to spatial order; no random; no silent mid-trick rebind.",
+      "confidence": 0.8,
+      "evidence": [
+        "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection"
+      ],
+      "alternatives": [
+        "Bind permanently to first HID ids",
+        "ML classifier for finger identity",
+        "Force user re-calib every plant"
+      ],
+      "unresolvedQuestions": [
+        "Predict horizon and reset timeout values",
+        "Measured ID swap rate on target hardware (P0)"
+      ]
+    },
+    {
+      "id": "FU-RELATIVE-CONTROL",
+      "title": "Relative board-local control model",
+      "status": "proposed-committed",
+      "decision": "Reject finite pad→world position teleport. Use board-local relative control: rest pose calibration, segment yaw-rate steering, soft recenter, edge clamp without world snap, foot slide as deck offset.",
+      "confidence": 0.88,
+      "evidence": [
+        "https://github.com/apsun/AbsoluteTouchEx",
+        "research/input-attribution.md"
+      ],
+      "alternatives": [
+        "AbsoluteTouch-style pad equals world/screen",
+        "Camera-relative only steering"
+      ],
+      "unresolvedQuestions": [
+        "Soft recenter time constants",
+        "Edge-hold recenter policy comfort"
+      ]
+    },
+    {
+      "id": "FU-TRICK-MATRIX-V0",
+      "title": "Trick primitive matrix v0 scope",
+      "status": "proposed-committed",
+      "decision": "Ship push, steer, ollie, nollie, kickflip, heelflip, pop shuv 180, catch/land, 50-50; board motion authoritative; body mostly cosmetic. Defer manual, powerslide, revert, expanded grinds post G2.",
+      "confidence": 0.84,
+      "evidence": [
+        "https://www.wikihow.com/Ollie",
+        "https://www.wikihow.com/Kickflip-on-a-Skateboard",
+        "https://www.wikihow.com/Heel-Flip",
+        "https://skateboarding.fandom.com/wiki/Kickflip",
+        "https://www.ea.com/games/skate/skate/news/get-control"
+      ],
+      "alternatives": [
+        "Full trick encyclopedia day one",
+        "Body-stick emulation required for all tricks"
+      ],
+      "unresolvedQuestions": [
+        "Body varial pad signal if any",
+        "Flick axis after hand-angle calib"
+      ]
+    },
+    {
+      "id": "FU-ERGONOMICS",
+      "title": "Ergonomics posture and fatigue",
+      "status": "proposed-committed",
+      "decision": "Design for neutral wrist, slight finger flexion, reduce click rate (hold-push), independent handedness/stance, on-screen foot ghosts, session breaks. Validate with pain-map protocol; do not claim medical safety.",
+      "confidence": 0.78,
+      "evidence": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC9265546/",
+        "https://catalog.lib.kyushu-u.ac.jp/opac_download_md/7236843/p1940-1955.pdf",
+        "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection"
+      ],
+      "alternatives": [
+        "Ignore fatigue until late beta",
+        "Require external controller only"
+      ],
+      "unresolvedQuestions": [
+        "15-minute pain rates on target laptop",
+        "Mechanical vs haptic click fatigue delta"
+      ]
+    },
+    {
+      "id": "FU-REUSE",
+      "title": "Reuse policy from audit",
+      "status": "proposed-committed",
+      "decision": "Study RawInput.Touchpad for P0-B patterns; WebView2Samples for host messaging; Rapier/gltf/fast-check/three-mesh-bvh as pinned deps where needed; $P+ optional offline; reject AbsoluteTouchEx injection and unlicensed Shuvit assets.",
+      "confidence": 0.9,
+      "evidence": [
+        "https://github.com/emoacht/RawInput.Touchpad",
+        "https://github.com/apsun/AbsoluteTouchEx",
+        "https://github.com/MicrosoftEdge/WebView2Samples",
+        "https://depts.washington.edu/acelab/proj/dollar/pdollarplus.html",
+        "https://www.npmjs.com/package/fast-check",
+        "https://www.npmjs.com/package/three-mesh-bvh",
+        "https://rapier.rs/",
+        "https://meshoptimizer.org/gltf/"
+      ],
+      "alternatives": [
+        "Vendor AbsoluteTouchEx for absolute coords",
+        "Primary $P+ recognizer"
+      ],
+      "unresolvedQuestions": [
+        "Shuvit historical license file if ever referenced for assets"
+      ]
+    },
+    {
+      "id": "FU-PE3-STATUS",
+      "title": "Pointer Events Level 3 status correction",
+      "status": "proposed-committed",
+      "decision": "Reaffirm PE3 is a W3C Recommendation dated 30 June 2026 (history: CRD May 2026 → REC June 2026). Correct overclaim risk: PE3 status does NOT imply browser dual-foot trackpad coordinates. Soften any reading that PE3 browser support is universal for coalesced/predicted events (implementation varies). PE3 supersedes PE2 for the TR track.",
+      "confidence": 0.95,
+      "evidence": [
+        "https://www.w3.org/TR/pointerevents3/",
+        "https://www.w3.org/TR/2026/REC-pointerevents3-20260630/",
+        "https://www.w3.org/standards/history/pointerevents3/"
+      ],
+      "alternatives": [
+        "Treat PE3 as still Working Draft (false as of access date)",
+        "Assume PE3 unlocks trackpad multi-touch in Chrome"
+      ],
+      "unresolvedQuestions": [
+        "Per-browser matrix for pointerrawupdate and getCoalescedEvents on desktop"
+      ]
+    },
+    {
+      "id": "FU-P0-VS-PLAYTEST",
+      "title": "P0 measurements vs deferred playtest questions",
+      "status": "proposed-committed",
+      "decision": "P0 must measure dual contact+lift, Button1 with plant counts, optional pressure/force presence, ID swap after dual lift, free dual-plant continuity. Defer threshold tuning, recenter constants, fatigue, and full trick feel to playtests after G1.",
+      "confidence": 0.9,
+      "evidence": [
+        "research/input-attribution.md",
+        "research/prototype-roadmap.md"
+      ],
+      "alternatives": [
+        "Tune all thresholds before hardware proof"
+      ],
+      "unresolvedQuestions": []
+    }
+  ],
+  "p0MustMeasure": [
+    "Two contacts with independent tip/lift and usable sample rate",
+    "Button 1 edges while 0, 1, and 2 contacts planted (CSV)",
+    "Optional pressure and mechanical force present/stable?",
+    "HID contact ID reordering rate after dual lift + dual plant (n>=20)",
+    "Win11 GetPointerFrameTouchpadInfo continuous free dual-plant vs pan/zoom-only; else Raw Input"
+  ],
+  "deferToPlaytest": [
+    "Click lookback/lookahead milliseconds",
+    "Soft recenter and edge policies feel",
+    "Both+click as push vs ollie preference",
+    "Flick axis after natural hand angle",
+    "15-minute fatigue and pain maps",
+    "Manual/powerslide/revert inclusion timing",
+    "Pressure intensity curves if hardware supports"
+  ]
+}

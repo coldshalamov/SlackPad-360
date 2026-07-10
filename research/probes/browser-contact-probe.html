@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SlackPad 360 — Browser Contact Probe</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #e8eef7; background: #0b1020; }
+    body { margin: 0; padding: 1rem 1.25rem 2rem; }
+    h1 { font-size: 1.15rem; margin: 0 0 0.25rem; }
+    p { color: #9fb0c9; max-width: 52rem; line-height: 1.45; }
+    #pad {
+      position: relative;
+      width: min(720px, 100%);
+      aspect-ratio: 16 / 10;
+      margin: 1rem 0;
+      border: 1px solid #3a4a66;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #121a2e, #0e1526);
+      touch-action: none;
+      user-select: none;
+      overflow: hidden;
+    }
+    .dot {
+      position: absolute;
+      width: 28px; height: 28px;
+      margin: -14px 0 0 -14px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: #3d8bfd88;
+      pointer-events: none;
+      font-size: 10px;
+      display: grid;
+      place-items: center;
+    }
+    #log {
+      white-space: pre-wrap;
+      font: 12px/1.4 ui-monospace, Consolas, monospace;
+      background: #070b14;
+      border: 1px solid #2a3548;
+      border-radius: 8px;
+      padding: 0.75rem;
+      max-height: 280px;
+      overflow: auto;
+    }
+    .tag { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; background: #243049; margin-right: 0.35rem; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Browser Contact Probe</h1>
+  <p>
+    Research probe only. Place one or two fingers on the <strong>laptop trackpad</strong> and move.
+    Then, if available, try a <strong>touchscreen</strong>. This page records Pointer/Touch/Wheel events
+    to document what the browser exposes. Expected on most Windows laptops: trackpad appears as
+    mouse/wheel, not two absolute pad feet.
+  </p>
+  <p>
+    <span class="tag" id="ptrSupport">PointerEvent: ?</span>
+    <span class="tag" id="touchSupport">TouchEvent: ?</span>
+    <span class="tag" id="activeCount">active: 0</span>
+  </p>
+  <div id="pad" tabindex="0"></div>
+  <div id="log"></div>
+  <script>
+    const pad = document.getElementById('pad');
+    const logEl = document.getElementById('log');
+    const active = new Map();
+    let lines = [];
+
+    document.getElementById('ptrSupport').textContent =
+      'PointerEvent: ' + ('PointerEvent' in window ? 'yes' : 'no');
+    document.getElementById('touchSupport').textContent =
+      'TouchEvent: ' + ('ontouchstart' in window || 'TouchEvent' in window ? 'yes' : 'no');
+
+    function log(msg) {
+      const t = performance.now().toFixed(1);
+      lines.unshift(`[${t}] ${msg}`);
+      if (lines.length > 80) lines.length = 80;
+      logEl.textContent = lines.join('\n');
+    }
+
+    function render() {
+      pad.querySelectorAll('.dot').forEach((n) => n.remove());
+      for (const [id, c] of active) {
+        const d = document.createElement('div');
+        d.className = 'dot';
+        d.style.left = c.x + 'px';
+        d.style.top = c.y + 'px';
+        d.textContent = String(id);
+        d.title = c.detail;
+        pad.appendChild(d);
+      }
+      document.getElementById('activeCount').textContent = 'active: ' + active.size;
+    }
+
+    function onPointer(e) {
+      const r = pad.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const detail = `type=${e.pointerType} id=${e.pointerId} buttons=${e.buttons} pressure=${e.pressure}`;
+      if (e.type === 'pointerup' || e.type === 'pointercancel' || e.type === 'pointerleave') {
+        active.delete(e.pointerId);
+      } else {
+        active.set(e.pointerId, { x, y, detail });
+      }
+      log(`${e.type} ${detail} @ (${x.toFixed(0)},${y.toFixed(0)})`);
+      render();
+      if (e.cancelable) e.preventDefault();
+    }
+
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerleave'].forEach((t) => {
+      pad.addEventListener(t, onPointer, { passive: false });
+    });
+
+    pad.addEventListener('wheel', (e) => {
+      log(`wheel deltaMode=${e.deltaMode} dX=${e.deltaX.toFixed(2)} dY=${e.deltaY.toFixed(2)} ctrl=${e.ctrlKey}`);
+      e.preventDefault();
+    }, { passive: false });
+
+    pad.addEventListener('touchstart', (e) => {
+      log(`touchstart touches=${e.touches.length}`);
+      e.preventDefault();
+    }, { passive: false });
+
+    pad.addEventListener('mousedown', (e) => {
+      log(`mousedown button=${e.button} buttons=${e.buttons}`);
+    });
+
+    log('Probe ready. Focus the pad and use trackpad / touchscreen / mouse.');
+  </script>
+</body>
+</html>

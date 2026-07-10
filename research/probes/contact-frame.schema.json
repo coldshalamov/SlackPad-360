@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slackpad360.local/schemas/contact-frame-v1.json",
+  "title": "SlackPad360ContactFrame",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "frameId",
+    "tPerfMs",
+    "source",
+    "contacts",
+    "buttons"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "frameId": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tPerfMs": {
+      "type": "number"
+    },
+    "tScanUs": {
+      "type": ["integer", "null"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["hardware", "agent", "replay", "synthetic"]
+    },
+    "contacts": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tip", "x", "y", "confidence"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 0 },
+          "tip": { "type": "boolean" },
+          "x": { "type": "number", "minimum": 0, "maximum": 1 },
+          "y": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidence": { "type": "boolean" },
+          "pressure": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "width": { "type": ["number", "null"], "minimum": 0 },
+          "height": { "type": ["number", "null"], "minimum": 0 }
+        }
+      }
+    },
+    "buttons": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "secondary", "auxiliary"],
+      "properties": {
+        "primary": { "type": "boolean" },
+        "secondary": { "type": "boolean" },
+        "auxiliary": { "type": "boolean" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "deviceId": { "type": "string" },
+        "contactCountRaw": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

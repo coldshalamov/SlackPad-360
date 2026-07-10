@@ -1,0 +1,440 @@
+{
+  "catalogVersion": 1,
+  "accessedDate": "2026-07-10",
+  "sources": [
+    {
+      "id": "ms-ptp-collection",
+      "title": "Windows Precision Touchpad Collection",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection",
+      "publisher": "Microsoft Learn",
+      "date": "2017-05-02",
+      "updated": "2026-05-01",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "PTP HID Touch Pad usage page 0x0D usage 0x05",
+        "Mandatory contact ID, X, Y, tip, confidence, scan time, contact count",
+        "Optional pressure, width, height, azimuth, mechanical force, buttons",
+        "Contact count maximum minimum 3 maximum 5",
+        "Tip switch independent lift semantics",
+        "Button types click-pad pressure-pad discrete-pad",
+        "Scan time units 100 microseconds"
+      ]
+    },
+    {
+      "id": "ms-ptp-sample-descriptors",
+      "title": "Sample Report Descriptors (Windows Precision Touchpad)",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-sample-report-descriptors",
+      "publisher": "Microsoft Learn",
+      "date": "2017-05-02",
+      "updated": "2024-01-29",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "Sample HID report layout for contacts and buttons",
+        "Mouse TLC companion collection pattern",
+        "Optional latency mode and haptics feature reports"
+      ]
+    },
+    {
+      "id": "ms-ptp-tlc",
+      "title": "Required HID Top-Level Collections (Precision Touchpad)",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-required-hid-top-level-collections",
+      "publisher": "Microsoft Learn",
+      "date": "2017-05-02",
+      "updated": "2024-01-24",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "Mandatory PTP collection and Configuration collection"
+      ]
+    },
+    {
+      "id": "ms-getpointerframeinfo",
+      "title": "GetPointerFrameInfo function (winuser.h)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerframeinfo",
+      "publisher": "Microsoft Learn",
+      "date": "2018-12-05",
+      "updated": "2025-07-01",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "Retrieve entire multi-pointer frame for current message",
+        "Windows 8+ desktop apps",
+        "Frame ownership limited to same window",
+        "History available via GetPointerFrameInfoHistory"
+      ]
+    },
+    {
+      "id": "ms-getpointertouchpadinfo",
+      "title": "GetPointerTouchpadInfo functions (Winuser.h)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/getpointertouchpadinfo",
+      "publisher": "Microsoft Learn",
+      "date": "2026-03-28",
+      "updated": "2026-04-15",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": [
+        "GetPointerTouchpadInfo and GetPointerFrameTouchpadInfo retrieve POINTER_TOUCH_INFO for touchpad pointers",
+        "Must process WM_POINTER after RegisterTouchpadCapableWindow/Thread",
+        "Minimum client Windows 11 desktop",
+        "Pixel location fields freeze at gesture-start cursor; himetric fields hold device-relative contact position",
+        "Frame variants return all currently-active contacts for the target",
+        "Docs carry pre-released product disclaimer"
+      ]
+    },
+    {
+      "id": "ms-register-touchpad-capable",
+      "title": "RegisterTouchpadCapableWindow and RegisterTouchpadCapableThread functions",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/registertouchpadcapable",
+      "publisher": "Microsoft Learn",
+      "date": "2026-03-28",
+      "updated": "2026-04-15",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": [
+        "Registers window or thread as touchpad-capable",
+        "Enables WM_POINTER for touchpad two-finger gestures (pans and zooms)",
+        "DefWindowProc converts those messages to mouse wheel if not consumed",
+        "GetPointerDevices includes touchpads when thread is capable",
+        "Windows 11 desktop minimum; pre-released product disclaimer"
+      ]
+    },
+    {
+      "id": "ms-ptp-input-portal",
+      "title": "Precision Touchpad Input (Win32 portal)",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/precision-touchpad-portal",
+      "publisher": "Microsoft Learn",
+      "date": "2026-03-28",
+      "updated": "2026-04-15",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": [
+        "Apps do not receive gesturing touchpad input by default",
+        "RegisterTouchpadCapable + GetPointerTouchpadInfo for higher-fidelity two-finger gestures",
+        "Default path often becomes mouse wheel via ninput.dll",
+        "Also documents inertia reporting, multi-finger controllers, and injection APIs"
+      ]
+    },
+    {
+      "id": "ms-raw-input",
+      "title": "About Raw Input",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/inputdev/about-raw-input",
+      "publisher": "Microsoft Learn",
+      "date": null,
+      "updated": "2026-03-18",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "RegisterRawInputDevices required to receive WM_INPUT",
+        "HID devices addressable by usage page and usage"
+      ]
+    },
+    {
+      "id": "ms-register-raw-input",
+      "title": "RegisterRawInputDevices function",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerrawinputdevices",
+      "publisher": "Microsoft Learn",
+      "date": null,
+      "updated": "2025-05-20",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "API to register raw input devices for WM_INPUT"
+      ]
+    },
+    {
+      "id": "w3c-pointerevents3",
+      "title": "Pointer Events Level 3",
+      "url": "https://www.w3.org/TR/pointerevents3/",
+      "publisher": "W3C",
+      "date": "2026-06-30",
+      "updated": "2026-06-30",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-specification",
+      "license": "W3C Software and Document Notice and License",
+      "reliability": "high",
+      "supportedClaims": [
+        "W3C Recommendation status as of 30 June 2026 (dated TR REC-pointerevents3-20260630)",
+        "Supersedes Pointer Events Level 2 on the TR track",
+        "Unified pointer model for mouse pen touch",
+        "PE3 features include altitudeAngle azimuthAngle pointerrawupdate coalesced and predicted events",
+        "No dedicated trackpad dual absolute coordinate model",
+        "Recommendation status does not imply universal browser implementation of every PE3 feature"
+      ]
+    },
+    {
+      "id": "w3c-pointerevents3-history",
+      "title": "Pointer Events Level 3 publication history",
+      "url": "https://www.w3.org/standards/history/pointerevents3/",
+      "publisher": "W3C",
+      "date": null,
+      "updated": "2026-06-30",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-specification-history",
+      "license": "W3C site terms",
+      "reliability": "high",
+      "supportedClaims": [
+        "Publication ladder from FPWD 2019 through WD/CR/CRD 2020-2026 to Recommendation 30 June 2026"
+      ]
+    },
+    {
+      "id": "w3c-pointerevents-issue-206",
+      "title": "Extend pointer events to support raw trackpad data #206",
+      "url": "https://github.com/w3c/pointerevents/issues/206",
+      "publisher": "W3C / GitHub w3c/pointerevents",
+      "date": "2017-05-11",
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "standards-issue",
+      "license": "Repository license / discussion",
+      "reliability": "high",
+      "supportedClaims": [
+        "Raw multi-touch trackpad coordinates requested as future scenario",
+        "Not delivered as standard dual-foot pad API"
+      ]
+    },
+    {
+      "id": "ms-edge-ptp-pointer-events",
+      "title": "Building a great touchpad experience for the web with Pointer Events",
+      "url": "https://blogs.windows.com/msedgedev/2017/12/07/better-precision-touchpad-experience-ptp-pointer-events/",
+      "publisher": "Microsoft Edge Dev Blog",
+      "date": "2017-12-07",
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-vendor-blog",
+      "license": "Microsoft content terms",
+      "reliability": "high-historical",
+      "supportedClaims": [
+        "EdgeHTML 17 PTP pointer events",
+        "Two-finger pan exposed as single contact at cursor",
+        "Browser optimization for pan zoom rotate not free dual feet"
+      ]
+    },
+    {
+      "id": "wicg-webhid-125",
+      "title": "Device access blocking: consider making way for touchpads/digitizers #125",
+      "url": "https://github.com/WICG/webhid/issues/125",
+      "publisher": "WICG / GitHub",
+      "date": "2025-03-01",
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "standards-issue",
+      "license": "Repository license / discussion",
+      "reliability": "medium-high",
+      "supportedClaims": [
+        "Windows digitizers often exclusive to Raw Input Manager",
+        "WebHID not a reliable path for system touchpads"
+      ]
+    },
+    {
+      "id": "rapier-js-getting-started",
+      "title": "Rapier JavaScript Getting Started",
+      "url": "https://rapier.rs/docs/user_guides/javascript/getting_started_js",
+      "publisher": "Dimforge",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Documentation; library Apache-2.0/MIT per package",
+      "reliability": "high",
+      "supportedClaims": [
+        "npm packages rapier3d and compat variants",
+        "world.step game loop pattern",
+        "debugRender for integration"
+      ]
+    },
+    {
+      "id": "rapier-determinism",
+      "title": "Rapier Determinism",
+      "url": "https://rapier.rs/docs/user_guides/rust/determinism/",
+      "publisher": "Dimforge",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Documentation; library Apache-2.0/MIT per package",
+      "reliability": "high",
+      "supportedClaims": [
+        "Local determinism default",
+        "Cross-platform determinism requires enhanced-determinism feature",
+        "Incompatible with parallel and simd features",
+        "IEEE 754-2008 compliance required"
+      ]
+    },
+    {
+      "id": "rapier-npm-deterministic",
+      "title": "@dimforge/rapier2d-deterministic npm package readme excerpt",
+      "url": "https://www.npmjs.com/package/@dimforge/rapier2d-deterministic",
+      "publisher": "npm / Dimforge",
+      "date": null,
+      "updated": "2025-11-05",
+      "accessedDate": "2026-07-10",
+      "sourceType": "package-registry",
+      "license": "See package (Apache-2.0/MIT typical for dimforge)",
+      "reliability": "high",
+      "supportedClaims": [
+        "Published deterministic npm flavors for Rapier JS bindings"
+      ]
+    },
+    {
+      "id": "ea-skate-get-control",
+      "title": "Get Control! (skate. Flick-It)",
+      "url": "https://www.ea.com/games/skate/skate/news/get-control",
+      "publisher": "Electronic Arts",
+      "date": "2025-09-16",
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-product-documentation",
+      "license": "EA site terms; game trademarks EA",
+      "reliability": "high-for-philosophy",
+      "supportedClaims": [
+        "Flick-It: left stick steer, right stick flip/board adjustments",
+        "Gesture flicks produce ollie kickflip shuvit family",
+        "Franchise control philosophy of expressive stick flicks"
+      ]
+    },
+    {
+      "id": "threejs-org",
+      "title": "three.js",
+      "url": "https://threejs.org/",
+      "publisher": "three.js / mrdoob",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-project",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": [
+        "WebGL/WebGPU 3D library suitable for browser and WebView"
+      ]
+    },
+    {
+      "id": "meshoptimizer-gltfpack",
+      "title": "gltfpack (meshoptimizer)",
+      "url": "https://meshoptimizer.org/gltf/",
+      "publisher": "zeux / meshoptimizer",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-project",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": [
+        "glTF optimization and meshopt compression",
+        "three.js loader support via setMeshoptDecoder"
+      ]
+    },
+    {
+      "id": "polyhaven",
+      "title": "Poly Haven",
+      "url": "https://polyhaven.com/",
+      "publisher": "Poly Haven",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "asset-library",
+      "license": "CC0 (verify per asset)",
+      "reliability": "high",
+      "supportedClaims": [
+        "CC0 HDRIs textures models catalog candidates"
+      ]
+    },
+    {
+      "id": "kenney-assets",
+      "title": "Kenney Assets",
+      "url": "https://kenney.nl/assets",
+      "publisher": "Kenney",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "asset-library",
+      "license": "CC0",
+      "reliability": "high",
+      "supportedClaims": [
+        "CC0 prototype game assets including environment kits"
+      ]
+    },
+    {
+      "id": "khronos-ktx",
+      "title": "KTX-Software / toktx",
+      "url": "https://github.com/KhronosGroup/KTX-Software",
+      "publisher": "Khronos Group",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-project",
+      "license": "Apache-2.0",
+      "reliability": "high",
+      "supportedClaims": [
+        "KTX2 texture encoding tools for GPU-compressed textures"
+      ]
+    },
+    {
+      "id": "ms-webview2",
+      "title": "Microsoft Edge WebView2",
+      "url": "https://developer.microsoft.com/microsoft-edge/webview2/",
+      "publisher": "Microsoft",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-product",
+      "license": "Microsoft Software License / runtime terms",
+      "reliability": "high",
+      "supportedClaims": [
+        "Embed Chromium-based WebView in native Windows hosts"
+      ]
+    },
+    {
+      "id": "local-pnp-enumeration",
+      "title": "Local PnP enumeration of touchpad devices (research machine)",
+      "url": "file://local/Get-PnpDevice",
+      "publisher": "SlackPad 360 research session",
+      "date": "2026-07-10",
+      "updated": "2026-07-10",
+      "accessedDate": "2026-07-10",
+      "sourceType": "local-hardware-observation",
+      "license": "N/A",
+      "reliability": "high-local-only",
+      "supportedClaims": [
+        "HID-compliant touch pad present",
+        "I2C HID Device ACPI VEN_06CB present",
+        "Synaptics vendor ID 0x06CB on research laptop"
+      ]
+    },
+    {
+      "id": "firefox-windows-pointing",
+      "title": "Windows Pointing Device Support in Firefox",
+      "url": "https://firefox-source-docs.mozilla.org/widget/windows/windows-pointing-device/index.html",
+      "publisher": "Mozilla",
+      "date": null,
+      "updated": null,
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-engine-documentation",
+      "license": "MDN/Firefox docs terms",
+      "reliability": "high",
+      "supportedClaims": [
+        "Precision Touchpad raw touch data interpreted by Windows",
+        "Browser engine considerations for multi-device pointer stacks"
+      ]
+    }
+  ]
+}

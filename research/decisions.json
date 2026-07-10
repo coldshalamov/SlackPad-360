@@ -1,0 +1,244 @@
+{
+  "catalogVersion": 1,
+  "accessedDate": "2026-07-10",
+  "decisions": [
+    {
+      "id": "DEC-FEASIBILITY",
+      "title": "Concept feasibility verdict",
+      "status": "proposed-committed",
+      "decision": "Conditionally feasible with native input bridge; not feasible as pure browser dual-foot trackpad game on Windows.",
+      "confidence": 0.86,
+      "evidence": [
+        "ms-ptp-collection",
+        "w3c-pointerevents3",
+        "w3c-pointerevents-issue-206",
+        "ms-edge-ptp-pointer-events",
+        "local-pnp-enumeration"
+      ],
+      "alternatives": [
+        "Pure browser only",
+        "Controller/gamepad primary (different product)",
+        "Touchscreen-only multi-touch feet"
+      ],
+      "unresolvedQuestions": [
+        "Per-device dual-contact stability on this Synaptics unit (needs P0)",
+        "Whether Win11 GetPointerFrameTouchpadInfo streams free dual-plant vs pan/zoom-only gestures on this machine"
+      ]
+    },
+    {
+      "id": "DEC-RUNTIME",
+      "title": "Runtime architecture",
+      "status": "proposed-committed",
+      "decision": "Native Win32 or Rust host + WebView2 + touchpad bridge emitting ContactFrame into TypeScript Three.js/Rapier game. Bridge prefers Win11 RegisterTouchpadCapableWindow + GetPointerFrameTouchpadInfo; falls back to Raw Input HID PTP parse.",
+      "confidence": 0.8,
+      "evidence": [
+        "ms-getpointertouchpadinfo",
+        "ms-register-touchpad-capable",
+        "ms-ptp-input-portal",
+        "ms-raw-input",
+        "ms-register-raw-input",
+        "ms-webview2",
+        "wicg-webhid-125",
+        "ms-ptp-collection"
+      ],
+      "alternatives": [
+        "Electron + N-API native module (fallback packaging)",
+        "Tauri + Rust HID",
+        "Standalone localhost input bridge + browser tab (probe only)",
+        "Pure browser"
+      ],
+      "unresolvedQuestions": [
+        "Host language preference C# vs Rust vs C++",
+        "When multi-OS packaging forces Electron/Tauri"
+      ]
+    },
+    {
+      "id": "DEC-INPUT-API",
+      "title": "Native input API preference",
+      "status": "proposed-committed",
+      "decision": "P0-A first on Windows 11: RegisterTouchpadCapableWindow + GetPointerFrameTouchpadInfo / GetPointerTouchpadInfo (POINTER_TOUCH_INFO himetric device coords; Win11-only; Learn docs carry pre-released product disclaimer). P0-B / production fallback: Raw Input + HID preparsed data for Touch Pad TLC 0x0D/0x05 for continuous dual-foot and full PTP button/scan fields when pointer path is gesture-bound or incomplete. Do not use touchpad pixel location fields for feet (they freeze at gesture-start cursor).",
+      "confidence": 0.84,
+      "evidence": [
+        "ms-getpointertouchpadinfo",
+        "ms-register-touchpad-capable",
+        "ms-ptp-input-portal",
+        "ms-raw-input",
+        "ms-getpointerframeinfo",
+        "ms-ptp-sample-descriptors"
+      ],
+      "alternatives": [
+        "Raw Input only (skip Win11 pointer APIs)",
+        "Generic GetPointerFrameInfo without RegisterTouchpadCapableWindow",
+        "Vendor Synaptics SDK (rejected: lock-in)",
+        "WebHID (rejected for system pads)"
+      ],
+      "unresolvedQuestions": [
+        "Whether Win11 WM_POINTER after RegisterTouchpadCapableWindow streams free dual-plant or only pan/zoom-classified two-finger gestures",
+        "Availability of exports on this machine's User32 build (pre-release disclaimer)",
+        "Click/button co-delivery quality on pointer path vs HID Button 1"
+      ]
+    },
+    {
+      "id": "DEC-CAMERA",
+      "title": "Default camera and input relativity",
+      "status": "proposed-committed",
+      "decision": "Default low three-quarter chase camera; board-relative input mapping after stance calibration; screen-relative only for UI.",
+      "confidence": 0.75,
+      "evidence": [
+        "ea-skate-get-control"
+      ],
+      "alternatives": [
+        "Side camera default",
+        "Overhead default",
+        "Camera-relative steering"
+      ],
+      "unresolvedQuestions": [
+        "Optimal look-ahead time constants after playtests"
+      ]
+    },
+    {
+      "id": "DEC-HAND-MAPPING",
+      "title": "Hand and stance mapping",
+      "status": "proposed-committed",
+      "decision": "Calibrate pad-left/pad-right by plant X; bind to nose/tail via regular/goofy; index/middle natural placement; click is global not per-foot.",
+      "confidence": 0.77,
+      "evidence": [
+        "ms-ptp-collection"
+      ],
+      "alternatives": [
+        "Hard-code right hand only",
+        "Assume screen axes equal board axes"
+      ],
+      "unresolvedQuestions": [
+        "Auto rest-angle calibration stability"
+      ]
+    },
+    {
+      "id": "DEC-GRAMMAR-HYBRID",
+      "title": "Control grammar vs continuous forces",
+      "status": "proposed-committed",
+      "decision": "Continuous ContactFrame forces for ground locomotion and modulation; click-centered rule FSM for trick initiation; scoring may name outcomes. Refines README pure continuous wording without changing product vision.",
+      "confidence": 0.82,
+      "evidence": [
+        "ea-skate-get-control"
+      ],
+      "alternatives": [
+        "Pure continuous free rigid-body only",
+        "Fully canned animation list",
+        "ML classifier primary"
+      ],
+      "unresolvedQuestions": [
+        "Exact window lengths per device latency"
+      ]
+    },
+    {
+      "id": "DEC-PHYSICS",
+      "title": "Physics and assistance model",
+      "status": "proposed-committed",
+      "decision": "Hybrid assisted physics on Rapier3d-deterministic: gesture sets impulses/torque targets; collisions and fails remain physical; assist levels 0-2; soft grind snap default.",
+      "confidence": 0.8,
+      "evidence": [
+        "rapier-js-getting-started",
+        "rapier-determinism",
+        "rapier-npm-deterministic",
+        "ea-skate-get-control"
+      ],
+      "alternatives": [
+        "cannon-es or ammo.js",
+        "Pure kinematic board",
+        "Animation-only tricks"
+      ],
+      "unresolvedQuestions": [
+        "Physics Hz 60 vs 120 final choice",
+        "Wheel model fidelity for grinds"
+      ]
+    },
+    {
+      "id": "DEC-TRICK-VOCAB-V0",
+      "title": "Initial trick vocabulary",
+      "status": "proposed-committed",
+      "decision": "Ship order: push, steer, ollie, nollie, kickflip, heelflip, shuv 180, catch/land, one grind type.",
+      "confidence": 0.85,
+      "evidence": [
+        "ea-skate-get-control"
+      ],
+      "alternatives": [
+        "Manuals first",
+        "Large trick encyclopedia day one"
+      ],
+      "unresolvedQuestions": [
+        "Whether body varials are v0 or v1"
+      ]
+    },
+    {
+      "id": "DEC-AGENT",
+      "title": "Agent and observability contract",
+      "status": "proposed-committed",
+      "decision": "Single ContactFrame pipeline for human, replay, agent; no privileged board movement API; golden traces and synthetic generators required before production.",
+      "confidence": 0.88,
+      "evidence": [
+        "rapier-determinism"
+      ],
+      "alternatives": [
+        "Agent shortcuts for faster RL",
+        "Observation-only without inject"
+      ],
+      "unresolvedQuestions": [
+        "IPC transport final form"
+      ]
+    },
+    {
+      "id": "DEC-ASSETS",
+      "title": "Asset and license policy",
+      "status": "proposed-committed",
+      "decision": "Prototype with CC0 only (Kenney, Poly Haven); track licenses in catalog; KTX2+meshopt pipeline; MIT/Apache stack preference.",
+      "confidence": 0.9,
+      "evidence": [
+        "polyhaven",
+        "kenney-assets",
+        "meshoptimizer-gltfpack",
+        "threejs-org",
+        "khronos-ktx"
+      ],
+      "alternatives": [
+        "Purchased asset store packs",
+        "CC-BY with credits from day one"
+      ],
+      "unresolvedQuestions": [
+        "Final SFX library selection"
+      ]
+    },
+    {
+      "id": "DEC-GO-NO-GO",
+      "title": "Pre-production gates",
+      "status": "proposed-committed",
+      "decision": "G1 input, G2 feel, G3 latency, G4 determinism required before production content; G5 performance and G6 agent before content lock.",
+      "confidence": 0.9,
+      "evidence": [
+        "local-pnp-enumeration",
+        "ms-ptp-collection",
+        "rapier-determinism"
+      ],
+      "alternatives": [
+        "Build park in parallel with unproven input",
+        "Soft launch without determinism"
+      ],
+      "unresolvedQuestions": [
+        "Exact numeric latency measurement harness"
+      ]
+    },
+    {
+      "id": "DEC-README-ALIGNMENT",
+      "title": "Root README preservation",
+      "status": "proposed-committed",
+      "decision": "Preserve root README product direction. Research confirms Three.js/Rapier/ContactFrame/native bridge. Grammar hybrid refinement recorded without gutting vision.",
+      "confidence": 0.92,
+      "evidence": [],
+      "alternatives": [
+        "Rewrite README to pure gesture catalog game",
+        "Rewrite README to pure physics sim"
+      ],
+      "unresolvedQuestions": []
+    }
+  ]
+}
