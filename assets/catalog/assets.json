@@ -1,0 +1,61 @@
+{
+  "catalogVersion": 1,
+  "accessedDate": "2026-07-10",
+  "description": "SlackPad 360 asset ledger. Cycle 1 catalogs candidates; no shipping binaries in runtime/.",
+  "assets": [
+    {
+      "id": "cand-kenney-mini-skate",
+      "description": "Kenney Mini Skate park kit (models/characters) — blockout candidate only, not downloaded in cycle 1",
+      "sourceUrl": "https://kenney-assets.itch.io/mini-skate",
+      "author": "Kenney",
+      "license": "CC0 1.0 Universal",
+      "spdx": "CC0-1.0",
+      "retrievalDate": null,
+      "originalFilename": null,
+      "checksum": null,
+      "allowedUses": ["commercial", "modify", "redistribute", "no-attribution-required"],
+      "attributionRequirement": "none (attribution appreciated)",
+      "modificationStatus": "unmodified",
+      "runtimeIntent": "none",
+      "reviewStatus": "unreviewed",
+      "path": null,
+      "notes": "Catalog-only entry. Download only when needed for blockout; keep LICENSE beside files."
+    },
+    {
+      "id": "cand-polyhaven-hdri",
+      "description": "Poly Haven HDRI/environment candidates for daylight ambient (per-asset license verify)",
+      "sourceUrl": "https://polyhaven.com/hdris",
+      "author": "Poly Haven contributors",
+      "license": "CC0 1.0 (verify per asset)",
+      "spdx": "CC0-1.0",
+      "retrievalDate": null,
+      "originalFilename": null,
+      "checksum": null,
+      "allowedUses": ["commercial", "modify", "redistribute"],
+      "attributionRequirement": "none",
+      "modificationStatus": "unmodified",
+      "runtimeIntent": "none",
+      "reviewStatus": "unreviewed",
+      "path": null,
+      "notes": "Do not bulk download. Pick one HDRI when lighting prototype begins."
+    },
+    {
+      "id": "cand-ambientcg-materials",
+      "description": "AmbientCG PBR material candidates for concrete/metal",
+      "sourceUrl": "https://ambientcg.com/",
+      "author": "AmbientCG",
+      "license": "CC0 1.0 (verify per asset)",
+      "spdx": "CC0-1.0",
+      "retrievalDate": null,
+      "originalFilename": null,
+      "checksum": null,
+      "allowedUses": ["commercial", "modify", "redistribute"],
+      "attributionRequirement": "none",
+      "modificationStatus": "unmodified",
+      "runtimeIntent": "none",
+      "reviewStatus": "unreviewed",
+      "path": null,
+      "notes": "Catalog-only."
+    }
+  ]
+}

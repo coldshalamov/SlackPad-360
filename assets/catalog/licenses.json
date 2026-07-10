@@ -1,0 +1,66 @@
+{
+  "catalogVersion": 1,
+  "accessedDate": "2026-07-10",
+  "licenses": [
+    {
+      "id": "CC0-1.0",
+      "spdx": "CC0-1.0",
+      "name": "Creative Commons Zero v1.0 Universal",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "commercialUse": true,
+      "attributionRequired": false,
+      "shareAlike": false,
+      "notes": "Preferred for prototype art (Kenney, Poly Haven, AmbientCG). Still verify each asset page."
+    },
+    {
+      "id": "MIT",
+      "spdx": "MIT",
+      "name": "MIT License",
+      "url": "https://opensource.org/licenses/MIT",
+      "commercialUse": true,
+      "attributionRequired": true,
+      "shareAlike": false,
+      "notes": "Common for code dependencies (three.js, meshoptimizer, etc.). Retain copyright notices."
+    },
+    {
+      "id": "Apache-2.0",
+      "spdx": "Apache-2.0",
+      "name": "Apache License 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "commercialUse": true,
+      "attributionRequired": true,
+      "shareAlike": false,
+      "notes": "Rapier/KTX-Software ecosystem; verify package LICENSE at pin."
+    },
+    {
+      "id": "BSD-3-Clause",
+      "spdx": "BSD-3-Clause",
+      "name": "BSD 3-Clause",
+      "url": "https://opensource.org/licenses/BSD-3-Clause",
+      "commercialUse": true,
+      "attributionRequired": true,
+      "shareAlike": false,
+      "notes": "$P+ academic recognizer if studied offline."
+    },
+    {
+      "id": "MS-SAMPLE",
+      "spdx": null,
+      "name": "Microsoft sample / documentation terms",
+      "url": "https://github.com/MicrosoftEdge/WebView2Samples",
+      "commercialUse": "confirm-per-repo",
+      "attributionRequired": true,
+      "shareAlike": false,
+      "notes": "Study patterns; prefer reimplementation under project license rather than wholesale sample ship."
+    },
+    {
+      "id": "REJECT-UNCLEAR",
+      "spdx": null,
+      "name": "Unclear or non-commercial only",
+      "url": null,
+      "commercialUse": false,
+      "attributionRequired": true,
+      "shareAlike": null,
+      "notes": "Do not place in assets/runtime/. Includes many 'free download' marketplace items without SPDX."
+    }
+  ]
+}

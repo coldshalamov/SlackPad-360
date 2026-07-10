@@ -1,0 +1,393 @@
+{
+  "catalogVersion": 1,
+  "cycle": "01-foundation",
+  "accessedDate": "2026-07-10",
+  "sources": [
+    {
+      "id": "root-readme",
+      "title": "SlackPad 360 root README",
+      "url": "file://README.md",
+      "publisher": "SlackPad 360",
+      "accessedDate": "2026-07-10",
+      "sourceType": "project-document",
+      "license": "project",
+      "reliability": "high",
+      "supportedClaims": ["Product direction Three.js Rapier ContactFrame native bridge"]
+    },
+    {
+      "id": "research-readme",
+      "title": "Research summary and committed recommendation",
+      "url": "file://research/README.md",
+      "publisher": "SlackPad 360 research",
+      "accessedDate": "2026-07-10",
+      "sourceType": "project-research",
+      "license": "project",
+      "reliability": "high",
+      "supportedClaims": ["Conditional feasibility", "G1-G6 gates", "Runtime recommendation"]
+    },
+    {
+      "id": "research-contact-frame-schema",
+      "title": "ContactFrame JSON Schema v1",
+      "url": "file://research/probes/contact-frame.schema.json",
+      "publisher": "SlackPad 360 research",
+      "accessedDate": "2026-07-10",
+      "sourceType": "schema",
+      "license": "project",
+      "reliability": "high",
+      "supportedClaims": ["ContactFrame required fields and norms"]
+    },
+    {
+      "id": "ms-ptp-collection",
+      "title": "Windows Precision Touchpad Collection",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": [
+        "PTP HID Touch Pad 0x0D/0x05",
+        "Mandatory contact ID X Y tip confidence scan time contact count",
+        "Optional pressure size force",
+        "Contact count max guidance"
+      ]
+    },
+    {
+      "id": "ms-touchpad-buttons",
+      "title": "Touchpad Buttons Report Level Usages",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-buttons-report-level-usages",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": ["Button 1 report-level not per-contact"]
+    },
+    {
+      "id": "ms-getpointertouchpadinfo",
+      "title": "GetPointerTouchpadInfo functions",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/getpointertouchpadinfo",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": [
+        "GetPointerFrameTouchpadInfo multi-contact frames",
+        "Himetric device positions vs frozen pixel locations",
+        "Windows 11 desktop minimum"
+      ]
+    },
+    {
+      "id": "ms-register-touchpad-capable",
+      "title": "RegisterTouchpadCapableWindow/Thread",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/registertouchpadcapable",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-api-reference",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": ["Opt-in touchpad-capable WM_POINTER path"]
+    },
+    {
+      "id": "ms-ptp-input-portal",
+      "title": "Precision Touchpad Input portal",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/precision-touchpad-portal",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high-with-prerelease-disclaimer",
+      "supportedClaims": ["Apps do not receive gesturing touchpad input by default"]
+    },
+    {
+      "id": "ms-raw-input",
+      "title": "About Raw Input",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/inputdev/about-raw-input",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": ["RegisterRawInputDevices for HID"]
+    },
+    {
+      "id": "ms-webview2-messaging",
+      "title": "WebView2 communicate between web and native",
+      "url": "https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/communicate-btwn-web-native",
+      "publisher": "Microsoft Learn",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft content terms (documentation)",
+      "reliability": "high",
+      "supportedClaims": ["PostWebMessageAsJson host to page messaging"]
+    },
+    {
+      "id": "ms-webview2",
+      "title": "Microsoft Edge WebView2",
+      "url": "https://developer.microsoft.com/microsoft-edge/webview2/",
+      "publisher": "Microsoft",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Microsoft software license terms apply to runtime",
+      "reliability": "high",
+      "supportedClaims": ["Evergreen WebView2 hosting Chromium"]
+    },
+    {
+      "id": "w3c-pointerevents3",
+      "title": "Pointer Events Level 3",
+      "url": "https://www.w3.org/TR/pointerevents3/",
+      "publisher": "W3C",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-specification",
+      "license": "W3C Software and Document Notice and License",
+      "reliability": "high",
+      "supportedClaims": [
+        "Unified pointer model",
+        "No dedicated dual-foot trackpad absolute coordinate model"
+      ]
+    },
+    {
+      "id": "rapier-js",
+      "title": "Rapier JavaScript getting started",
+      "url": "https://rapier.rs/docs/user_guides/javascript/getting_started_js/",
+      "publisher": "Dimforge",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Documentation; engine Apache-2.0/MIT verify package",
+      "reliability": "high",
+      "supportedClaims": ["npm packages rapier3d", "world.step WASM"]
+    },
+    {
+      "id": "rapier-determinism",
+      "title": "Rapier determinism guide",
+      "url": "https://rapier.rs/docs/user_guides/javascript/determinism/",
+      "publisher": "Dimforge",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "Documentation",
+      "reliability": "high",
+      "supportedClaims": ["deterministic package builds for cross-platform determinism"]
+    },
+    {
+      "id": "rapier-npm-deterministic",
+      "title": "@dimforge/rapier3d-deterministic-compat npm",
+      "url": "https://www.npmjs.com/package/@dimforge/rapier3d-deterministic-compat",
+      "publisher": "npm / Dimforge",
+      "accessedDate": "2026-07-10",
+      "sourceType": "package-registry",
+      "license": "Apache-2.0 (registry metadata; re-verify tarball)",
+      "reliability": "high",
+      "supportedClaims": ["Published deterministic Rapier JS builds"]
+    },
+    {
+      "id": "threejs-org",
+      "title": "three.js",
+      "url": "https://threejs.org/",
+      "publisher": "mrdoob / contributors",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-project",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["WebGL renderer ecosystem"]
+    },
+    {
+      "id": "fast-check",
+      "title": "fast-check",
+      "url": "https://fast-check.dev/",
+      "publisher": "Nicolas DUBIEN et al.",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-project",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["Property-based testing library"]
+    },
+    {
+      "id": "three-mesh-bvh",
+      "title": "three-mesh-bvh",
+      "url": "https://github.com/gkjohnson/three-mesh-bvh",
+      "publisher": "Garrett Johnson",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["BVH accelerated mesh queries for three.js"]
+    },
+    {
+      "id": "meshoptimizer-gltfpack",
+      "title": "meshoptimizer gltfpack",
+      "url": "https://meshoptimizer.org/gltf/",
+      "publisher": "Arseny Kapoulkine",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["glTF meshopt compression tooling"]
+    },
+    {
+      "id": "gltf-transform",
+      "title": "glTF Transform",
+      "url": "https://gltf-transform.dev/",
+      "publisher": "Don McCurdy et al.",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-documentation",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["glTF optimize pipeline"]
+    },
+    {
+      "id": "ktx-software",
+      "title": "KTX-Software",
+      "url": "https://github.com/KhronosGroup/KTX-Software",
+      "publisher": "Khronos Group",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "Apache-2.0",
+      "reliability": "high",
+      "supportedClaims": ["KTX2 encode/decode tools"]
+    },
+    {
+      "id": "spectorjs",
+      "title": "Spector.js",
+      "url": "https://github.com/BabylonJS/Spector.js",
+      "publisher": "BabylonJS / Microsoft contributors",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "MIT",
+      "reliability": "high",
+      "supportedClaims": ["WebGL frame capture debugging"]
+    },
+    {
+      "id": "rawinput-touchpad",
+      "title": "RawInput.Touchpad sample",
+      "url": "https://github.com/emoacht/RawInput.Touchpad",
+      "publisher": "emoacht",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "MIT",
+      "reliability": "medium",
+      "supportedClaims": ["C# Raw Input PTP multi-contact sample pattern"]
+    },
+    {
+      "id": "absolute-touch-ex-negative",
+      "title": "AbsoluteTouchEx",
+      "url": "https://github.com/apsun/AbsoluteTouchEx",
+      "publisher": "apsun",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "MIT",
+      "reliability": "medium",
+      "supportedClaims": ["Absolute pad mapping and injection approach (reject for product)"]
+    },
+    {
+      "id": "webview2-samples",
+      "title": "WebView2Samples",
+      "url": "https://github.com/MicrosoftEdge/WebView2Samples",
+      "publisher": "Microsoft Edge",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "Microsoft sample terms (confirm LICENSE at clone)",
+      "reliability": "high",
+      "supportedClaims": ["Host web messaging sample patterns"]
+    },
+    {
+      "id": "ea-skate-get-control",
+      "title": "EA skate. Get Control",
+      "url": "https://www.ea.com/games/skate/skate/news/get-control",
+      "publisher": "Electronic Arts",
+      "accessedDate": "2026-07-10",
+      "sourceType": "product-documentation",
+      "license": "EA site terms; no code reuse rights implied",
+      "reliability": "medium-high for design philosophy only",
+      "supportedClaims": ["Flick-It dual-stick control philosophy publicly described"]
+    },
+    {
+      "id": "wikihow-ollie",
+      "title": "How to Ollie",
+      "url": "https://www.wikihow.com/Ollie",
+      "publisher": "WikiHow",
+      "accessedDate": "2026-07-10",
+      "sourceType": "instructional",
+      "license": "WikiHow terms",
+      "reliability": "medium",
+      "supportedClaims": ["Ollie foot roles tail pop front slide"]
+    },
+    {
+      "id": "wikihow-kickflip",
+      "title": "How to Kickflip on a Skateboard",
+      "url": "https://www.wikihow.com/Kickflip-on-a-Skateboard",
+      "publisher": "WikiHow",
+      "accessedDate": "2026-07-10",
+      "sourceType": "instructional",
+      "license": "WikiHow terms",
+      "reliability": "medium",
+      "supportedClaims": ["Kickflip front foot heelside edge"]
+    },
+    {
+      "id": "wikihow-heelflip",
+      "title": "How to Heel Flip",
+      "url": "https://www.wikihow.com/Heel-Flip",
+      "publisher": "WikiHow",
+      "accessedDate": "2026-07-10",
+      "sourceType": "instructional",
+      "license": "WikiHow terms",
+      "reliability": "medium",
+      "supportedClaims": ["Heelflip toeside flick"]
+    },
+    {
+      "id": "kenney-cc0",
+      "title": "Kenney assets / Mini Skate",
+      "url": "https://kenney-assets.itch.io/mini-skate",
+      "publisher": "Kenney",
+      "accessedDate": "2026-07-10",
+      "sourceType": "asset-catalog",
+      "license": "CC0-1.0",
+      "reliability": "high",
+      "supportedClaims": ["CC0 skate park kit candidate for blockout"]
+    },
+    {
+      "id": "polyhaven-cc0",
+      "title": "Poly Haven",
+      "url": "https://polyhaven.com/",
+      "publisher": "Poly Haven",
+      "accessedDate": "2026-07-10",
+      "sourceType": "asset-catalog",
+      "license": "CC0-1.0 (verify per asset)",
+      "reliability": "high",
+      "supportedClaims": ["CC0 HDRIs textures models"]
+    },
+    {
+      "id": "godot-skate",
+      "title": "Godot_Skate prototype",
+      "url": "https://github.com/3deric/Godot_Skate",
+      "publisher": "3deric",
+      "accessedDate": "2026-07-10",
+      "sourceType": "primary-repository",
+      "license": "MIT",
+      "reliability": "medium",
+      "supportedClaims": ["Open skate prototype in Godot for study"]
+    },
+    {
+      "id": "dollar-p-plus",
+      "title": "$P+ point-cloud recognizer",
+      "url": "https://depts.washington.edu/acelab/proj/dollar/pdollarplus.html",
+      "publisher": "University of Washington ACE Lab",
+      "accessedDate": "2026-07-10",
+      "sourceType": "academic-project",
+      "license": "BSD-3-Clause (project page)",
+      "reliability": "high",
+      "supportedClaims": ["Template stroke recognition reference"]
+    },
+    {
+      "id": "iso-hci-mouse-ergonomics",
+      "title": "ISO 9241-related mouse design review (PMC)",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9265546/",
+      "publisher": "PMC / IJERPH",
+      "accessedDate": "2026-07-10",
+      "sourceType": "peer-reviewed-summary",
+      "license": "publisher terms",
+      "reliability": "medium-high",
+      "supportedClaims": ["Neutral wrist and reduced finger strain design principles"]
+    }
+  ]
+}

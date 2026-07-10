@@ -1,0 +1,261 @@
+{
+  "catalogVersion": 1,
+  "cycle": "01-foundation",
+  "accessedDate": "2026-07-10",
+  "decisions": [
+    {
+      "id": "C1-PRODUCT",
+      "theme": "product",
+      "title": "Product fantasy and first-ship scope",
+      "status": "committed",
+      "decision": "SlackPad 360 is a Windows-first hybrid finger-skate game: two trackpad contacts as feet; Skate-like forgiving initiation + THUG2-like line exploration without IP copy. First ship: one compact plaza, small combinable trick vocab, progression-light sandbox. Not a microscopic rigid-body sim; not pure canned animation; not pure browser dual-foot.",
+      "confidence": 0.9,
+      "evidence": ["root-readme", "research-readme", "ea-skate-get-control"],
+      "alternatives": [
+        "Pure free rigid-body finger sim",
+        "Full trick encyclopedia day one",
+        "Open-world career city",
+        "Controller-primary product"
+      ],
+      "unresolvedQuestions": [
+        "G2 feel unproven",
+        "15-minute ergonomics unproven"
+      ]
+    },
+    {
+      "id": "C1-PHYSICS-QUALITY-BARS",
+      "theme": "product",
+      "title": "Measurable physics/feel quality bars",
+      "status": "committed",
+      "decision": "Replace unfalsifiable AAA parity claims with PQ-1..PQ-8 and EX-1..EX-3 bars (continuity, interruptibility, landing fairness, agency survey, failure clarity, grind skill band, combo ownership, determinism tools; plaza line loops/verticality).",
+      "confidence": 0.88,
+      "evidence": ["product-vision.md", "research-physics"],
+      "alternatives": [
+        "Market as Skate/THUG2 quality without metrics",
+        "Only FPS as quality proxy"
+      ],
+      "unresolvedQuestions": [
+        "Exact cone degrees and snap meters pending prototypes"
+      ]
+    },
+    {
+      "id": "C1-INPUT-CONTACTFRAME",
+      "theme": "input",
+      "title": "Normative ContactFrame v1 and single pipeline",
+      "status": "committed",
+      "decision": "ContactFrame schemaVersion 1 (research schema) is the sole input contract for hardware, agent, replay, and synthetic sources. Foot roles live in InputProfile after frames. Agent injects frames only.",
+      "confidence": 0.92,
+      "evidence": ["research-contact-frame-schema", "research-agent-observability"],
+      "alternatives": [
+        "Separate agent pose API",
+        "Per-adapter incompatible formats"
+      ],
+      "unresolvedQuestions": [
+        "SharedBuffer vs JSON when G3 fails"
+      ]
+    },
+    {
+      "id": "C1-INPUT-RELATIVE",
+      "theme": "input",
+      "title": "Board-local relative control",
+      "status": "committed",
+      "decision": "Reject finite pad→world teleport. Rest-pose calibration, segment yaw-rate steering, soft recenter, edge clamp without world snap.",
+      "confidence": 0.9,
+      "evidence": ["research-input-attribution", "absolute-touch-ex-negative"],
+      "alternatives": [
+        "AbsoluteTouch-style mapping",
+        "Camera-relative primary steering"
+      ],
+      "unresolvedQuestions": [
+        "Recenter time constants",
+        "Edge-hold comfort"
+      ]
+    },
+    {
+      "id": "C1-INPUT-CLICK-FSM",
+      "theme": "input",
+      "title": "Click attribution and click-centered FSM",
+      "status": "committed",
+      "decision": "Button 1 is report-level; attribute by planted feet (tail-only ollie, nose-only nollie, both push) plus motion windows. Rule-based temporal FSM primary; ML not primary. Logical foot tracker with deterministic dual-lift reassignment.",
+      "confidence": 0.86,
+      "evidence": [
+        "ms-ptp-collection",
+        "ms-touchpad-buttons",
+        "research-input-attribution",
+        "research-control-grammar"
+      ],
+      "alternatives": [
+        "Hardware per-finger click (impossible on PTP Button 1)",
+        "ML classifier primary",
+        "Pressure-gated success"
+      ],
+      "unresolvedQuestions": [
+        "Exact lookback/lookahead ms",
+        "both+click advanced preference"
+      ]
+    },
+    {
+      "id": "C1-TRICK-V0",
+      "theme": "input",
+      "title": "v0 trick vocabulary and grind family",
+      "status": "committed",
+      "decision": "Ship push, steer, ollie, nollie, kickflip (heelside), heelflip (toeside), front/back shuv 180, catch, land, bail, 50-50 grind family. Defer manuals, powerslides, reverts, expanded grinds post-G2.",
+      "confidence": 0.88,
+      "evidence": [
+        "research-trick-matrix",
+        "wikihow-ollie",
+        "wikihow-kickflip",
+        "wikihow-heelflip",
+        "ea-skate-get-control"
+      ],
+      "alternatives": [
+        "Encyclopedia day one",
+        "Boardslide as first grind"
+      ],
+      "unresolvedQuestions": [
+        "Body varial pad signal",
+        "360 shuv hard requirement"
+      ]
+    },
+    {
+      "id": "C1-PHYSICS-HYBRID",
+      "theme": "physics",
+      "title": "Hybrid assisted Rapier controller",
+      "status": "committed",
+      "decision": "Gesture opens ManeuverSpec impulses/torque targets; Rapier owns integration/collisions; assists interruptible; assist levels 0-2; soft grind snap default Assist 1; single dynamic board body v0; playable skate scale meters.",
+      "confidence": 0.84,
+      "evidence": ["research-physics", "rapier-js", "rapier-determinism"],
+      "alternatives": [
+        "Pure free rigid-body only",
+        "Animation-only tricks",
+        "cannon-es/ammo.js"
+      ],
+      "unresolvedQuestions": [
+        "120 vs 60 Hz final",
+        "Raycast wheels vs hull",
+        "Mass aggregate tuning"
+      ]
+    },
+    {
+      "id": "C1-CAMERA",
+      "theme": "camera",
+      "title": "Default low three-quarter chase camera",
+      "status": "committed",
+      "decision": "Default low three-quarter chase with look-ahead, air pull-back, grind overhead blend 10-20%, spring-arm occlusion; camera never rewrites board-relative foot mapping. Side/overhead assist optional.",
+      "confidence": 0.78,
+      "evidence": ["research-camera", "ea-skate-get-control"],
+      "alternatives": [
+        "Side default",
+        "Overhead default",
+        "Nose cam default"
+      ],
+      "unresolvedQuestions": [
+        "Look-ahead constants after playtest",
+        "Motion discomfort rate"
+      ]
+    },
+    {
+      "id": "C1-RUNTIME",
+      "theme": "runtime",
+      "title": "Primary Windows host architecture",
+      "status": "committed",
+      "decision": "Primary: .NET 8 host + WebView2 + touchpad bridge emitting ContactFrame into TypeScript Three.js/Rapier game. Input order: Win11 RegisterTouchpadCapableWindow + GetPointerFrameTouchpadInfo (himetric) then Raw Input HID PTP fallback. Packaging fallback: Electron + N-API. Probe-only: standalone localhost bridge. Reject pure browser for human dual-foot.",
+      "confidence": 0.85,
+      "evidence": [
+        "ms-getpointertouchpadinfo",
+        "ms-register-touchpad-capable",
+        "ms-ptp-input-portal",
+        "ms-raw-input",
+        "ms-webview2-messaging",
+        "research-technology"
+      ],
+      "alternatives": [
+        "Electron default",
+        "Tauri default",
+        "Rust host first",
+        "Pure browser"
+      ],
+      "unresolvedQuestions": [
+        "C# vs Rust if HID safety issues dominate",
+        "Win11 API pre-release stability"
+      ]
+    },
+    {
+      "id": "C1-ART",
+      "theme": "art",
+      "title": "Professional tactile art direction and CC0-first pipeline",
+      "status": "committed",
+      "decision": "Detailed coherent daylight plaza + hero board/shoes; restrained effects; PBR; performance via budgets/LOD/meshopt/KTX2 not permanent unlit prototypes. Catalog-first assets; CC0 preferred; assets/runtime only approved shipping files. Cycle 1 does not populate runtime.",
+      "confidence": 0.82,
+      "evidence": ["research-technology", "kenney-cc0", "polyhaven-cc0", "meshoptimizer-gltfpack"],
+      "alternatives": [
+        "Ugly prototype aesthetic as ship look",
+        "Heavy post-process showcase",
+        "Bulk uncertain Sketchfab import"
+      ],
+      "unresolvedQuestions": [
+        "Whether re-dressed CC0 kits pass professional bar under G5"
+      ]
+    },
+    {
+      "id": "C1-WORLD-UI-AUDIO",
+      "theme": "world",
+      "title": "Compact plaza, minimal HUD, audio policy",
+      "status": "committed",
+      "decision": "One modular plaza with ≥3 line loops, rails/ledges/stairs/banks/QP, recoverable failures, checkpoint respawn. Minimal HUD; calibration and input theater. Audio: board/surface/impact/grind/ambience; music opt-in licensed/original only.",
+      "confidence": 0.84,
+      "evidence": ["product-vision", "world-ui-audio-spec"],
+      "alternatives": [
+        "Multiple large cities v0",
+        "Score-gated free skate",
+        "Music-forward unlicensed tracks"
+      ],
+      "unresolvedQuestions": [
+        "Final SFX library selection"
+      ]
+    },
+    {
+      "id": "C1-VERIFICATION",
+      "theme": "verification",
+      "title": "Gates G1-G6 and deterministic observability",
+      "status": "committed",
+      "decision": "G1 input, G2 feel, G3 latency, G4 determinism before production content; G5 performance and G6 agent before content lock. Golden ContactFrame traces, synthetic generators, fast-check PBT (dev), playtest E1-E6, hardware matrix. Subjective claims use structured surveys.",
+      "confidence": 0.9,
+      "evidence": ["research-prototype-roadmap", "research-agent-observability", "rapier-determinism"],
+      "alternatives": [
+        "Build park before input proof",
+        "Soft launch without determinism"
+      ],
+      "unresolvedQuestions": [
+        "Exact latency harness implementation details"
+      ]
+    },
+    {
+      "id": "C1-REUSE-DEPS",
+      "theme": "reuse",
+      "title": "Dependency and OSS reuse policy",
+      "status": "committed",
+      "decision": "Adopt three + rapier3d-deterministic + Vite/TS stack; study RawInput.Touchpad and WebView2Samples; optional three-mesh-bvh for render queries; fast-check and SpectorJS dev-only; pipeline gltf-transform/meshopt/KTX2; reject AbsoluteTouchEx injection and unlicensed assets; study Godot/Unity skate prototypes for feel only; rule FSM over $P+ primary.",
+      "confidence": 0.9,
+      "evidence": [
+        "research-reuse-audit",
+        "rawinput-touchpad",
+        "webview2-samples",
+        "rapier-js",
+        "threejs-org",
+        "fast-check",
+        "three-mesh-bvh",
+        "spectorjs",
+        "godot-skate"
+      ],
+      "alternatives": [
+        "Vendor AbsoluteTouchEx",
+        "Primary ML or $P+ recognizer",
+        "cannon-es physics"
+      ],
+      "unresolvedQuestions": [
+        "Pin exact package versions at implementation"
+      ]
+    }
+  ]
+}
