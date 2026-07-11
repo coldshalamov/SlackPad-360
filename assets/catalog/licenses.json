@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 1,
+  "catalogVersion": 2,
   "accessedDate": "2026-07-10",
   "licenses": [
     {
@@ -7,10 +7,13 @@
       "spdx": "CC0-1.0",
       "name": "Creative Commons Zero v1.0 Universal",
       "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "legalcodeLocal": "assets/source/vendor/cc0-license-text/CC0-1.0-legalcode.txt",
       "commercialUse": true,
       "attributionRequired": false,
       "shareAlike": false,
-      "notes": "Preferred for prototype art (Kenney, Poly Haven, AmbientCG). Still verify each asset page."
+      "modificationAllowed": true,
+      "redistributionAllowed": true,
+      "notes": "Preferred for prototype art (Kenney, Poly Haven, AmbientCG). Still verify each asset page. Local legalcode retrieved 2026-07-10."
     },
     {
       "id": "MIT",
@@ -20,7 +23,9 @@
       "commercialUse": true,
       "attributionRequired": true,
       "shareAlike": false,
-      "notes": "Common for code dependencies (three.js, meshoptimizer, etc.). Retain copyright notices."
+      "modificationAllowed": true,
+      "redistributionAllowed": true,
+      "notes": "Common for code dependencies (three.js, meshoptimizer, vite, vitest, fast-check, three-mesh-bvh)."
     },
     {
       "id": "Apache-2.0",
@@ -30,7 +35,9 @@
       "commercialUse": true,
       "attributionRequired": true,
       "shareAlike": false,
-      "notes": "Rapier/KTX-Software ecosystem; verify package LICENSE at pin."
+      "modificationAllowed": true,
+      "redistributionAllowed": true,
+      "notes": "Rapier JS packages and KTX-Software. Verify package LICENSE at pin."
     },
     {
       "id": "BSD-3-Clause",
@@ -40,6 +47,8 @@
       "commercialUse": true,
       "attributionRequired": true,
       "shareAlike": false,
+      "modificationAllowed": true,
+      "redistributionAllowed": true,
       "notes": "$P+ academic recognizer if studied offline."
     },
     {
@@ -50,7 +59,21 @@
       "commercialUse": "confirm-per-repo",
       "attributionRequired": true,
       "shareAlike": false,
+      "modificationAllowed": true,
+      "redistributionAllowed": "confirm-per-repo",
       "notes": "Study patterns; prefer reimplementation under project license rather than wholesale sample ship."
+    },
+    {
+      "id": "MS-WEBVIEW2-RUNTIME",
+      "spdx": null,
+      "name": "Microsoft Edge WebView2 Runtime license",
+      "url": "https://developer.microsoft.com/microsoft-edge/webview2/",
+      "commercialUse": true,
+      "attributionRequired": "per Microsoft terms",
+      "shareAlike": false,
+      "modificationAllowed": false,
+      "redistributionAllowed": "per Microsoft redistributable terms",
+      "notes": "Evergreen runtime; not redistributed as project source art."
     },
     {
       "id": "REJECT-UNCLEAR",
@@ -60,7 +83,21 @@
       "commercialUse": false,
       "attributionRequired": true,
       "shareAlike": null,
-      "notes": "Do not place in assets/runtime/. Includes many 'free download' marketplace items without SPDX."
+      "modificationAllowed": null,
+      "redistributionAllowed": false,
+      "notes": "Do not place in assets/runtime/. Includes many free-download marketplace items without SPDX, NC licenses, brand-heavy assets."
+    },
+    {
+      "id": "PROJECT-ORIGINAL",
+      "spdx": null,
+      "name": "Project-original (to be authored)",
+      "url": null,
+      "commercialUse": true,
+      "attributionRequired": false,
+      "shareAlike": false,
+      "modificationAllowed": true,
+      "redistributionAllowed": true,
+      "notes": "Hero board/shoes gap assets will be project-owned after Blender authoring pass."
     }
   ]
 }

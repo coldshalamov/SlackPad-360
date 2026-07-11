@@ -1,0 +1,322 @@
+{
+  "catalogVersion": 2,
+  "cycle": "02-adversarial",
+  "accessedDate": "2026-07-10",
+  "decisions": [
+    {
+      "id": "C2-PRODUCT-SCOPE",
+      "status": "committed",
+      "decision": "Preserve hybrid finger-skate product: two contacts as feet; click kick/pop; relative board-local control; Skate-like initiation + THUG2-like compact plaza lines. First ship expands grind family to include boardslide-class sideways entry; vertical slice may still land 50-50 first.",
+      "rationale": "User intent and cycle-1 product fantasy survive adversarial review; grind expansion answers explicit sideways-into-grind desire without forcing boardslide into the smallest G1-G2 proof slice.",
+      "evidenceIds": [
+        "root-readme",
+        "c1-baseline",
+        "c2-audit"
+      ],
+      "alternatives": [
+        "Microscopic rigid finger sim",
+        "Canned trick menu only",
+        "Boardslide required in first vertical slice"
+      ],
+      "rejectionReasons": [
+        "Rigid micro-sim fails arcade line exploration",
+        "Canned menu fails continuous control fantasy",
+        "Boardslide in smallest slice raises grind entry complexity before feel proven"
+      ],
+      "confidence": 0.9,
+      "owner": "product",
+      "implementationConsequence": "Prototype slice: push/steer/ollie/nollie/flip/shuv/catch/land/bail + 50-50; first ship: add boardslide family and broader plaza art after G2.",
+      "validationMethod": "Playtest vocabulary checklist + G2 formative feel",
+      "reopenTrigger": "G2 fails because grind family incomplete for enjoyment"
+    },
+    {
+      "id": "C2-RAPIER-PACKAGE",
+      "status": "committed",
+      "decision": "Adopt @dimforge/rapier3d-deterministic-compat@0.19.3 (Apache-2.0) as primary physics npm package with init-via-await RAPIER.init(); pin exact version at implement.",
+      "rationale": "npm registry 2026-07-10 lists both @dimforge/rapier3d-deterministic and -compat at 0.19.3. Cycle 1 mixed bare name with -compat URL. Compat inlines WASM base64, better first-path for Vite/WebView2. Official docs state JS Rapier is cross-platform deterministic with caveats.",
+      "evidenceIds": [
+        "npm-rapier-det-compat",
+        "npm-rapier-det",
+        "rapier-determinism-docs"
+      ],
+      "alternatives": [
+        "@dimforge/rapier3d-deterministic separate WASM",
+        "@dimforge/rapier3d non-deterministic-labeled",
+        "cannon-es"
+      ],
+      "rejectionReasons": [
+        "Separate WASM more bundler friction for first host",
+        "Non-labeled package adds golden-trace ambiguity",
+        "cannon-es weaker official determinism story"
+      ],
+      "confidence": 0.92,
+      "owner": "engineering",
+      "implementationConsequence": "package.json depends on -compat 0.19.3; import path documented; upgrade requires re-running G4 golden hashes.",
+      "validationMethod": "npm install + init smoke + world.createSnapshot hash on fixed steps",
+      "reopenTrigger": "WASM payload size breaks packaging or init fails in WebView2"
+    },
+    {
+      "id": "C2-INPUT-PRIMARY-API",
+      "status": "committed",
+      "decision": "First executable P0 spike implements BOTH paths, but production-primary ranking is Raw Input HID Touch Pad (0x0D/0x05) first for free dual-plant; Win11 RegisterTouchpadCapableWindow + GetPointerFrameTouchpadInfo is co-spike and preferred only if it proves free dual-plant on target hardware.",
+      "rationale": "MS Learn documents registered windows receive WM_POINTER for two-finger pans and zooms; pre-release disclaimer remains. Free dual-plant for feet is not documented as guaranteed. Raw Input against PTP HID is the proven multi-contact class path (with study sample). Choose evidence over aesthetic preference for Win11 modern API.",
+      "evidenceIds": [
+        "ms-register-touchpad-capable",
+        "ms-getpointertouchpadinfo",
+        "ms-ptp-collection",
+        "rawinput-touchpad-study"
+      ],
+      "alternatives": [
+        "Win11 pointer primary with Raw fallback only",
+        "Raw-only never try pointer APIs"
+      ],
+      "rejectionReasons": [
+        "Pointer-as-primary risks months on pan/zoom-only stream",
+        "Raw-only skips free official path that may still work"
+      ],
+      "confidence": 0.78,
+      "owner": "platform",
+      "implementationConsequence": "P0 host binary must log both adapters; G1 accept can pass on either path; packaging uses the path that meets accept criteria.",
+      "validationMethod": "P0 spike CSV traces with accept/reject metrics",
+      "reopenTrigger": "Pointer path proves free dual-plant with lower latency than Raw on target device"
+    },
+    {
+      "id": "C2-CLICK-ATTRIBUTION",
+      "status": "committed",
+      "decision": "Keep report-level Button 1; attribute kick to left/right foot mental model via planted-state mapping (tail-only=ollie, nose-only=nollie, both=push default) plus motion windows. Device-mode matrix defines supported/ignored/rejected modes. Spatial click zone is advisory only, never sole authority.",
+      "rationale": "PTP buttons are report-level, not per-contact (MS docs). User left/right foot model is reconstructed from stance + plant mask, not hardware finger identity.",
+      "evidenceIds": [
+        "ms-touchpad-buttons",
+        "c1-baseline",
+        "research-input-feasibility"
+      ],
+      "alternatives": [
+        "Require per-finger force",
+        "Use only Windows left/right click zones"
+      ],
+      "rejectionReasons": [
+        "Per-finger force not guaranteed",
+        "Click zones are OS UI concepts not feet"
+      ],
+      "confidence": 0.88,
+      "owner": "input",
+      "implementationConsequence": "Device mode matrix in input-platform-and-device-spec; profile toggles for tap-to-click and bothClickMeans.",
+      "validationMethod": "Hardware matrix tests + synthetic plant-mask golden traces",
+      "reopenTrigger": "Hardware exposes reliable per-contact force usable without false pops"
+    },
+    {
+      "id": "C2-PHYSICS-REPRESENTATION",
+      "status": "committed",
+      "decision": "v0: single dynamic board rigid body + cosmetic rider mass bias + assisted ManeuverSpec impulses. P3 probe: add constrained/raycast truck-wheel contacts if hull fails rail/lean. Reject full articulated multi-body rider for first ship.",
+      "rationale": "Single body minimizes determinism risk and implementation cost while hybrid assist can open flip/grind windows. Rail fidelity may force raycast wheels later; full articulated system is high risk for little v0 gain.",
+      "evidenceIds": [
+        "rapier-determinism-docs",
+        "rapier-getting-started",
+        "oss-godot-skate",
+        "oss-gevp-vehicle",
+        "c1-baseline"
+      ],
+      "alternatives": [
+        "Raycast wheels from day one",
+        "Full board+trucks+wheels joints+foot constraints"
+      ],
+      "rejectionReasons": [
+        "Raycast day-one delays G2 feel proof",
+        "Articulated model high CPU and instability risk"
+      ],
+      "confidence": 0.8,
+      "owner": "physics",
+      "implementationConsequence": "BoardController applies impulses to one body; colliders: deck hull + optional truck boxes; grind as constraint/latch not full truck sim.",
+      "validationMethod": "Physics comparison checklist + P3 stability metrics",
+      "reopenTrigger": "Single body fails fair rail entry or off-axis land under G2"
+    },
+    {
+      "id": "C2-HOST-LANG",
+      "status": "committed",
+      "decision": "Primary host: C# / .NET 8 + WebView2. Switch trigger to Rust: unresolved memory-safety defects in HID report parsing that C# cannot adequately contain, or team requirement for single Rust toolchain across host+tools.",
+      "rationale": "WebView2Samples and Windows productivity favor C#. Rust is viable but dual-skill cost is real; switch only on evidence.",
+      "evidenceIds": [
+        "ms-webview2-messaging",
+        "webview2-samples",
+        "c1-baseline"
+      ],
+      "alternatives": [
+        "Rust host first",
+        "Electron-only"
+      ],
+      "rejectionReasons": [
+        "Rust-first delays WebView2 host without proven need",
+        "Electron-only is heavier packaging default"
+      ],
+      "confidence": 0.86,
+      "owner": "platform",
+      "implementationConsequence": "host/ project is .NET; native bridge emits ContactFrame JSON via PostWebMessageAsJson.",
+      "validationMethod": "P0 host builds and posts frames into page",
+      "reopenTrigger": "Documented HID safety failure class or packaging dead-end"
+    },
+    {
+      "id": "C2-HZ-PLAN",
+      "status": "committed",
+      "decision": "Default fixed physics step 60 Hz for development and first ship candidate. Benchmark 120 Hz as quality mode with same golden traces; adopt 120 only if step CPU p95 budget holds on target iGPU and formative feel improves.",
+      "rationale": "Cycle 1 preferred 120 without device measurement. 60 is safer default; 120 is experiment not constant.",
+      "evidenceIds": [
+        "oss-gevp-vehicle",
+        "c1-baseline",
+        "rapier-determinism-docs"
+      ],
+      "alternatives": [
+        "Hard-require 120 Hz",
+        "Variable dt physics"
+      ],
+      "rejectionReasons": [
+        "120 unproven on iGPU",
+        "Variable dt breaks determinism goldens"
+      ],
+      "confidence": 0.84,
+      "owner": "physics",
+      "implementationConsequence": "SimConfig.hz=60 default; feature flag 120; render interpolates.",
+      "validationMethod": "OQ-PHYS-01 dual-rate golden + FPS log",
+      "reopenTrigger": "Measured 120 within budget and improves land/grind fairness"
+    },
+    {
+      "id": "C2-ASSET-LIBRARY",
+      "status": "committed",
+      "decision": "Acquire CC0 HDRI + PBR materials + Kenney blockout with full provenance. Reject Kenney as final look. Hero board and shoes are bespoke Blender-ready gaps deferred because Blender process is owned by unrelated work (not because optional). No runtime/ promotions.",
+      "rationale": "Codex audit P1: shell is insufficient. Free high-quality hero board/shoes with safe redistribution not found.",
+      "evidenceIds": [
+        "polyhaven-kloppenheim",
+        "acg-concrete040",
+        "kenney-mini-skate",
+        "polyhaven-license",
+        "c2-audit"
+      ],
+      "alternatives": [
+        "Ship Kenney look",
+        "Bulk Sketchfab import"
+      ],
+      "rejectionReasons": [
+        "Kenney conflicts professional target",
+        "Sketchfab licenses often non-redistributable"
+      ],
+      "confidence": 0.9,
+      "owner": "art",
+      "implementationConsequence": "assets/source/vendor populated; gap briefs in cycle-2; cycle 3 schedules isolated Blender pass.",
+      "validationMethod": "Catalog hash checks + visual rubric",
+      "reopenTrigger": "Credible redistributable hero board/shoes appear with license page evidence"
+    },
+    {
+      "id": "C2-EVIDENCE-LEVELS",
+      "status": "committed",
+      "decision": "Separate structural smoke, deterministic automated regression, hardware acceptance, formative feel (n small), tuning study, and release confidence. n>=5 is formative only, never release proof.",
+      "rationale": "Codex audit P2 conflation of playtest n with ship quality.",
+      "evidenceIds": [
+        "c2-audit",
+        "c1-baseline"
+      ],
+      "alternatives": [
+        "Single pass/fail n>=5 for ship"
+      ],
+      "rejectionReasons": [
+        "Statistically weak for release"
+      ],
+      "confidence": 0.93,
+      "owner": "verification",
+      "implementationConsequence": "observability-and-verification.md tags every gate with evidence level.",
+      "validationMethod": "Review checklist enforces labels",
+      "reopenTrigger": "Release process defines different statistical policy"
+    },
+    {
+      "id": "C2-AUTONOMY-GATES",
+      "status": "committed",
+      "decision": "Autonomous agents may implement and test everything through ContactFrame injection. Must pause at G1 (device), G2 (human feel), and any hardware matrix item requiring physical trackpad. Failed G1 stops content production and pivots to input only.",
+      "rationale": "Codex audit P1 autonomy must be gate-aware.",
+      "evidenceIds": [
+        "c2-audit",
+        "c1-baseline"
+      ],
+      "alternatives": [
+        "Blind full-product automation"
+      ],
+      "rejectionReasons": [
+        "Spends months on wrong product after G1 fail"
+      ],
+      "confidence": 0.95,
+      "owner": "process",
+      "implementationConsequence": "autonomy-and-gate-plan.md is binding for cycle 3 production goals.",
+      "validationMethod": "Process review + agent harness contract tests",
+      "reopenTrigger": "New remote device farm proves dual-contact without local human"
+    },
+    {
+      "id": "C2-BOARD-SLIDE-SCOPE",
+      "status": "committed",
+      "decision": "Boardslide family is first-ship required (sideways yaw into grind). Not required to pass first vertical-slice fun gate; 50-50 remains slice-first grind for simpler rail approach.",
+      "rationale": "User wants turning sideways into grind; adversarial review keeps slice small but elevates boardslide to first ship.",
+      "evidenceIds": [
+        "root-readme",
+        "c1-baseline",
+        "c2-audit"
+      ],
+      "alternatives": [
+        "Boardslide in first vertical slice",
+        "Boardslide deferred post-ship"
+      ],
+      "rejectionReasons": [
+        "Slice complexity risk",
+        "Defer conflicts explicit user intent for sideways grind"
+      ],
+      "confidence": 0.82,
+      "owner": "design",
+      "implementationConsequence": "ManeuverSpec grind kinds include fifty_fifty and boardslide; slice milestone checklist marks boardslide post-G2.",
+      "validationMethod": "G2 then first-ship checklist",
+      "reopenTrigger": "Boardslide recognition costs too many false conflicts with flip yaw"
+    },
+    {
+      "id": "C2-FEET-VISUAL",
+      "status": "committed",
+      "decision": "Disembodied shoes/feet with procedural attachment and catch assist radii; no full humanoid required for v0. Visual foot animation is cosmetic; catch uses generous board-local catch volumes not millimeter shoe mesh contact.",
+      "rationale": "Players must not need impossible precision; shoes carry readability.",
+      "evidenceIds": [
+        "root-readme",
+        "c1-baseline"
+      ],
+      "alternatives": [
+        "Full humanoid IK rider",
+        "No visible feet"
+      ],
+      "rejectionReasons": [
+        "Humanoid cost high",
+        "No feet hurts foot-placement readability"
+      ],
+      "confidence": 0.88,
+      "owner": "animation",
+      "implementationConsequence": "Two shoe meshes parented/procedurally placed; catch volume != shoe mesh.",
+      "validationMethod": "Shot rubric + catch fairness tests",
+      "reopenTrigger": "Playtests demand visible lower-leg for readability"
+    },
+    {
+      "id": "C2-MANEUVER-ASSIST",
+      "status": "committed",
+      "decision": "Implementable ManeuverAssist: state machine opens interruptible envelopes with target omega, impulse clamps, catch damping, landing cones, grind latch constraints; assist levels 0-2 scale snap and quantize only.",
+      "rationale": "Cycle 1 hybrid concept needs math-enough spec for implementation without canned pose cheats.",
+      "evidenceIds": [
+        "c1-baseline",
+        "oss-godot-skate",
+        "oss-gevp-vehicle",
+        "rapier-determinism-docs"
+      ],
+      "alternatives": [
+        "Pure free rigid body",
+        "Animation-only tricks"
+      ],
+      "rejectionReasons": [
+        "Pure free too harsh for finger metaphor",
+        "Animation-only fails collision/fail fantasy"
+      ],
+      "confidence": 0.85,
+      "owner": "physics",
+      "implementationConsequence": "See physics-animation-and-camera-spec.md equations and state table.",
+      "validationMethod": "Golden interruption/catch/bail traces",
+      "reopenTrigger": "Assist 1 still feels magnetic/unfair in G2"
+    }
+  ]
+}

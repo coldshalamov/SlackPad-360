@@ -1,0 +1,575 @@
+{
+  "catalogVersion": 2,
+  "cycle": "02-adversarial",
+  "accessedDate": "2026-07-10",
+  "sources": [
+    {
+      "id": "ms-register-touchpad-capable",
+      "title": "RegisterTouchpadCapableWindow and RegisterTouchpadCapableThread",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/registertouchpadcapable",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-api-reference",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Window/thread registration API shape",
+        "WM_POINTER for two-finger pans and zooms",
+        "Pre-release disclaimer",
+        "Win11 desktop minimum",
+        "GetPointerDevices includes touchpads when thread capable"
+      ],
+      "limitations": [
+        "Does not prove free dual-plant continuous feet stream",
+        "Does not prove target laptop behavior"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-getpointertouchpadinfo",
+      "title": "GetPointerTouchpadInfo functions",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/getpointertouchpadinfo",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-api-reference",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Frame and history variants",
+        "Himetric contact positions",
+        "Pixel location freezes at gesture start",
+        "Win11 only",
+        "Pre-release disclaimer"
+      ],
+      "limitations": [
+        "Documented in gesture/WM_POINTER context",
+        "No free dual-plant guarantee"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-ptp-portal",
+      "title": "Precision Touchpad Input portal",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/precision-touchpad-portal",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Portal to PTP programming guide and registration"
+      ],
+      "limitations": [
+        "Overview only"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-ptp-collection",
+      "title": "Windows Precision Touchpad Collection",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "HID Touch Pad 0x0D/0x05",
+        "Mandatory contact fields",
+        "Scan time 100us units",
+        "Optional pressure"
+      ],
+      "limitations": [
+        "Device class requirements not target proof"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-touchpad-buttons",
+      "title": "Touchpad Buttons Report Level Usages",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-buttons-report-level-usages",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Button 1 report-level not per-contact"
+      ],
+      "limitations": [
+        "Does not define game foot attribution"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-raw-input",
+      "title": "Raw Input",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows/win32/inputdev/raw-input",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-api-reference",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "RegisterRawInputDevices HID access path"
+      ],
+      "limitations": [
+        "App must parse HID reports"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "ms-webview2-messaging",
+      "title": "Interop of native and web code (WebView2)",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/communicate-btwn-web-native",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "PostWebMessageAsJson",
+        "WebMessageReceived",
+        "hostObjects",
+        "ExecuteScript"
+      ],
+      "limitations": [
+        "Latency not quantified for high-rate ContactFrame"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-rapier-det-compat",
+      "title": "npm @dimforge/rapier3d-deterministic-compat",
+      "canonicalUrl": "https://www.npmjs.com/package/@dimforge/rapier3d-deterministic-compat",
+      "publisher": "npm / dimforge",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Exact package name",
+        "version 0.19.3",
+        "Apache-2.0",
+        "inlined WASM base64 compat description"
+      ],
+      "limitations": [
+        "Registry snapshot at access date"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-rapier-det",
+      "title": "npm optional-alt non-compat @dimforge/rapier3d-deterministic (cycle-1 bare name also registered)",
+      "canonicalUrl": "https://www.npmjs.com/package/@dimforge/rapier3d-deterministic",
+      "publisher": "npm / dimforge",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Optional alt non-compat package exists at 0.19.3 (not cycle-1 defect as nonexistent)",
+        "Apache-2.0",
+        "Separate WASM bundling alternative to -compat"
+      ],
+      "limitations": [
+        "Requires separate WASM bundling; not primary"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-rapier3d",
+      "title": "npm @dimforge/rapier3d",
+      "canonicalUrl": "https://www.npmjs.com/package/@dimforge/rapier3d",
+      "publisher": "npm / dimforge",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Standard package 0.19.3"
+      ],
+      "limitations": [
+        "Not selected primary"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "rapier-determinism-docs",
+      "title": "Rapier JS Determinism guide",
+      "canonicalUrl": "https://rapier.rs/docs/user_guides/javascript/determinism/",
+      "publisher": "dimforge",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "WASM/TS fully cross-platform deterministic under same version and construction order",
+        "snapshot MD5 guidance",
+        "Math.sin/cos not deterministic across platforms"
+      ],
+      "limitations": [
+        "Assumes identical app inputs"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "rapier-getting-started",
+      "title": "Rapier JS Getting Started",
+      "canonicalUrl": "https://rapier.rs/docs/user_guides/javascript/getting_started_js/",
+      "publisher": "dimforge",
+      "sourceType": "primary-documentation",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Install paths for rapier3d and -compat init differences"
+      ],
+      "limitations": [
+        "Versions drift"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-three",
+      "title": "npm three",
+      "canonicalUrl": "https://www.npmjs.com/package/three",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "three 0.185.1 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-vite",
+      "title": "npm vite",
+      "canonicalUrl": "https://www.npmjs.com/package/vite",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "vite 8.1.4 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-vitest",
+      "title": "npm vitest",
+      "canonicalUrl": "https://www.npmjs.com/package/vitest",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "vitest 4.1.10 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-fast-check",
+      "title": "npm fast-check",
+      "canonicalUrl": "https://www.npmjs.com/package/fast-check",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "fast-check 4.9.0 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-three-mesh-bvh",
+      "title": "npm three-mesh-bvh",
+      "canonicalUrl": "https://www.npmjs.com/package/three-mesh-bvh",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "0.9.11 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "npm-gltf-transform-cli",
+      "title": "npm @gltf-transform/cli",
+      "canonicalUrl": "https://www.npmjs.com/package/@gltf-transform/cli",
+      "publisher": "npm",
+      "sourceType": "package-registry",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "4.4.1 MIT"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "polyhaven-kloppenheim",
+      "title": "Kloppenheim 05 Pure Sky HDRI",
+      "canonicalUrl": "https://polyhaven.com/a/kloppenheim_05_puresky",
+      "publisher": "Poly Haven",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Exact asset page",
+        "CC0 library policy"
+      ],
+      "limitations": [
+        "Author field from site metadata"
+      ],
+      "localEvidencePath": "assets/source/vendor/ph-kloppenheim-05-puresky/SOURCE.md"
+    },
+    {
+      "id": "polyhaven-license",
+      "title": "Poly Haven License",
+      "canonicalUrl": "https://polyhaven.com/license",
+      "publisher": "Poly Haven",
+      "sourceType": "license",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "CC0 for assets"
+      ],
+      "limitations": null,
+      "localEvidencePath": null
+    },
+    {
+      "id": "acg-concrete040",
+      "title": "ambientCG Concrete040",
+      "canonicalUrl": "https://ambientcg.com/view?id=Concrete040",
+      "publisher": "ambientCG",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Exact asset page",
+        "CC0 commercial free"
+      ],
+      "limitations": null,
+      "localEvidencePath": "assets/source/vendor/acg-concrete-040/SOURCE.md"
+    },
+    {
+      "id": "acg-metal006",
+      "title": "ambientCG Metal006",
+      "canonicalUrl": "https://ambientcg.com/view?id=Metal006",
+      "publisher": "ambientCG",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Exact asset page"
+      ],
+      "limitations": null,
+      "localEvidencePath": "assets/source/vendor/acg-metal-006/SOURCE.md"
+    },
+    {
+      "id": "acg-wood043",
+      "title": "ambientCG WoodFloor043",
+      "canonicalUrl": "https://ambientcg.com/view?id=WoodFloor043",
+      "publisher": "ambientCG",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Exact asset page"
+      ],
+      "limitations": null,
+      "localEvidencePath": "assets/source/vendor/acg-wood-floor-043/SOURCE.md"
+    },
+    {
+      "id": "kenney-mini-skate",
+      "title": "Kenney Mini Skate",
+      "canonicalUrl": "https://kenney.nl/assets/mini-skate",
+      "publisher": "Kenney",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "CC0 license on page",
+        "20 models",
+        "download URL"
+      ],
+      "limitations": [
+        "Low-detail aesthetic"
+      ],
+      "localEvidencePath": "assets/source/vendor/kenney-mini-skate/SOURCE.md"
+    },
+    {
+      "id": "cc0-legalcode",
+      "title": "CC0 1.0 Legal Code",
+      "canonicalUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
+      "publisher": "Creative Commons",
+      "sourceType": "license",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Full CC0 text"
+      ],
+      "limitations": null,
+      "localEvidencePath": "assets/source/vendor/cc0-license-text/CC0-1.0-legalcode.txt"
+    },
+    {
+      "id": "freesound-655371",
+      "title": "Freesound grind rail candidate",
+      "canonicalUrl": "https://freesound.org/people/21100495/sounds/655371/",
+      "publisher": "Freesound",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "CC0 labeled on page for grind SFX candidate"
+      ],
+      "limitations": [
+        "Not downloaded this cycle"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "rawinput-touchpad-study",
+      "title": "emoacht RawInput.Touchpad",
+      "canonicalUrl": "https://github.com/emoacht/RawInput.Touchpad",
+      "publisher": "emoacht",
+      "sourceType": "open-source-repository",
+      "accessDate": "2026-07-10",
+      "classification": "secondary",
+      "supports": [
+        "C# Raw Input PTP study pattern MIT"
+      ],
+      "limitations": [
+        "Sample not library; 2021 tag"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "webview2-samples",
+      "title": "Microsoft WebView2Samples",
+      "canonicalUrl": "https://github.com/MicrosoftEdge/WebView2Samples",
+      "publisher": "Microsoft",
+      "sourceType": "open-source-repository",
+      "accessDate": "2026-07-10",
+      "classification": "secondary",
+      "supports": [
+        "Host-web messaging patterns"
+      ],
+      "limitations": [
+        "Sample terms; reimplement"
+      ],
+      "localEvidencePath": null
+    },
+    {
+      "id": "c1-baseline",
+      "title": "Cycle 1 foundation package",
+      "canonicalUrl": "file://preproduction/cycles/01-foundation/",
+      "publisher": "SlackPad 360",
+      "sourceType": "project-document",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Immutable baseline decisions and specs at 53b3f14"
+      ],
+      "limitations": [
+        "Contains known Rapier package-name mixing"
+      ],
+      "localEvidencePath": "preproduction/cycles/01-foundation/"
+    },
+    {
+      "id": "c2-audit",
+      "title": "Codex audit cycle 1 foundation",
+      "canonicalUrl": "file://preproduction/reviews/01-foundation-codex-audit.md",
+      "publisher": "SlackPad 360",
+      "sourceType": "project-review",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "P1/P2 findings for cycle 2",
+        "Rapier name ambiguity",
+        "asset shell",
+        "G1 empirical",
+        "autonomy gates",
+        "evidence levels"
+      ],
+      "limitations": null,
+      "localEvidencePath": "preproduction/reviews/01-foundation-codex-audit.md"
+    },
+    {
+      "id": "research-input-feasibility",
+      "title": "Research input feasibility",
+      "canonicalUrl": "file://research/input-feasibility.md",
+      "publisher": "SlackPad 360",
+      "sourceType": "project-research",
+      "accessDate": "2026-07-10",
+      "classification": "secondary",
+      "supports": [
+        "Layered capability stack",
+        "PTP field inventory"
+      ],
+      "limitations": [
+        "Not device proof"
+      ],
+      "localEvidencePath": "research/input-feasibility.md"
+    },
+    {
+      "id": "root-readme",
+      "title": "SlackPad 360 root README",
+      "canonicalUrl": "file://README.md",
+      "publisher": "SlackPad 360",
+      "sourceType": "project-document",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "Product direction: dual-foot trackpad, Three.js, Rapier, ContactFrame, native bridge"
+      ],
+      "limitations": [
+        "Does not prove hardware dual-plant"
+      ],
+      "localEvidencePath": "README.md"
+    },
+    {
+      "id": "oss-godot-skate",
+      "title": "3deric/Godot_Skate source inspection",
+      "canonicalUrl": "https://github.com/3deric/Godot_Skate",
+      "publisher": "3deric (Eric Schubert)",
+      "sourceType": "open-source-repository",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "MIT license",
+        "Kinematic skate states GRIND/LIP/PIPESNAP",
+        "Path3D rail grind entry via closest offset and tangent-projected path_vel",
+        "balance_angle bail > pi/4",
+        "Editor park mesh naming workflow",
+        "Not dual-foot trackpad input"
+      ],
+      "limitations": [
+        "Godot CharacterBody architecture not Rapier board body",
+        "Inspected main HEAD e4ff4687fa4f03a9cbe3a86d5f6e65607032cc9e as of access date"
+      ],
+      "localEvidencePath": null,
+      "inspectedCommit": "e4ff4687fa4f03a9cbe3a86d5f6e65607032cc9e",
+      "license": "MIT"
+    },
+    {
+      "id": "oss-gevp-vehicle",
+      "title": "DAShoe1/Godot-Easy-Vehicle-Physics source inspection",
+      "canonicalUrl": "https://github.com/DAShoe1/Godot-Easy-Vehicle-Physics",
+      "publisher": "DAShoe1",
+      "sourceType": "open-source-repository",
+      "accessDate": "2026-07-10",
+      "classification": "primary",
+      "supports": [
+        "MIT license",
+        "RayCast3D wheel suspension spring/damper forces at contact",
+        "Lateral/longitudinal tire force application",
+        "Assist knobs separate from suspension core",
+        "README recommends physics tick >= 120 with behavior sensitivity to Hz"
+      ],
+      "limitations": [
+        "Godot/Jolt vehicle domain not skate ContactFrame product",
+        "Inspected main HEAD c392257f54f6ca537dc10bc5badad0c060f18982"
+      ],
+      "localEvidencePath": null,
+      "inspectedCommit": "c392257f54f6ca537dc10bc5badad0c060f18982",
+      "license": "MIT"
+    }
+  ]
+}

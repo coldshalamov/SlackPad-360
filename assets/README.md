@@ -34,4 +34,13 @@ vendor/blender sources → optimize (meshopt/KTX2) → review → runtime/
 
 ```bash
 node preproduction/probes/validate-cycle-01.mjs
+node preproduction/probes/validate-cycle-02.mjs
 ```
+
+## Cycle 2 note
+
+Selected CC0 sources live under `source/vendor/<asset-id>/` with `LICENSE`,
+`SOURCE.md`, original binaries, and SHA-256 catalog entries. Previews are under
+`generated/previews/`. Kenney Mini Skate is blockout-only (not final look).
+Hero board and shoes remain bespoke gaps (Blender deferred). `runtime/` stays
+empty of shipping candidates until approved.
