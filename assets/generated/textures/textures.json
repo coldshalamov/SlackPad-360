@@ -1,0 +1,35 @@
+{
+  "metal": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\metal/Color.jpg",
+    "normal": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\metal/NormalGL.jpg",
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\metal\\MR.png"
+  },
+  "wood": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\wood/Color.jpg",
+    "normal": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\wood/NormalGL.jpg",
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\wood\\MR.png",
+    "ao": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\wood/AmbientOcclusion.jpg"
+  },
+  "concrete": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\concrete/Color.jpg",
+    "normal": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\concrete/NormalGL.jpg",
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\concrete\\MR.png",
+    "ao": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\concrete/AmbientOcclusion.jpg"
+  },
+  "rubber": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\rubber/Color.jpg",
+    "normal": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\rubber/NormalGL.jpg",
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\rubber\\MR.png"
+  },
+  "grip": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\grip\\baseColor.png",
+    "normal": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\grip\\NormalGL.png",
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\grip\\MR.png"
+  },
+  "deckGraphic": {
+    "baseColor": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\deck-graphic\\baseColor.png"
+  },
+  "urethane": {
+    "mr": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\textures\\urethane\\MR.png"
+  }
+}

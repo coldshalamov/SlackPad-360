@@ -1,0 +1,414 @@
+{
+  "generator": "SlackPad360-asset-pipeline",
+  "note": "Staged authored assets. NOT runtime-promoted. Awaiting shot-rubric review.",
+  "meshopt": "EXT_meshopt_compression (level medium)",
+  "ktx2": "deferred (no toktx on PATH)",
+  "assets": [
+    {
+      "id": "authored-hero-board",
+      "files": [
+        {
+          "file": "hero-board.lod0.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\hero-board.lod0.glb",
+          "lod": 0,
+          "sha256": "d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
+          "bytes": 4322828,
+          "tris": 9260,
+          "nodeTris": {
+            "Deck": 4864,
+            "GripTape": 1296,
+            "Truck_F": 1580,
+            "Truck_R": 1580,
+            "Axle_F": 72,
+            "Axle_R": 72,
+            "Wheel_FR": 1008,
+            "Wheel_FL": 1008,
+            "Wheel_RR": 1008,
+            "Wheel_RL": 1008,
+            "Hardware_Bolts": 336
+          },
+          "parts": [
+            "Deck",
+            "GripTape",
+            "Truck_F",
+            "Truck_R",
+            "Axle_F",
+            "Axle_R",
+            "Wheel_FR",
+            "Wheel_FL",
+            "Wheel_RR",
+            "Wheel_RL",
+            "Hardware_Bolts",
+            "Socket_NoseFoot",
+            "Socket_TailFoot",
+            "COL_Deck",
+            "COL_Truck_F",
+            "COL_Truck_R"
+          ],
+          "textureCount": 12,
+          "textures": [
+            {
+              "name": "Color.jpg",
+              "bytes": 649557,
+              "size": [
+                1024,
+                512
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 296445,
+              "size": [
+                1024,
+                512
+              ]
+            },
+            {
+              "name": "NormalGL.jpg",
+              "bytes": 408639,
+              "size": [
+                1024,
+                512
+              ]
+            },
+            {
+              "name": "AmbientOcclusion.jpg",
+              "bytes": 121220,
+              "size": [
+                1024,
+                512
+              ]
+            },
+            {
+              "name": "baseColor.png",
+              "bytes": 181552,
+              "size": [
+                1024,
+                256
+              ]
+            },
+            {
+              "name": "baseColor.png",
+              "bytes": 168942,
+              "size": [
+                512,
+                512
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 211126,
+              "size": [
+                512,
+                512
+              ]
+            },
+            {
+              "name": "NormalGL.png",
+              "bytes": 596353,
+              "size": [
+                512,
+                512
+              ]
+            },
+            {
+              "name": "Color.jpg",
+              "bytes": 669322,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 673625,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "NormalGL.jpg",
+              "bytes": 239449,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 23944,
+              "size": [
+                256,
+                256
+              ]
+            }
+          ]
+        },
+        {
+          "file": "hero-board.lod1.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\hero-board.lod1.glb",
+          "lod": 1,
+          "sha256": "c04f85f519a78e19a8b095b0daff09b5cf91add662b268429e676b9015e21b95",
+          "bytes": 43872,
+          "tris": 3512,
+          "nodeTris": {
+            "Deck": 1440,
+            "GripTape": 416,
+            "Truck_F": 848,
+            "Truck_R": 848,
+            "Axle_F": 72,
+            "Axle_R": 72,
+            "Wheel_FR": 448,
+            "Wheel_FL": 448,
+            "Wheel_RR": 448,
+            "Wheel_RL": 448,
+            "Hardware_Bolts": 288
+          },
+          "parts": [
+            "Deck",
+            "GripTape",
+            "Truck_F",
+            "Truck_R",
+            "Axle_F",
+            "Axle_R",
+            "Wheel_FR",
+            "Wheel_FL",
+            "Wheel_RR",
+            "Wheel_RL",
+            "Hardware_Bolts",
+            "Socket_NoseFoot",
+            "Socket_TailFoot"
+          ],
+          "textureCount": 0,
+          "textures": []
+        },
+        {
+          "file": "hero-board.lod2.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\hero-board.lod2.glb",
+          "lod": 2,
+          "sha256": "3f541494e44d592d6e20cb715c865cf93bbf1fd4d94b89e37163476a0d345fc0",
+          "bytes": 26104,
+          "tris": 1276,
+          "nodeTris": {
+            "Deck": 448,
+            "GripTape": 96,
+            "Truck_F": 252,
+            "Truck_R": 252,
+            "Axle_F": 72,
+            "Axle_R": 72,
+            "Wheel_FR": 120,
+            "Wheel_FL": 120,
+            "Wheel_RR": 120,
+            "Wheel_RL": 120,
+            "Hardware_Bolts": 288
+          },
+          "parts": [
+            "Deck",
+            "GripTape",
+            "Truck_F",
+            "Truck_R",
+            "Axle_F",
+            "Axle_R",
+            "Wheel_FR",
+            "Wheel_FL",
+            "Wheel_RR",
+            "Wheel_RL",
+            "Hardware_Bolts",
+            "Socket_NoseFoot",
+            "Socket_TailFoot"
+          ],
+          "textureCount": 0,
+          "textures": []
+        }
+      ]
+    },
+    {
+      "id": "authored-shoes",
+      "files": [
+        {
+          "file": "shoes.lod0.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\shoes.lod0.glb",
+          "lod": 0,
+          "sha256": "2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
+          "bytes": 4379016,
+          "tris": 7896,
+          "nodeTris": {
+            "Shoe_R": 3948,
+            "Shoe_L": 3948
+          },
+          "parts": [
+            "Shoe_R",
+            "Shoe_L"
+          ],
+          "textureCount": 3,
+          "textures": [
+            {
+              "name": "Color.jpg",
+              "bytes": 1150755,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 999821,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "NormalGL.jpg",
+              "bytes": 2145653,
+              "size": [
+                1024,
+                1024
+              ]
+            }
+          ]
+        },
+        {
+          "file": "shoes.lod1.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\shoes.lod1.glb",
+          "lod": 1,
+          "sha256": "fd56b2ae7a1ed12c0d3e254a01997da4931e7c1002c3b116a523564bb3569875",
+          "bytes": 46964,
+          "tris": 3040,
+          "nodeTris": {
+            "Shoe_R": 1520,
+            "Shoe_L": 1520
+          },
+          "parts": [
+            "Shoe_R",
+            "Shoe_L"
+          ],
+          "textureCount": 0,
+          "textures": []
+        },
+        {
+          "file": "shoes.lod2.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\shoes.lod2.glb",
+          "lod": 2,
+          "sha256": "feedd99afebd2a316fd4ac9c247d55ab19be108d5c0cd8cc3a46214be9ab5c4f",
+          "bytes": 15840,
+          "tris": 528,
+          "nodeTris": {
+            "Shoe_R": 264,
+            "Shoe_L": 264
+          },
+          "parts": [
+            "Shoe_R",
+            "Shoe_L"
+          ],
+          "textureCount": 0,
+          "textures": []
+        }
+      ]
+    },
+    {
+      "id": "authored-plaza-modules",
+      "files": [
+        {
+          "file": "plaza-modules.glb",
+          "path": "C:\\Users\\93rob\\Documents\\GitHub\\SlackPad 360\\assets\\generated\\authored\\staged\\plaza-modules.glb",
+          "lod": 0,
+          "sha256": "1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
+          "bytes": 6743160,
+          "tris": 1852,
+          "nodeTris": {
+            "flat_4x4": 52,
+            "ledge_2m": 372,
+            "rail_round_3m": 528,
+            "stairs_3set": 32,
+            "stairs_5set": 48,
+            "bank_2m": 12,
+            "qp_corner_2m": 148,
+            "curb_1m": 176,
+            "planter_1x2m": 176
+          },
+          "parts": [
+            "flat_4x4",
+            "flat_4x4_Col_0",
+            "ledge_2m",
+            "ledge_2m_Col_0",
+            "rail_round_3m",
+            "rail_round_3m_Col_0",
+            "stairs_3set",
+            "stairs_3set_Col_0",
+            "stairs_5set",
+            "stairs_5set_Col_0",
+            "bank_2m",
+            "bank_2m_Col_0",
+            "qp_corner_2m",
+            "qp_corner_2m_Col_0",
+            "curb_1m",
+            "curb_1m_Col_0",
+            "planter_1x2m",
+            "planter_1x2m_Col_0"
+          ],
+          "textureCount": 7,
+          "textures": [
+            {
+              "name": "Color.jpg",
+              "bytes": 1642761,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 874145,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "NormalGL.jpg",
+              "bytes": 1915770,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "AmbientOcclusion.jpg",
+              "bytes": 682468,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "Color.jpg",
+              "bytes": 669322,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "MR.png",
+              "bytes": 673625,
+              "size": [
+                1024,
+                1024
+              ]
+            },
+            {
+              "name": "NormalGL.jpg",
+              "bytes": 239449,
+              "size": [
+                1024,
+                1024
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

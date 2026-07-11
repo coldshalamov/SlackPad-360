@@ -471,6 +471,138 @@
       "previewPath": null,
       "rejectionReason": null,
       "notes": "Cycle 3 confirmed download requires Freesound login. Human-auth acquisition allowed later; no account scraping."
+    },
+    {
+      "id": "authored-hero-board",
+      "description": "Procedurally authored hero skateboard (deck, grip, trucks, wheels, sockets, colliders) — LOD0/1/2 GLBs, staged pending review",
+      "sourceUrl": null,
+      "exactAssetPage": null,
+      "author": "SlackPad procedural authoring pipeline (M8a)",
+      "license": "original-work (repo)",
+      "spdx": null,
+      "provenance": "procedural-authored",
+      "retrievalDate": "2026-07-11",
+      "originalFilename": null,
+      "checksum": "sha256:d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
+      "sha256": "d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
+      "files": [
+        {
+          "file": "assets/generated/authored/staged/hero-board.lod0.glb",
+          "sha256": "d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
+          "bytes": 4322828,
+          "lod": 0
+        },
+        {
+          "file": "assets/generated/authored/staged/hero-board.lod1.glb",
+          "sha256": "c04f85f519a78e19a8b095b0daff09b5cf91add662b268429e676b9015e21b95",
+          "bytes": 43872,
+          "lod": 1
+        },
+        {
+          "file": "assets/generated/authored/staged/hero-board.lod2.glb",
+          "sha256": "3f541494e44d592d6e20cb715c865cf93bbf1fd4d94b89e37163476a0d345fc0",
+          "bytes": 26104,
+          "lod": 2
+        }
+      ],
+      "allowedUses": [
+        "project-owned"
+      ],
+      "attributionRequirement": "n/a",
+      "modificationStatus": "created",
+      "runtimeIntent": "none",
+      "reviewStatus": "staged-pending-review",
+      "path": "assets/generated/authored/staged/hero-board.lod0.glb",
+      "localPath": "assets/generated/authored/staged/hero-board.lod0.glb",
+      "licenseSidecar": null,
+      "sourceSidecar": null,
+      "previewPath": null,
+      "rejectionReason": null,
+      "notes": "Procedurally authored via packages/asset-pipeline (IMPL-004: Blender unavailable). Staged under assets/generated/authored/staged/; NOT promoted to assets/runtime/. Awaiting shot-rubric visual review before promotion."
+    },
+    {
+      "id": "authored-shoes",
+      "description": "Procedurally authored unbranded skate shoes (L/R) — LOD0/1/2 GLBs, staged pending review",
+      "sourceUrl": null,
+      "exactAssetPage": null,
+      "author": "SlackPad procedural authoring pipeline (M8a)",
+      "license": "original-work (repo)",
+      "spdx": null,
+      "provenance": "procedural-authored",
+      "retrievalDate": "2026-07-11",
+      "originalFilename": null,
+      "checksum": "sha256:2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
+      "sha256": "2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
+      "files": [
+        {
+          "file": "assets/generated/authored/staged/shoes.lod0.glb",
+          "sha256": "2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
+          "bytes": 4379016,
+          "lod": 0
+        },
+        {
+          "file": "assets/generated/authored/staged/shoes.lod1.glb",
+          "sha256": "fd56b2ae7a1ed12c0d3e254a01997da4931e7c1002c3b116a523564bb3569875",
+          "bytes": 46964,
+          "lod": 1
+        },
+        {
+          "file": "assets/generated/authored/staged/shoes.lod2.glb",
+          "sha256": "feedd99afebd2a316fd4ac9c247d55ab19be108d5c0cd8cc3a46214be9ab5c4f",
+          "bytes": 15840,
+          "lod": 2
+        }
+      ],
+      "allowedUses": [
+        "project-owned"
+      ],
+      "attributionRequirement": "n/a",
+      "modificationStatus": "created",
+      "runtimeIntent": "none",
+      "reviewStatus": "staged-pending-review",
+      "path": "assets/generated/authored/staged/shoes.lod0.glb",
+      "localPath": "assets/generated/authored/staged/shoes.lod0.glb",
+      "licenseSidecar": null,
+      "sourceSidecar": null,
+      "previewPath": null,
+      "rejectionReason": null,
+      "notes": "Procedurally authored via packages/asset-pipeline (IMPL-004: Blender unavailable). Staged under assets/generated/authored/staged/; NOT promoted to assets/runtime/. Awaiting shot-rubric visual review before promotion."
+    },
+    {
+      "id": "authored-plaza-modules",
+      "description": "Procedurally authored modular plaza kit (flat, ledge, rail, stairs, bank, quarter-pipe, curb, planter) with named colliders — staged pending review",
+      "sourceUrl": null,
+      "exactAssetPage": null,
+      "author": "SlackPad procedural authoring pipeline (M8a)",
+      "license": "original-work (repo)",
+      "spdx": null,
+      "provenance": "procedural-authored",
+      "retrievalDate": "2026-07-11",
+      "originalFilename": null,
+      "checksum": "sha256:1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
+      "sha256": "1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
+      "files": [
+        {
+          "file": "assets/generated/authored/staged/plaza-modules.glb",
+          "sha256": "1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
+          "bytes": 6743160,
+          "lod": 0
+        }
+      ],
+      "allowedUses": [
+        "project-owned"
+      ],
+      "attributionRequirement": "n/a",
+      "modificationStatus": "created",
+      "runtimeIntent": "none",
+      "reviewStatus": "staged-pending-review",
+      "path": "assets/generated/authored/staged/plaza-modules.glb",
+      "localPath": "assets/generated/authored/staged/plaza-modules.glb",
+      "licenseSidecar": null,
+      "sourceSidecar": null,
+      "previewPath": null,
+      "rejectionReason": null,
+      "notes": "Procedurally authored via packages/asset-pipeline (IMPL-004: Blender unavailable). Staged under assets/generated/authored/staged/; NOT promoted to assets/runtime/. Awaiting shot-rubric visual review before promotion."
     }
   ]
 }

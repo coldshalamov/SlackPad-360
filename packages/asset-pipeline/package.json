@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Offline GLB authoring/optimization pipeline. Outputs promote to assets/runtime/ only with quality + license + format review evidence.",
+  "scripts": {
+    "build-assets": "node src/build-assets.mjs",
+    "validate-assets": "node src/validate.mjs",
+    "prep-textures": "node src/prep-textures.mjs"
+  },
   "dependencies": {
     "@gltf-transform/cli": "4.4.1",
     "@gltf-transform/core": "4.4.1"
