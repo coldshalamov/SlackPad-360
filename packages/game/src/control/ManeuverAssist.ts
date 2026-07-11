@@ -1,0 +1,144 @@
+/**
+ * ManeuverAssist — owns AssistState (final-physics-animation-camera-spec §3.1,
+ * field-exact) and translates GestureFSM decisions into clamped plain-data
+ * ManeuverCommands for SimWorld.applyManeuver (M4).
+ *
+ * Division of labor (final-input-and-trick-spec §2.1): the FSM owns discrete
+ * OCCURRENCE (labels + windows); this class owns INTENSITY → impulse scaling
+ * within clamps; Rapier owns continuous pose/collisions. Recognition never
+ * teleports the board to a trick pose — an under-popped or crooked pop just
+ * flies crooked (that IS the game).
+ *
+ * Pop (spec §3.2): J = (0, jY, 0), jY = jMin + q·(jMax − jMin) from prep
+ * quality, plus a pitch-bias torque impulse about board-right
+ * (pitchBias·pitchTorqueScale·jY — nose-up for ollie, mirrored nose-down for
+ * nollie). Applied ONCE at the pop step.
+ *
+ * Catch (spec §3.2): omega *= (1 − catchGain·assistScale[assistLevel]).
+ *
+ * Interrupts (§3.3): a bail event clears omegaTarget/impulseQueued and emits
+ * the bailStart command; physics continues (SimWorld only damps + later
+ * respawns via its internal game rule).
+ */
+
+import type { SimConfig, Vec3 } from '@slackpad/shared';
+import type { FsmResult } from './GestureFSM';
+import type { ManeuverCommand } from './ManeuverCommand';
+
+/** Spec §3.1 AssistState — exact fields. */
+export interface AssistState {
+  phase: 'none' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
+  label: string | null;
+  assistLevel: 0 | 1 | 2;
+  openStep: number;
+  expireStep: number;
+  omegaTarget: Vec3;
+  impulseQueued: Vec3;
+  catchGain: number;
+  grindAxis: Vec3 | null;
+  grindAnchor: Vec3 | null;
+  interruptible: true;
+}
+
+function zero(): Vec3 {
+  return { x: 0, y: 0, z: 0 };
+}
+
+export class ManeuverAssist {
+  private readonly state: AssistState;
+
+  constructor(
+    private readonly config: SimConfig,
+    assistLevel: 0 | 1 | 2,
+  ) {
+    this.state = {
+      phase: 'none',
+      label: null,
+      assistLevel,
+      openStep: 0,
+      expireStep: 0,
+      omegaTarget: zero(), // flips are M5; stays zero in M4
+      impulseQueued: zero(),
+      catchGain: 0,
+      grindAxis: null, // grind is M6
+      grindAnchor: null,
+      interruptible: true,
+    };
+  }
+
+  /** Read-only snapshot for HUD/tests (plain data copy). */
+  snapshot(): AssistState {
+    return {
+      ...this.state,
+      omegaTarget: { ...this.state.omegaTarget },
+      impulseQueued: { ...this.state.impulseQueued },
+      grindAxis: this.state.grindAxis ? { ...this.state.grindAxis } : null,
+      grindAnchor: this.state.grindAnchor ? { ...this.state.grindAnchor } : null,
+    };
+  }
+
+  /** Translate one FSM step result into SimWorld commands + AssistState. */
+  update(result: FsmResult, step: number): ManeuverCommand[] {
+    const cmds: ManeuverCommand[] = [];
+    const s = this.state;
+    const pop = this.config.pop;
+    const cat = this.config.catch;
+
+    // impulseQueued is a one-step latch: whatever was queued last step has
+    // been applied by SimWorld already.
+    s.impulseQueued = zero();
+
+    for (const ev of result.events) {
+      switch (ev.kind) {
+        case 'pop': {
+          const q = Math.max(0, Math.min(1, ev.q));
+          const jY = pop.jMin + q * (pop.jMax - pop.jMin);
+          // Negative pitch about board-right = nose UP (see SimWorld sign
+          // convention comment): ollie pops nose-up, nollie mirrors nose-down.
+          const sign = ev.label === 'ollie' ? -1 : 1;
+          const pitchTorqueImpulse = sign * pop.pitchBias * pop.pitchTorqueScale * jY;
+          cmds.push({ kind: 'pop', jY, pitchTorqueImpulse });
+          s.impulseQueued = { x: 0, y: jY, z: 0 };
+          break;
+        }
+        case 'catch': {
+          const gain = cat.catchGain * cat.assistScale[s.assistLevel];
+          s.catchGain = gain;
+          cmds.push({ kind: 'catch', angularFactor: 1 - gain });
+          break;
+        }
+        case 'land': {
+          if (ev.cleanliness === 'dirty') {
+            cmds.push({ kind: 'landScrub', scrubFraction: this.config.land.dirtySpeedScrub });
+          }
+          s.catchGain = 0;
+          break;
+        }
+        case 'bail': {
+          // Interrupt (§3.3): clear targets/queues; physics continues.
+          s.omegaTarget = zero();
+          s.impulseQueued = zero();
+          s.catchGain = 0;
+          cmds.push({ kind: 'bailStart' });
+          break;
+        }
+        case 'popFizzled': {
+          s.impulseQueued = zero();
+          break;
+        }
+      }
+    }
+
+    // Mirror the FSM into the spec-shaped state. FSM 'ground' maps to the
+    // spec's 'none' (AssistState has no ground phase — nothing is assisted).
+    s.phase = result.phase === 'ground' ? 'none' : result.phase;
+    s.label = result.label?.label ?? null;
+    if (result.label) {
+      s.openStep = result.label.openStep;
+      s.expireStep = result.label.expireStep;
+    }
+    void step;
+
+    return cmds;
+  }
+}

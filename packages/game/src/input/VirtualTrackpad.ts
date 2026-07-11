@@ -11,8 +11,15 @@
  *  - Hold SHIFT (with LMB) = foot B, mirrored across the pad vertical center, so
  *    dragging + rotating the pair steers. Hold CTRL to LOCK B for independent A.
  *  - SPACE = primary click (kick) while held.
+ *  - X = suspend foot A while held (M4: lifts A without dropping B, so nollie
+ *    prep is performable — releasing X replants A, which is also the catch).
  *  - S toggle stance · C capture padYawOffset from the current segment ·
- *    0/1/2 set assist level (all via ProfileStore, persisted to localStorage).
+ *    F swap feet · 0/1/2 set assist level (via ProfileStore, persisted).
+ *
+ * M4 ollie recipe (regular stance, A on the pad-right = tail, B = nose):
+ *   hold LMB right-of-center + SHIFT (cruise) → release SHIFT (nose lift) →
+ *   SPACE within the pop window → pop/air → re-press SHIFT after the apex
+ *   (replant near the socket) → catch → clean land. Nollie mirrors with X.
  *
  * Frames emit at ~120 Hz on a UI-side wall clock — legitimate here because this
  * is an input DEVICE; those timestamps simply become tPerfMs downstream.
@@ -45,6 +52,8 @@ export class VirtualTrackpad {
 
   private shiftHeld = false;
   private ctrlHeld = false;
+  /** X held: foot A is suspended (lifted) without dropping B — nollie prep. */
+  private aSuspended = false;
   private bId = 0;
   private bPos: Vec2 = { x: 0.5, y: 0.5 };
   private primary = false;
@@ -152,6 +161,9 @@ export class VirtualTrackpad {
       return;
     }
     switch (e.key.toLowerCase()) {
+      case 'x':
+        this.aSuspended = true; // lift foot A while held (nollie prep)
+        break;
       case 's':
         this.profile.toggleStance();
         break;
@@ -183,6 +195,10 @@ export class VirtualTrackpad {
       this.ctrlHeld = false;
     } else if (e.code === 'Space') {
       this.primary = false;
+    } else if (e.key.toLowerCase() === 'x') {
+      this.aSuspended = false;
+      // Re-plant is a fresh hardware contact: new id (real pads never reuse).
+      if (this.aDown) this.aId = this.nextContactId++;
     }
   };
 
@@ -196,7 +212,8 @@ export class VirtualTrackpad {
   // --- 120 Hz frame emission ----------------------------------------------
   private emit = (): void => {
     const contacts: ContactFrame['contacts'] = [];
-    if (this.aDown) contacts.push({ id: this.aId, tip: true, x: this.aPos.x, y: this.aPos.y, confidence: true });
+    if (this.aDown && !this.aSuspended)
+      contacts.push({ id: this.aId, tip: true, x: this.aPos.x, y: this.aPos.y, confidence: true });
     if (this.bId) contacts.push({ id: this.bId, tip: true, x: this.bPos.x, y: this.bPos.y, confidence: true });
     const frame: ContactFrame = {
       schemaVersion: 1,
@@ -248,7 +265,7 @@ export class VirtualTrackpad {
       PANEL_H - 22,
     );
     ctx.fillStyle = 'rgba(120,145,170,0.7)';
-    ctx.fillText('LMB=A · Shift=B · Ctrl=lockB · Space=click', 8, PANEL_H - 8);
+    ctx.fillText('LMB=A · Shift=B · X=liftA · Ctrl=lockB · Space=click', 8, PANEL_H - 8);
 
     // Segment line between the two feet.
     if (this.aDown && this.bId) {
@@ -259,7 +276,7 @@ export class VirtualTrackpad {
       ctx.lineTo(this.bPos.x * PANEL_W, this.bPos.y * PANEL_H);
       ctx.stroke();
     }
-    if (this.aDown) this.drawContact(this.aPos, '#4aa3ff', 'A');
+    if (this.aDown && !this.aSuspended) this.drawContact(this.aPos, '#4aa3ff', 'A');
     if (this.bId) this.drawContact(this.bPos, '#4ade80', 'B');
   }
 

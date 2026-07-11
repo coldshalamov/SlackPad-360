@@ -3,9 +3,11 @@
 
 import type { LevelBuilder } from './types';
 import { flatDev } from './flat-dev';
+import { testObstacle } from './test-obstacle';
 
 export const LEVELS: Readonly<Record<string, LevelBuilder>> = {
   'flat-dev': flatDev,
+  'test-obstacle': testObstacle,
 };
 
 export const DEFAULT_LEVEL_ID = 'flat-dev';

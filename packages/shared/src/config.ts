@@ -92,11 +92,42 @@ export interface FootTrackerConfig {
 }
 
 export interface PopConfig {
-  /** Vertical pop impulse range, N·s at board mass scale. */
+  /**
+   * Vertical pop impulse range, N·s at board mass scale (M4, hypothesis —
+   * retuned from the cycle-3 placeholders so pop heights land in the playable
+   * 0.25–0.8 m band at boardMass 2.4: v0 = jY/m, h ≈ v0²/2g).
+   * jY = jMin + q·(jMax − jMin) where q ∈ [0,1] is pop prep quality.
+   */
   jMin: number;
   jMax: number;
-  /** Pitch bias factor applied along boardRight × up during pop. */
+  /** Pitch bias factor applied to the pop pitch torque impulse (spec §3.2). */
   pitchBias: number;
+  /**
+   * Pitch torque impulse per N·s of vertical pop (M4, hypothesis): the pop's
+   * torque impulse about the board-right axis is
+   * `pitchBias · pitchTorqueScale · jY` (nose-up for ollie, mirrored for
+   * nollie). Tuned so an UNCAUGHT max-q ollie lands DIRTY (~30° cone) while a
+   * caught one lands CLEAN — catching matters, per the M4 feel goals.
+   */
+  pitchTorqueScale: number;
+  /** Hard clamp on the pop pitch torque impulse magnitude, N·m·s (SimWorld). */
+  pitchTorqueImpulseMax: number;
+  /**
+   * Prep-lift pad speed (calibrated units/s) at which the crispness component
+   * of pop quality saturates to 1 (M4, hypothesis). Lifts slower than
+   * `recognition.prepLiftSpeedMin` contribute zero crispness.
+   */
+  prepLiftSpeedForMaxQ: number;
+  /** Pop quality weights (sum ≤ 1): q = qTimingWeight·timing + qCrispWeight·crisp. */
+  qTimingWeight: number;
+  qCrispWeight: number;
+  /**
+   * Steps after the pop impulse within which the board must actually leave
+   * the ground; otherwise the pop "fizzles" (board blocked) and the FSM
+   * returns to ground with the label cancelled (M4, hypothesis — failure is
+   * never silent/undefined per final-input-and-trick-spec §7).
+   */
+  groundLeaveTimeoutSteps: number;
 }
 
 export interface FlipConfig {
@@ -118,6 +149,12 @@ export interface CatchConfig {
   assistScale: [number, number, number];
   /** Base catch gain multiplied by assistScale. */
   catchGain: number;
+  /**
+   * When true (M4 default, hypothesis) the catch window opens only after the
+   * vertical apex (lv.y ≤ 0); a replant during the ascent does not catch.
+   * When false any mid-air replant into a catch volume catches.
+   */
+  apexOnly: boolean;
 }
 
 export interface LandConfig {
@@ -125,6 +162,36 @@ export interface LandConfig {
   thetaCleanDeg: number;
   /** Dirty landing limit, deg (~45); beyond is bail. */
   thetaDirtyDeg: number;
+  /**
+   * Fraction of horizontal speed scrubbed on a DIRTY landing (M4, hypothesis).
+   * Applied by SimWorld as an opposing impulse (−mass·scrub·v_horizontal),
+   * force/impulse-based — never a velocity write.
+   */
+  dirtySpeedScrub: number;
+}
+
+/** Air-phase guards (M4). */
+export interface AirConfig {
+  /**
+   * Max sim steps a maneuver may stay airborne before it bails with reason
+   * 'timeout' (M4, hypothesis ~4 s — falling-out-of-world guard).
+   */
+  timeoutSteps: number;
+}
+
+/** Bail state tuning (M4). */
+export interface BailConfig {
+  /**
+   * Steps the bail state lasts before the deterministic checkpoint respawn
+   * (M4, hypothesis 1.5 s — long enough to read the failure).
+   */
+  recoverSteps: number;
+  /**
+   * Rigid-body linear+angular damping applied while bailed (M4, hypothesis).
+   * Damping-parameter change integrated by the engine — not a velocity write.
+   * Restored to the physics defaults on respawn.
+   */
+  dampingFactor: number;
 }
 
 export interface GrindConfig {
@@ -161,6 +228,17 @@ export interface PhysicsConfig {
   rollingFriction: number;
   /** Collision impulse above which maneuvers interrupt (T_col). */
   interruptCollisionImpulse: number;
+  /**
+   * Steps over which airborne contact impulses accumulate toward the
+   * interrupt threshold (M4, hypothesis). The contact solver spreads a sharp
+   * impact across ~2-3 steps at 60 Hz (measured: a 5.9 m/s wall crash reports
+   * ~6 N·s on each of 3 consecutive steps, while a dirty-landing tail strike
+   * is a single ~5.8 N·s step), so a windowed SUM separates "hard crash"
+   * (~18 N·s > T_col) from "scrappy landing" (~6 N·s < T_col) where a
+   * per-step magnitude cannot. The window resets whenever the board is
+   * grounded and at each pop.
+   */
+  interruptWindowSteps: number;
 
   // --- Model A rigid body construction (M2) -----------------------------
   /**
@@ -306,6 +384,8 @@ export interface SimConfig {
   flip: FlipConfig;
   catch: CatchConfig;
   land: LandConfig;
+  air: AirConfig;
+  bail: BailConfig;
   grind: GrindConfig;
   physics: PhysicsConfig;
   locomotion: LocomotionConfig;
@@ -338,9 +418,15 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     recenterRateHz: 1.5,
   },
   pop: {
-    jMin: 2.2,
-    jMax: 4.6,
+    jMin: 5.8,
+    jMax: 9.6,
     pitchBias: 0.35,
+    pitchTorqueScale: 0.064,
+    pitchTorqueImpulseMax: 0.5,
+    prepLiftSpeedForMaxQ: 2.0,
+    qTimingWeight: 0.5,
+    qCrispWeight: 0.5,
+    groundLeaveTimeoutSteps: 12,
   },
   flip: {
     omegaFlipMax: 15,
@@ -353,10 +439,19 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     windowMs: 420,
     assistScale: [0.35, 0.55, 0.75],
     catchGain: 1.0,
+    apexOnly: true,
   },
   land: {
     thetaCleanDeg: 25,
     thetaDirtyDeg: 45,
+    dirtySpeedScrub: 0.35,
+  },
+  air: {
+    timeoutSteps: 240,
+  },
+  bail: {
+    recoverSteps: 90,
+    dampingFactor: 6.0,
   },
   grind: {
     vMin: 0.8,
@@ -380,6 +475,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     steerYawRateMax: 2.6,
     rollingFriction: 0.18,
     interruptCollisionImpulse: 8.0,
+    interruptWindowSteps: 3,
     deckThickness: 0.05,
     truckHalfExtents: { x: 0.05, y: 0.03, z: 0.03 },
     truckInsetZ: 0.215,

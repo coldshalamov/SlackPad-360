@@ -13,11 +13,12 @@
  */
 
 import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import type { RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
+import type { EventQueue, RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
 import type { Quat, SimConfig, Vec3 } from '@slackpad/shared';
 import { getLevelBuilder } from './levels/index';
 import type { Rng } from './levels/types';
 import type { GroundCommand } from '../control/GroundCommand';
+import type { ManeuverCommand } from '../control/ManeuverCommand';
 
 /** Full rigid-body observation (position, orientation, linear/angular velocity). */
 export interface BoardPose {
@@ -82,9 +83,18 @@ export class SimWorld {
   // runtime from anything holding a SimWorld (G6 anti-cheat hardening).
   #world: World | null = null;
   #board: RigidBody | null = null;
+  #eventQueue: EventQueue | null = null;
   private stepCount = 0;
   private seed = 0;
   private levelId = '';
+
+  // --- M4 maneuver/bail state (all #private: game rules, not agent API) ----
+  /** Level spawn marker captured at build time (deterministic per seed). */
+  #spawn: Vec3 = zero();
+  /** Bail-respawn countdown; null when not bailing (the respawn game rule). */
+  #bailStepsLeft: number | null = null;
+  /** Max board contact impulse (N·s) observed during the LAST step(). */
+  #lastContactImpulse = 0;
 
   /** Pose snapshots for render interpolation (previous + current step). */
   private prevPose: RenderPose = { p: zero(), q: { x: 0, y: 0, z: 0, w: 1 } };
@@ -103,11 +113,7 @@ export class SimWorld {
    */
   async reset(seed: number, levelId: string): Promise<void> {
     await ensureRapier();
-    if (this.#world) {
-      this.#world.free();
-      this.#world = null;
-      this.#board = null;
-    }
+    this.free();
 
     const phys = this.config.physics;
     const world = new RAPIER.World(phys.gravity);
@@ -118,6 +124,10 @@ export class SimWorld {
 
     this.#world = world;
     this.#board = handle.board;
+    this.#eventQueue = new RAPIER.EventQueue(true);
+    this.#spawn = { ...handle.spawn };
+    this.#bailStepsLeft = null;
+    this.#lastContactImpulse = 0;
     this.stepCount = 0;
     this.seed = seed;
     this.levelId = levelId;
@@ -130,10 +140,48 @@ export class SimWorld {
   /** Advance exactly one fixed step and refresh pose snapshots. */
   step(): void {
     const world = this.requireWorld();
-    world.step();
+    const queue = this.#eventQueue;
+    if (queue) {
+      world.step(queue);
+      // Observe (never alter) collision strength: max contact force over the
+      // step, converted to an impulse magnitude (N·s) at the fixed timestep so
+      // the FSM compares directly against physics.interruptCollisionImpulse.
+      let maxForce = 0;
+      queue.drainContactForceEvents((ev) => {
+        const f = ev.maxForceMagnitude();
+        if (Number.isFinite(f) && f > maxForce) maxForce = f;
+      });
+      this.#lastContactImpulse = maxForce / this.config.physics.hz;
+    } else {
+      world.step();
+      this.#lastContactImpulse = 0;
+    }
     this.stepCount += 1;
+
+    // --- Bail-respawn game rule (M4). Internal + deterministic: the countdown
+    // starts when applyManeuver receives 'bailStart' and NOTHING external can
+    // trigger or retime the respawn. This is the one sanctioned pose write —
+    // the checkpoint respawn of final-input-and-trick-spec §7.
+    if (this.#bailStepsLeft !== null) {
+      this.#bailStepsLeft -= 1;
+      if (this.#bailStepsLeft <= 0) this.#respawn();
+    }
+
     this.prevPose = this.currPose;
     this.currPose = this.readRenderPose();
+  }
+
+  /** Deterministic checkpoint respawn to the level spawn marker (bail rule). */
+  #respawn(): void {
+    const body = this.requireBoard();
+    const phys = this.config.physics;
+    body.setTranslation({ ...this.#spawn }, true);
+    body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    body.setLinearDamping(phys.linearDamping);
+    body.setAngularDamping(phys.angularDamping);
+    this.#bailStepsLeft = null;
   }
 
   getStep(): number {
@@ -264,6 +312,82 @@ export class SimWorld {
   }
 
   /**
+   * Max board contact impulse (N·s) observed during the last step(). Narrow
+   * observational query for the maneuver interrupt rule (final-physics §3.3);
+   * never exposes the body or the event queue.
+   */
+  lastContactImpulseMagnitude(): number {
+    return this.#lastContactImpulse;
+  }
+
+  /**
+   * Apply a ManeuverCommand (M4). Exactly the applyGroundForces pattern: the
+   * ONLY place maneuver intents touch the body. Every component is validated +
+   * clamped from config; everything is force/impulse-based. The single
+   * exception is the catch angular damping, which the spec defines AS an
+   * omega scaling (final-physics §3.2) — implemented as an angvel scale. There
+   * are NO pose writes here; the bail respawn is an internal countdown game
+   * rule (see step()/#respawn), not a commandable action.
+   *
+   * Must be called BEFORE step() so impulses integrate this tick.
+   */
+  applyManeuver(cmd: ManeuverCommand): void {
+    const body = this.requireBoard();
+    const phys = this.config.physics;
+    const pop = this.config.pop;
+
+    const q = body.rotation();
+    const lv = body.linvel();
+    const av = body.angvel();
+    // Bail out on any non-finite body state rather than propagate NaN.
+    for (const v of [lv.x, lv.y, lv.z, av.x, av.y, av.z, q.x, q.y, q.z, q.w]) {
+      if (!Number.isFinite(v)) return;
+    }
+
+    switch (cmd.kind) {
+      case 'pop': {
+        const jY = clampNum(cmd.jY, 0, pop.jMax);
+        body.applyImpulse({ x: 0, y: jY, z: 0 }, true);
+        // Pitch torque impulse about the world-space board-right axis. Sign
+        // convention (right-handed, nose = local +Z, right = local +X): a
+        // NEGATIVE impulse about board-right pitches the nose UP.
+        const pitch = clampNum(
+          cmd.pitchTorqueImpulse,
+          -pop.pitchTorqueImpulseMax,
+          pop.pitchTorqueImpulseMax,
+        );
+        if (pitch !== 0) {
+          const right = quatRotate(q, 1, 0, 0);
+          body.applyTorqueImpulse(
+            { x: right.x * pitch, y: right.y * pitch, z: right.z * pitch },
+            true,
+          );
+        }
+        break;
+      }
+      case 'catch': {
+        // The spec's own equation: omega *= (1 - catchGain * assistScale).
+        const factor = clampNum(cmd.angularFactor, 0, 1);
+        body.setAngvel({ x: av.x * factor, y: av.y * factor, z: av.z * factor }, true);
+        break;
+      }
+      case 'landScrub': {
+        const scrub = clampNum(cmd.scrubFraction, 0, 0.9);
+        const m = phys.boardMass;
+        body.applyImpulse({ x: -m * scrub * lv.x, y: 0, z: -m * scrub * lv.z }, true);
+        break;
+      }
+      case 'bailStart': {
+        if (this.#bailStepsLeft !== null) break; // already bailing — idempotent
+        body.setLinearDamping(this.config.bail.dampingFactor);
+        body.setAngularDamping(this.config.bail.dampingFactor);
+        this.#bailStepsLeft = Math.max(1, Math.floor(this.config.bail.recoverSteps));
+        break;
+      }
+    }
+  }
+
+  /**
    * Render pose interpolated between the previous and current step by alpha in
    * [0, 1]. Renderer only — never feeds back into the sim.
    */
@@ -280,6 +404,10 @@ export class SimWorld {
   }
 
   free(): void {
+    if (this.#eventQueue) {
+      this.#eventQueue.free();
+      this.#eventQueue = null;
+    }
     if (this.#world) {
       this.#world.free();
       this.#world = null;

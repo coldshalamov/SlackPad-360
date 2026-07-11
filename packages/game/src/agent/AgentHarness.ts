@@ -8,8 +8,8 @@
  * runtime (ECMAScript #private fields, not TypeScript-only privacy).
  *
  * Step orchestration (the M2-chosen frame-consumption policy): each step drains
- * ALL pending ordered frames, runs the recognizer hook (a no-op placeholder in
- * M2 — recognition lands in M4/M5), steps the world once, then snapshots.
+ * ALL pending ordered frames, runs the recognizer/assist pipeline (M3 ground
+ * locomotion + M4 maneuver FSM), steps the world once, then snapshots.
  *
  * Determinism note (G4): frames are canonicalized (quantized + rebuilt) at
  * InputHub intake, so the sim consumes bit-identical values live and on
@@ -43,6 +43,9 @@ import { Telemetry } from '../telemetry/Telemetry';
 import { FootTracker } from '../input/FootTracker';
 import type { FeetState } from '../input/FootTracker';
 import { BoardController } from '../control/BoardController';
+import { KickArbiter } from '../control/KickArbiter';
+import { GestureFSM } from '../control/GestureFSM';
+import { ManeuverAssist } from '../control/ManeuverAssist';
 import { DEFAULT_LEVEL_ID } from '../sim/levels/index';
 
 /** Reads the current InputProfile snapshot on each reset (dev ProfileStore). */
@@ -91,14 +94,18 @@ export class AgentHarness {
   #telemetry: Telemetry;
   #config: SimConfig;
 
-  // M3 recognizer/controller pipeline (runs inside #advance, single-step auth).
+  // M3/M4 recognizer/controller pipeline (runs inside #advance, single-step
+  // auth): FootTracker → KickArbiter → GestureFSM → ManeuverAssist +
+  // BoardController → SimWorld command application.
   #profileProvider: ProfileProvider | null;
   #profile: InputProfile;
   #footTracker: FootTracker;
   #boardController: BoardController;
+  #kickArbiter: KickArbiter;
+  #fsm: GestureFSM;
+  #assist: ManeuverAssist;
   #feetState: FeetState | null = null;
 
-  // Placeholder maneuver/observation state (recognition + assist arrive later).
   #assistLevel: 0 | 1 | 2;
   #lastInputSource: ContactFrameSource | null = null;
 
@@ -125,6 +132,9 @@ export class AgentHarness {
     this.#assistLevel = this.#profile.assistLevel;
     this.#footTracker = this.#makeFootTracker();
     this.#boardController = this.#makeBoardController();
+    this.#kickArbiter = this.#makeKickArbiter();
+    this.#fsm = this.#makeGestureFsm();
+    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel);
   }
 
   /** Deep-frozen private copy of the current profile — trackers only read it. */
@@ -151,6 +161,14 @@ export class AgentHarness {
     );
   }
 
+  #makeKickArbiter(): KickArbiter {
+    return new KickArbiter(this.#config, this.#profile, this.#telemetry);
+  }
+
+  #makeGestureFsm(): GestureFSM {
+    return new GestureFSM(this.#config, this.#assistLevel, this.#telemetry);
+  }
+
   /** One-time engine init (idempotent). reset() also awaits this. */
   init(): Promise<void> {
     return this.#world.init();
@@ -174,6 +192,9 @@ export class AgentHarness {
     this.#assistLevel = this.#profile.assistLevel;
     this.#footTracker = this.#makeFootTracker();
     this.#boardController = this.#makeBoardController();
+    this.#kickArbiter = this.#makeKickArbiter();
+    this.#fsm = this.#makeGestureFsm();
+    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel);
     this.#feetState = null;
     this.#telemetry.log({ type: 'reset', step: 0, seed, levelId });
   }
@@ -210,16 +231,16 @@ export class AgentHarness {
         lv: { x: pose.lv.x, y: pose.lv.y, z: pose.lv.z },
         av: { x: pose.av.x, y: pose.av.y, z: pose.av.z },
       },
-      phase: 'none',
-      label: null,
+      phase: this.#fsm.phase,
+      label: this.#fsm.label?.label ?? null,
       assistLevel: this.#assistLevel,
       feet: {
         nose: this.#footObservation('nose'),
         tail: this.#footObservation('tail'),
       },
       grind: null,
-      score: 0,
-      lastFailReason: null,
+      score: 0, // M9 owns scoring; trickCompleted telemetry feeds it later
+      lastFailReason: this.#fsm.lastFailReason,
       inputSource: this.#lastInputSource,
     };
   }
@@ -356,10 +377,7 @@ export class AgentHarness {
       this.#advance();
       const ns = this.#world.getStep();
       if (ns % every === 0) {
-        out.push({
-          step: ns,
-          hash: checkpointHash(this.#world.boardPose(), 'none', this.#inputDigest),
-        });
+        out.push({ step: ns, hash: this.#checkpointHash() });
       }
     }
     return out;
@@ -421,7 +439,7 @@ export class AgentHarness {
 
     const newStep = this.#world.getStep();
     if (this.#recording && newStep % this.#config.runtime.replay.checkpointEverySteps === 0) {
-      const hash = checkpointHash(this.#world.boardPose(), 'none', this.#inputDigest);
+      const hash = this.#checkpointHash();
       this.#recordedCheckpoints.push({ step: newStep, hash });
       this.#telemetry.log({ type: 'checkpoint', step: newStep, hash });
     }
@@ -430,11 +448,27 @@ export class AgentHarness {
   }
 
   /**
-   * The M3 per-step recognizer/controller pipeline, run between drain and
-   * world.step() (single-step authority): FootTracker.update(frames) →
-   * BoardController.applyGroundControl(...) → SimWorld.applyGroundForces(cmd).
-   * Impulses are applied before the step so they integrate this tick. It never
-   * writes board pose directly — SimWorld clamps every command component.
+   * THE checkpoint hash (M4): pose + the REAL maneuver phase + input digest.
+   * One helper shared by #advance (record) and replay() so the two paths can
+   * never diverge on what goes into the hash.
+   */
+  #checkpointHash(): string {
+    return checkpointHash(this.#world.boardPose(), this.#fsm.phase, this.#inputDigest);
+  }
+
+  /**
+   * The per-step recognizer/controller pipeline (M3 ground + M4 maneuvers),
+   * run between drain and world.step() (single-step authority):
+   *
+   *   FootTracker.update(frames)                 — feet + click attribution
+   *   → KickArbiter                              — push-vs-ollie in ONE place
+   *   → GestureFSM                               — phase machine + labels
+   *   → ManeuverAssist                           — clamped maneuver commands
+   *   → BoardController (ground phase only)      — locomotion command
+   *   → SimWorld.applyGroundForces/applyManeuver — clamps + impulses
+   *
+   * Impulses apply before the step so they integrate this tick. Nothing here
+   * writes board pose — SimWorld validates and clamps every command component.
    */
   #runRecognizer(frames: ContactFrame[]): void {
     if (frames.length > 0) {
@@ -445,8 +479,37 @@ export class AgentHarness {
     const feet = this.#footTracker.update(frames, step);
     const kicks = this.#footTracker.drainKicks();
     const grounded = this.#world.isGrounded();
-    const cmd = this.#boardController.applyGroundControl(feet, kicks, grounded, step);
+    const pose = this.#world.boardPose();
+    const contactImpulse = this.#world.lastContactImpulseMagnitude();
+    // Impact observability (deterministic — derived from sim state only).
+    // Normal rolling stays well under 0.5 N·s per step; landings + wall hits
+    // show up here, which is what interrupt tuning reads.
+    if (contactImpulse > 0.5) {
+      this.#telemetry.log({ type: 'contactImpulse', step, impulse: contactImpulse, grounded });
+    }
+
+    // Arbitrate kicks against the PREVIOUS step's phase (the FSM gate): pop
+    // paths open only from riding-on-ground recognition.
+    const arb = this.#kickArbiter.update(feet, kicks, this.#fsm.phase === 'ground', step);
+
+    const fsmResult = this.#fsm.update({
+      feet,
+      pops: arb.pops,
+      grounded,
+      pose,
+      contactImpulse,
+      step,
+    });
+
+    const maneuverCmds = this.#assist.update(fsmResult, step);
+
+    // Ground locomotion runs only while riding on the ground — no drive/steer
+    // during pop/air/catch/bail (kicks the arbiter released come through here).
+    const groundControlActive = grounded && fsmResult.phase === 'ground';
+    const cmd = this.#boardController.applyGroundControl(feet, arb.locomotion, groundControlActive, step);
     this.#world.applyGroundForces(cmd);
+    for (const mc of maneuverCmds) this.#world.applyManeuver(mc);
+
     this.#feetState = feet;
   }
 

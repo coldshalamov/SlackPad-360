@@ -80,16 +80,23 @@ describe('ground locomotion (b) push pulses', () => {
       h.step(1);
     }
     const before = hSpeed(h);
-    // Kick with both planted (rising edge on primary) → push pulse.
+    // Kick with both planted (rising edge on primary) → push pulse. Since M4
+    // the KickArbiter holds a both-planted kick for popLookaheadMs (the
+    // push-vs-ollie forgiveness window) before releasing it as a push, so keep
+    // both feet planted through the window and measure after it resolves.
     h.injectContactFrame(plantFrame(210, REST, true));
     h.step(1);
+    for (let i = 0; i < 6; i++) {
+      h.injectContactFrame(plantFrame(211 + i, REST));
+      h.step(1);
+    }
     const after = hSpeed(h);
     const dv = DEFAULT_SIM_CONFIG.physics.pushImpulse / DEFAULT_SIM_CONFIG.physics.boardMass;
     expect(after - before).toBeGreaterThan(dv * 0.6); // ~1.2 m/s, minus a little drag
     expect(after - before).toBeLessThan(dv * 1.2);
 
     // Hammer pushes past the cap: speed climbs but never exceeds maxGroundSpeed.
-    let step = 211;
+    let step = 217;
     let primary = false;
     for (let p = 0; p < 12; p++) {
       // toggle primary to make repeated rising edges, spaced by the cooldown

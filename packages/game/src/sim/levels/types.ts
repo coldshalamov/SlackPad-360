@@ -15,6 +15,12 @@ export type RapierModule = (typeof import('@dimforge/rapier3d-deterministic-comp
 export interface LevelHandle {
   /** The single dynamic board rigid body (Model A). */
   board: RigidBody;
+  /**
+   * Spawn marker (M4): the exact (seed-jittered) board spawn translation. The
+   * deterministic bail-respawn game rule inside SimWorld returns the board
+   * here — it is level data, never an agent-reachable API.
+   */
+  spawn: { x: number; y: number; z: number };
 }
 
 export type LevelBuilder = (

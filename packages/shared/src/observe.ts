@@ -13,7 +13,13 @@ export interface Quat {
   w: number;
 }
 
-export type ManeuverPhase = 'none' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
+/**
+ * Maneuver phase visible to the agent. 'ground' (riding on the ground) is an
+ * M4 addition for observability; the spec AssistState phase enum maps it to
+ * 'none' (nothing is assisted on plain ground). 'none' = not riding (spawn
+ * drop, post-bail respawn fall).
+ */
+export type ManeuverPhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
 
 export type GrindFamily = 'fifty-fifty' | 'boardslide';
 

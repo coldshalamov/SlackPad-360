@@ -27,6 +27,18 @@ export type TelemetryEvent =
   | { type: 'recenter'; reason: string }
   | { type: 'groundControl'; step: number; drive: number; yaw: number; bothPlanted: boolean }
   | { type: 'profileChanged'; patch: Record<string, unknown> }
+  // --- M4 maneuver (pop/air/catch/land/bail) events -----------------------
+  | { type: 'phaseChanged'; step: number; from: string; to: string }
+  | { type: 'popRecognized'; step: number; label: 'ollie' | 'nollie'; q: number; confidence: number }
+  | { type: 'popFizzled'; step: number; label: string }
+  | { type: 'kickArbitrated'; step: number; decision: string; mask: string }
+  | { type: 'catch'; step: number; foot: 'nose' | 'tail' | 'both'; factor: number }
+  | { type: 'trickCompleted'; step: number; label: string; cleanliness: 'clean' | 'dirty'; thetaDeg: number }
+  | { type: 'bail'; step: number; reason: string }
+  | { type: 'respawn'; step: number }
+  | { type: 'contactImpulse'; step: number; impulse: number; grounded: boolean }
+  // M5 extension point: free-foot air gestures are routed + logged only in M4.
+  | { type: 'airGesture'; step: number; foot: 'nose' | 'tail'; kind: string; speed: number }
   // Escape hatch for ad-hoc diagnostic events (never used for gameplay logic).
   | { type: string; [key: string]: unknown };
 
