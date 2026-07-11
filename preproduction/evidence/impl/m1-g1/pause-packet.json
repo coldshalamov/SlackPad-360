@@ -1,0 +1,28 @@
+{
+  "gate": "G1",
+  "why": "dual-foot hardware truth requires a human run on the target laptop; free dual-plant, click latency, and OS-gesture hijack cannot be proven by code or synthetic frames (final-observability §1: never claim G1 from synthetic ContactFrame tests alone).",
+  "user_actions": [
+    "1. Build the host: from repo root run  dotnet build \"host/SlackPad.sln\" -c Release",
+    "2. Launch the spike:  dotnet run --project \"host/SlackPad.Host\" -c Release   (or run host/SlackPad.Host/bin/Release/net10.0-windows/SlackPad.Host.exe)",
+    "3. Confirm the adapter status reads 'raw [supported]'. If it shows DEGRADED, the machine exposed no PTP digitizer collection (0x0D/0x05) — check Precision Touchpad drivers.",
+    "4. Select the Raw Input (P0-B) adapter (default). Click 'Start Recording'.",
+    "5. Follow the on-screen T1-T11 gesture script, ticking each row as you complete it. Critical rows: T2 (dual free plant HELD >= 60 seconds with no OS desktop pan), T5 (staggered L-then-R lifts), T7/T8 (physical clicks with one/two fingers down).",
+    "6. Each time you physically press-click the pad for T7/T8/T9, press the 'Register Click Attempt (+1)' button so the click-edge denominator is correct.",
+    "7. Keep the spike window focused during T2 and T11. If focus is lost the OS-hijack counter increments (that is the signal we are testing).",
+    "8. Click 'Stop Recording'. The app writes traces/<adapter>-<timestamp>.jsonl and metrics.json into preproduction/evidence/impl/m1-g1/. The live readout shows the computed status.",
+    "9. (Optional) Re-run steps 4-8 with the Win11 Pointer (P0-A) adapter selected to co-spike the pointer path.",
+    "10. Confirm metrics.json exists with a 'status' field and at least one traces/*.jsonl file was written."
+  ],
+  "continue_when": "metrics.json status == 'accept' for at least one adapter (dual_plant_stable_s >= 60, click edges >= 90% of attempts on T7/T8, independent staggered lifts on T5, id thrash <= 2/min while held, zero OS hijack during focused T2).",
+  "artifacts_needed": [
+    "metrics.json",
+    "traces/*.jsonl"
+  ],
+  "resume_commit": "<fill at commit>",
+  "next_milestone": "M6 G2 prep / M8 content unlock",
+  "notes": [
+    "The host never fabricates hardware evidence: metrics.json is written ONLY at the end of an actual recording session with >=1 frame. Unit tests use fixtures under host/SlackPad.Host.Tests/fixtures/ and write only to temp dirs.",
+    "If the Raw path rejects but Pointer accepts, ship Pointer primary (reopen the C2-INPUT-PRIMARY-API ranking). If both reject on this device, try the alternate PTP laptop list before any product pivot (input-platform spec §3.6 Fallback).",
+    "WebView2 is optional: if the Evergreen runtime is missing the adapters and trace/metrics writing still work; the WebView2 status label reports the degradation."
+  ]
+}
