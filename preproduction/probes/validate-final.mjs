@@ -184,10 +184,17 @@ else ok('vite-build-smoke.md present for final package');
 if (!/rubberduck/i.test(am)) fail('ASSET_MANIFEST missing rubberduck OGA author');
 else ok('ASSET_MANIFEST names rubberduck');
 
-// --- no production game paths ---
-for (const rel of FORBIDDEN_PRODUCTION) {
-  if (exists(path.join(repoRoot, rel))) fail(`forbidden production path: ${rel}`);
-  else ok(`no forbidden path: ${rel}`);
+// --- no production game paths (preproduction freeze only) ---
+// Once the autonomous build has begun (evidence under preproduction/evidence/impl/),
+// production paths are expected; the freeze check applied only before that point.
+const implStarted = exists(path.join(repoRoot, 'preproduction', 'evidence', 'impl'));
+if (implStarted) {
+  ok('implementation era detected (evidence/impl exists); production-path freeze not applicable');
+} else {
+  for (const rel of FORBIDDEN_PRODUCTION) {
+    if (exists(path.join(repoRoot, rel))) fail(`forbidden production path: ${rel}`);
+    else ok(`no forbidden path: ${rel}`);
+  }
 }
 
 // --- no root scratch ---

@@ -49,3 +49,24 @@ positions, and independent lift events at a useful sampling rate. Then build one
 small skate area with acceleration, steering, ollie, nollie, flip rotation,
 landing, and one grindable rail. Visual polish and a larger level follow only
 after the controls are enjoyable under recorded playtests.
+
+## Development setup
+
+Prerequisites: Node `^20.19.0 || >=22.12.0` (22 LTS recommended) and the
+.NET 10 SDK for the Windows host. Pinned versions live in
+`preproduction/cycles/03-production/dependency-lock.json`.
+
+```
+npm install                # workspaces: packages/shared, packages/game, packages/asset-pipeline
+npm run dev                # Vite dev server for the game (browser dev mode, synthetic input)
+npm test                   # Vitest unit/golden suites
+npm run typecheck          # tsc project references
+npm run ci:smoke           # validators + tests + production build (+ host build when SDK present)
+dotnet build host/SlackPad.sln   # native WebView2 host (net10.0-windows)
+```
+
+Repository layout: `packages/shared` (ContactFrame v1 + replay + config
+contracts), `packages/game` (Three.js + Rapier game), `packages/asset-pipeline`
+(offline GLB authoring/optimization), `host/` (C# WebView2 + touchpad
+adapters), `preproduction/` (planning — read-only), `research/` (schemas and
+probes). Implementation evidence lands under `preproduction/evidence/impl/`.

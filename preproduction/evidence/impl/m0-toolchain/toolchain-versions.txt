@@ -1,0 +1,4 @@
+node v24.15.0
+npm 11.5.2
+dotnet SDKs:
+8.0.419 [C:\Program Files\dotnet\sdk] 10.0.301 [C:\Program Files\dotnet\sdk]

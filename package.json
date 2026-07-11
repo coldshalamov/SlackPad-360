@@ -1,0 +1,29 @@
+{
+  "name": "slackpad-360",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/game",
+    "packages/asset-pipeline"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @slackpad/game",
+    "build": "npm run build -w @slackpad/game",
+    "preview": "npm run preview -w @slackpad/game",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b packages/shared packages/game",
+    "validate": "node research/probes/validate-deliverables.mjs && node research/probes/validate-followup.mjs && node preproduction/probes/validate-cycle-01.mjs && node preproduction/probes/validate-cycle-02.mjs && node preproduction/probes/validate-cycle-03.mjs && node preproduction/probes/validate-final.mjs",
+    "ci:smoke": "node scripts/ci-smoke.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.10",
+    "fast-check": "4.9.0"
+  }
+}
