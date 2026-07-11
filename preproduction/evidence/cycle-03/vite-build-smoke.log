@@ -1,0 +1,18 @@
+(node:16676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14712) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+vite v8.1.4 building client environment for production...
+[2K
+transforming...[32mΓ£ô[0m 7 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[0m[32mindex.html                [0m[1;2m    0.27 kB[0m[2m Γöé gzip:   0.21 kB[0m
+[2mdist/[0m[2massets/[0m[36mindex-Dga_xtSY.js  [0m[33;1m2,422.24 kB[0m[2m Γöé gzip: 894.40 kB[0m
+
+Γ£ô built in 371ms
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

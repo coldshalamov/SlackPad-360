@@ -1,0 +1,234 @@
+{
+  "catalogVersion": 3,
+  "cycle": "03-production",
+  "accessedDate": "2026-07-10",
+  "authority": "Normative production decisions. Supersedes cycle-1/2 where IDs conflict. Cycles 1–2 files are historical and immutable.",
+  "decisions": [
+    {
+      "id": "C3-HOST-NET10",
+      "status": "committed",
+      "decision": "Primary host TFM is net10.0-windows (.NET 10 LTS through 2028-11-14). Supersedes C2-HOST-LANG's .NET 8 pin. Language remains C#; Rust switch trigger unchanged.",
+      "rationale": "Microsoft support policy: .NET 8 EOS 2026-11-10; .NET 10 active LTS. New host must not start on a nearly-EOL LTS.",
+      "evidenceIds": [
+        "ms-dotnet-support-policy",
+        "ms-dotnet-lifecycle",
+        "c2-audit-p1-dotnet"
+      ],
+      "alternatives": [
+        "net8.0-windows",
+        "Rust host first"
+      ],
+      "rejectionReasons": [
+        "EOS within months",
+        "Rust-first still no evidence need"
+      ],
+      "confidence": 0.95,
+      "owner": "platform",
+      "implementationConsequence": "host/*.csproj TargetFramework=net10.0-windows; install .NET 10 SDK before M0 host smoke",
+      "validationMethod": "dotnet build host after SDK install",
+      "reopenTrigger": "Measured interop failure unique to net10 with WebView2/touchpad"
+    },
+    {
+      "id": "C3-WEBVIEW2-PIN",
+      "status": "committed",
+      "decision": "Pin Microsoft.Web.WebView2 NuGet 1.0.4078.44 (stable release). Evergreen runtime. Do not use prerelease 1.0.4126.",
+      "rationale": "NuGet + MS Learn release notes 2026-07-10 show 1.0.4078.44 as current release SDK.",
+      "evidenceIds": [
+        "nuget-webview2",
+        "ms-webview2-release-notes"
+      ],
+      "alternatives": [
+        "float latest",
+        "prerelease SDK"
+      ],
+      "rejectionReasons": [
+        "non-reproducible builds",
+        "prerelease risk"
+      ],
+      "confidence": 0.93,
+      "owner": "platform",
+      "implementationConsequence": "PackageReference Version=1.0.4078.44",
+      "validationMethod": "restore/build smoke when SDK present",
+      "reopenTrigger": "Security advisory requires newer release SDK"
+    },
+    {
+      "id": "C3-JS-TOOLCHAIN",
+      "status": "committed",
+      "decision": "Node engines ^20.19.0 || >=22.12.0 (recommend 22 LTS); Vite 8.1.4; TypeScript 5.9.3; Three 0.185.1; Rapier deterministic-compat 0.19.3; Vitest 4.1.10; fast-check 4.9.0; optional three-mesh-bvh 0.9.11; glTF Transform 4.4.1.",
+      "rationale": "npm re-query 2026-07-10 + disposable smoke: Rapier two-run hash match + Three resolve under Vite package graph. Vite production build exit 0 with three@0.185.1 + rapier-compat@0.19.3 (vite-build-smoke.md).",
+      "evidenceIds": [
+        "npm-registry-2026-07-10",
+        "js-smoke-cycle03",
+        "vite-build-smoke-c3"
+      ],
+      "alternatives": [
+        "TypeScript 7.0.2",
+        "Rapier non-compat"
+      ],
+      "rejectionReasons": [
+        "TS7 optional after smoke",
+        "compat preferred for WASM inline"
+      ],
+      "confidence": 0.92,
+      "owner": "engineering",
+      "implementationConsequence": "package.json pins exact; package-lock committed at implement",
+      "validationMethod": "M0 toolchain smoke + Vitest suite",
+      "reopenTrigger": "Registry deprecation or security CVE on pinned version"
+    },
+    {
+      "id": "C3-PRODUCT-SCOPE",
+      "status": "committed",
+      "decision": "Preserve hybrid finger-skate product contract. Vertical slice: push/steer/ollie/nollie/flips/shuvs/catch/land/bail + 50-50. First ship: + boardslide family, hero art, plaza, audio, packaging. Pure browser not dual-foot product.",
+      "rationale": "Non-negotiable product charter + cycle-2 boardslide ship scope.",
+      "evidenceIds": [
+        "root-readme",
+        "c2-product-scope"
+      ],
+      "alternatives": [
+        "controller-primary",
+        "canned trick menu"
+      ],
+      "rejectionReasons": [
+        "violates charter"
+      ],
+      "confidence": 0.95,
+      "owner": "product",
+      "implementationConsequence": "Milestone order G1-first; boardslide in M6 ship path after 50-50",
+      "validationMethod": "ACCEPTANCE_MATRIX + G2 formative",
+      "reopenTrigger": "G1 total failure forces product pivot"
+    },
+    {
+      "id": "C3-ARCH-MODULES",
+      "status": "committed",
+      "decision": "Single normative topology: .NET host adapters → ContactFrame JSON → InputHub → FootTracker → GestureFSM → BoardController/ManeuverAssist → Rapier fixed-step → Three interpolate; AgentHarness inject-only; Replay/Telemetry shared pipeline.",
+      "rationale": "Cycle-2 architecture validated; cycle-3 freezes interfaces so implementers cannot invent parallel subsystems.",
+      "evidenceIds": [
+        "c2-tech-arch",
+        "contact-frame-schema"
+      ],
+      "alternatives": [
+        "sim in C#",
+        "dual physics"
+      ],
+      "rejectionReasons": [
+        "splits determinism",
+        "dual worlds forbidden"
+      ],
+      "confidence": 0.93,
+      "owner": "engineering",
+      "implementationConsequence": "See final-technical-architecture.md public interfaces",
+      "validationMethod": "module contract tests + no forceTrick API",
+      "reopenTrigger": "G3 proves JSON transport structurally insufficient"
+    },
+    {
+      "id": "C3-PHYSICS-MODEL-A",
+      "status": "committed",
+      "decision": "v0 single dynamic board body + assisted ManeuverSpec; Model B raycast wheels at measured probe after G2 if hull fails rails; no articulated rider first ship. Default 60 Hz; 120 quality benchmark.",
+      "rationale": "Cycle-2 comparison + OSS study (Godot_Skate latch idea study-only; GEVP raycast for Model B) still support Model A first.",
+      "evidenceIds": [
+        "c2-physics",
+        "oss-godot-skate",
+        "oss-gevp"
+      ],
+      "alternatives": [
+        "Model B day-one",
+        "full multi-body"
+      ],
+      "rejectionReasons": [
+        "delays G2",
+        "stability risk"
+      ],
+      "confidence": 0.85,
+      "owner": "physics",
+      "implementationConsequence": "BoardController impulses one body; grind latch constraint",
+      "validationMethod": "golden interrupt/catch/land/grind",
+      "reopenTrigger": "G2 unfair rails or tip-over failures"
+    },
+    {
+      "id": "C3-INPUT-PATH",
+      "status": "committed",
+      "decision": "P0 implements both Win11 pointer and Raw Input HID. Production ranking: Raw primary for free dual-plant until pointer accepts. Button 1 report-level; plant-mask foot attribution. Device-mode matrix binding.",
+      "rationale": "Unchanged from C2-INPUT-PRIMARY-API; still empirical G1.",
+      "evidenceIds": [
+        "ms-register-touchpad",
+        "ms-ptp",
+        "c2-input"
+      ],
+      "alternatives": [
+        "pointer-only"
+      ],
+      "rejectionReasons": [
+        "docs only guarantee pan/zoom"
+      ],
+      "confidence": 0.8,
+      "owner": "platform",
+      "implementationConsequence": "M1 dual adapter spike before content",
+      "validationMethod": "G1 hardware metrics",
+      "reopenTrigger": "Pointer free dual-plant proven better on target"
+    },
+    {
+      "id": "C3-ASSET-GAPS",
+      "status": "committed",
+      "decision": "Hero board, shoes, modular pro plaza are bespoke. Audio proxies acquired (Kenney UI/Impact, OGA metal-wood + ambience) but not runtime-ready. Rubber004 acquired. Kenney mini-skate blockout only. Freesound grind remains auth-gated candidate. readinessVerdict=asset-gap.",
+      "rationale": "Honest quality bar; do not mark boxes with low-quality/unclear assets.",
+      "evidenceIds": [
+        "asset-readiness",
+        "audio-acq-c3"
+      ],
+      "alternatives": [
+        "ship Kenney look"
+      ],
+      "rejectionReasons": [
+        "professional bar"
+      ],
+      "confidence": 0.92,
+      "owner": "art",
+      "implementationConsequence": "M8 isolated Blender with ownership check; runtime empty until review",
+      "validationMethod": "shot rubric + catalog hashes",
+      "reopenTrigger": "credible redistributable hero sources appear"
+    },
+    {
+      "id": "C3-AUTONOMY",
+      "status": "committed",
+      "decision": "Autonomous build may continue software-verifiable work; must pause at G1 device, G2 human feel, G5 target-machine perf claims, and Blender foreign-process ownership. Never claim G1/G2/G5 from synthetic alone. ContactFrame-only agent. Milestone commits. Failed G1 stops expensive content.",
+      "rationale": "Codex cycle-2 audit + product honesty.",
+      "evidenceIds": [
+        "c2-autonomy",
+        "c2-audit"
+      ],
+      "alternatives": [
+        "blind full automation"
+      ],
+      "rejectionReasons": [
+        "wastes months after G1 fail"
+      ],
+      "confidence": 0.97,
+      "owner": "process",
+      "implementationConsequence": "AUTONOMOUS_BUILD_GOAL.md binding",
+      "validationMethod": "validate-final.mjs + process review",
+      "reopenTrigger": "remote device farm proves dual-contact without local human"
+    },
+    {
+      "id": "C3-INTERNET-STOP",
+      "status": "committed",
+      "decision": "Topic-by-topic internet stop for preproduction: host/toolchain closed with primary evidence; input/physics research closed (empirical remain); audio acquired or negative-result recorded; hero mesh search stopped after repeated low-quality/unclear pattern. Implementation-time re-pin is maintenance.",
+      "rationale": "Cycle-2 stop was premature on .NET/WebView2/audio; cycle-3 closed those. Remaining uncertainties are gates not web questions.",
+      "evidenceIds": [
+        "internet-stop-log",
+        "ms-dotnet-support-policy",
+        "npm-registry-2026-07-10"
+      ],
+      "alternatives": [
+        "endless asset scraping"
+      ],
+      "rejectionReasons": [
+        "diminishing returns"
+      ],
+      "confidence": 0.9,
+      "owner": "process",
+      "implementationConsequence": "No further open-web research required before M0 except security recheck",
+      "validationMethod": "internet-stop-log completeness",
+      "reopenTrigger": "named CVE or dependency disappearance"
+    }
+  ]
+}

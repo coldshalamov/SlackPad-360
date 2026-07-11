@@ -1,0 +1,107 @@
+{
+  "catalogVersion": 3,
+  "cycle": "03-production",
+  "accessedDate": "2026-07-10",
+  "ordering": "dependency-ordered; do not unlock expensive content before G1 accept",
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Environment / toolchain smoke and repository guardrails",
+      "dependsOn": [],
+      "gateHooks": [],
+      "commitBoundary": "chore(m0): toolchain lock + repo guardrails",
+      "entryEvidence": ["dependency-lock.json", "dotnet SDK check", "node engines check"],
+      "exitEvidence": ["js smoke green", "host restore/build if SDK present", "validators green", "no production game scaffolding beyond planned dirs"]
+    },
+    {
+      "id": "M1",
+      "name": "P0 native dual-contact hardware spike",
+      "dependsOn": ["M0"],
+      "gateHooks": ["G1"],
+      "commitBoundary": "feat(m1): dual adapter ContactFrame spike",
+      "entryEvidence": ["M0 exit"],
+      "exitEvidence": ["pointer+raw adapters emit frames", "JSONL traces", "metrics report; G1 accept/reject/pause"]
+    },
+    {
+      "id": "M2",
+      "name": "ContactFrame, replay, agent, deterministic sim skeleton",
+      "dependsOn": ["M0"],
+      "gateHooks": ["G4", "G6"],
+      "commitBoundary": "feat(m2): ContactFrame pipeline + rapier skeleton",
+      "entryEvidence": ["M0 exit"],
+      "exitEvidence": ["InputHub multi-source", "replay header", "agent inject-only", "fixed-step world", "first goldens"]
+    },
+    {
+      "id": "M3",
+      "name": "Foot tracking/calibration and ground locomotion",
+      "dependsOn": ["M2"],
+      "gateHooks": [],
+      "commitBoundary": "feat(m3): feet + push/steer ground",
+      "entryEvidence": ["M2 exit"],
+      "exitEvidence": ["stance calib", "regular/goofy", "push/steer continuous", "synthetic foot scenarios"]
+    },
+    {
+      "id": "M4",
+      "name": "Ollie/nollie and catch/land/bail vertical slice core",
+      "dependsOn": ["M3"],
+      "gateHooks": [],
+      "commitBoundary": "feat(m4): ollie nollie catch land bail",
+      "entryEvidence": ["M3 exit"],
+      "exitEvidence": ["pop sequences", "catch volumes", "land cones", "bail state", "goldens"]
+    },
+    {
+      "id": "M5",
+      "name": "Flips/shuvs and recognizer conflict tuning",
+      "dependsOn": ["M4"],
+      "gateHooks": [],
+      "commitBoundary": "feat(m5): flips shuvs recognition",
+      "entryEvidence": ["M4 exit"],
+      "exitEvidence": ["kickflip/heelflip/shuv 180", "conflict table tests", "no forceTrick"]
+    },
+    {
+      "id": "M6",
+      "name": "Grind system: 50-50 then boardslide",
+      "dependsOn": ["M5", "M1"],
+      "gateHooks": ["G2"],
+      "commitBoundary": "feat(m6): fifty-fifty and boardslide",
+      "entryEvidence": ["M5 exit", "G1 accept preferred before human G2"],
+      "exitEvidence": ["50-50 entry", "boardslide family", "balance/exit/interrupt", "formative G2 pause packet"]
+    },
+    {
+      "id": "M7",
+      "name": "Camera, shoes/feet animation, failure presentation",
+      "dependsOn": ["M4"],
+      "gateHooks": [],
+      "commitBoundary": "feat(m7): camera feet bail presentation",
+      "entryEvidence": ["M4 exit"],
+      "exitEvidence": ["shot modes", "procedural shoes", "bail readable", "viewport checks"]
+    },
+    {
+      "id": "M8",
+      "name": "Isolated hero art + modular plaza asset pipeline",
+      "dependsOn": ["M1"],
+      "gateHooks": ["G-BLENDER"],
+      "commitBoundary": "feat(m8): hero glb pipeline when authored",
+      "entryEvidence": ["G1 accept (hard stop if G1 reject)", "Blender ownership free"],
+      "exitEvidence": ["GLB+colliders", "catalog runtime promotion evidence", "shot renders"]
+    },
+    {
+      "id": "M9",
+      "name": "Compact plaza, UI, onboarding, audio, challenges, scoring",
+      "dependsOn": ["M6", "M7", "M8"],
+      "gateHooks": [],
+      "commitBoundary": "feat(m9): plaza ui audio challenges",
+      "entryEvidence": ["M6–M8 exits"],
+      "exitEvidence": ["playable plaza lines", "audio mapped", "onboarding", "scoring"]
+    },
+    {
+      "id": "M10",
+      "name": "Performance, accessibility, packaging, release evidence",
+      "dependsOn": ["M9"],
+      "gateHooks": ["G3", "G5", "release"],
+      "commitBoundary": "feat(m10): package first ship",
+      "entryEvidence": ["M9 exit"],
+      "exitEvidence": ["installer", "perf budgets", "a11y baseline", "release confidence packet"]
+    }
+  ]
+}

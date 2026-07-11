@@ -1,0 +1,196 @@
+{
+  "catalogVersion": 3,
+  "cycle": "03-production",
+  "accessedDate": "2026-07-10",
+  "runtimePolicy": "assets/runtime/ stays empty until quality + license + runtime-format review pass. Source acquisition is not runtime approval.",
+  "summary": {
+    "acquiredSource": 10,
+    "runtimeReady": 0,
+    "bespokeGaps": 4,
+    "catalogCandidatesAuthGated": 1,
+    "rejectedAsFinalLook": 1
+  },
+  "acquired": [
+    {
+      "id": "ph-kloppenheim-05-puresky",
+      "role": "plaza IBL",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/ph-kloppenheim-05-puresky/kloppenheim_05_puresky_1k.hdr",
+      "sha256": "9da5a7f9c799fa6e41cac8fbc4fb7aa2d4556e2f00ce9943abe0fd83b6d4caf5",
+      "license": "CC0-1.0",
+      "sidecars": [
+        "LICENSE",
+        "SOURCE.md"
+      ],
+      "preview": "assets/generated/previews/ph-kloppenheim-05-puresky/tonemapped.jpg"
+    },
+    {
+      "id": "acg-concrete-040",
+      "role": "ground/curbs PBR",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/acg-concrete-040/Concrete040_1K-JPG.zip",
+      "sha256": "24af2b6826d114cc6c55106d9a49bf71b6bf32f710111708dadce0152e28677f",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "acg-metal-006",
+      "role": "rails/metal PBR",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/acg-metal-006/Metal006_1K-JPG.zip",
+      "sha256": "6b836315b5f846ec2dbe3964dd67a0e62addb5943365a03231803c592d45296f",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "acg-wood-floor-043",
+      "role": "wood props/ledges PBR",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/acg-wood-floor-043/WoodFloor043_1K-JPG.zip",
+      "sha256": "0bd1309b36c9a0add6fd9b4108f8cba73ba475afb6fb824c42bb05080c01403b",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "acg-rubber-004",
+      "role": "rubber sole / rubber material",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/acg-rubber-004/Rubber004_1K-JPG.zip",
+      "sha256": "d8933e73c3b983892209bb143ca4bc13a48e4d55720ab12f6e6a303c96c84a31",
+      "license": "CC0-1.0",
+      "cycleAdded": 3
+    },
+    {
+      "id": "kenney-mini-skate",
+      "role": "layout blockout only",
+      "status": "rejected-as-final-look",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/kenney-mini-skate/kenney_mini-skate.zip",
+      "sha256": "82582f6de507e93090c16bb4802a7c361015fe246eddd571e6e96f816b12e8c6",
+      "license": "CC0-1.0",
+      "note": "Allowed for collision layout; not ship plaza look"
+    },
+    {
+      "id": "kenney-interface-sounds",
+      "role": "UI audio",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/kenney-interface-sounds/kenney_interface-sounds.zip",
+      "sha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+      "license": "CC0-1.0",
+      "cycleAdded": 3
+    },
+    {
+      "id": "kenney-impact-sounds",
+      "role": "land/bail/pop proxy foley",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/kenney-impact-sounds/kenney_impact-sounds.zip",
+      "sha256": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+      "license": "CC0-1.0",
+      "cycleAdded": 3,
+      "note": "Not skate field recordings"
+    },
+    {
+      "id": "oga-100-cc0-metal-wood-sfx",
+      "role": "grind/metal/wood proxy SFX",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/oga-100-cc0-metal-wood-sfx/100-CC0-wood-metal-SFX.zip",
+      "sha256": "be6eba63b03409ac0c77787a956b1503a7c186403d04aef9725c52644a4b7878",
+      "license": "CC0-1.0",
+      "cycleAdded": 3,
+      "author": "rubberduck",
+      "note": "Author: rubberduck per OGA page (corrected from OwlishMedia misattribution)."
+    },
+    {
+      "id": "oga-100-cc0-sfx-2",
+      "role": "ambience loops + misc foley",
+      "status": "selected-source",
+      "runtimeReady": false,
+      "path": "assets/source/vendor/oga-100-cc0-sfx-2/sfx_100_v2.zip",
+      "sha256": "0fc61b4494e2e893c0c015ced4877b3f689c7d84a48cb61daecd7ddb52db797b",
+      "license": "CC0-1.0",
+      "cycleAdded": 3,
+      "author": "rubberduck",
+      "note": "Author: rubberduck per OGA page (corrected from OwlishMedia misattribution)."
+    }
+  ],
+  "bespoke": [
+    {
+      "id": "gap-hero-board",
+      "role": "hero board/trucks/wheels",
+      "status": "bespoke-blender",
+      "disposition": "Isolated Blender authoring required; no quality reduction to Kenney",
+      "contract": "preproduction/cycles/03-production/final-art-assets-world-audio-spec.md#isolated-blender-task-contract"
+    },
+    {
+      "id": "gap-shoes-feet",
+      "role": "disembodied unbranded shoes",
+      "status": "bespoke-blender",
+      "disposition": "Isolated Blender authoring; catch volumes ≠ mesh"
+    },
+    {
+      "id": "gap-modular-plaza",
+      "role": "professional modular plaza",
+      "status": "bespoke-blender-plus-procedural",
+      "disposition": "Hero modular pieces GLB; some trim/curbs may be procedural Three if quality holds; Kenney blockout only pre-G2"
+    },
+    {
+      "id": "gap-grip-tape-material",
+      "role": "deck grip tape",
+      "status": "procedural-or-bespoke",
+      "disposition": "Prefer procedural dark high-roughness grit in Three or Blender; rubber pack is sole-adjacent not grip"
+    }
+  ],
+  "deferredAuthGated": [
+    {
+      "id": "cand-fs-grind-655371",
+      "role": "skate grind field recording",
+      "status": "catalog-candidate-auth-gated",
+      "reason": "Freesound login required; no account scraping in cycle 3"
+    }
+  ],
+  "audioEventMap": {
+    "roll": {
+      "candidate": "procedural loop + soft continuous; field later",
+      "acquiredProxy": null
+    },
+    "push": {
+      "candidate": "kenney-impact-sounds soft whoosh/impact mapping",
+      "acquiredProxy": "kenney-impact-sounds"
+    },
+    "pop": {
+      "candidate": "kenney-impact-sounds short hit",
+      "acquiredProxy": "kenney-impact-sounds"
+    },
+    "catch": {
+      "candidate": "soft rubber tick from impact pack",
+      "acquiredProxy": "kenney-impact-sounds"
+    },
+    "land": {
+      "candidate": "wood/impact from kenney-impact or oga metal-wood",
+      "acquiredProxy": "kenney-impact-sounds"
+    },
+    "bail": {
+      "candidate": "heavier impact cluster",
+      "acquiredProxy": "kenney-impact-sounds"
+    },
+    "grind": {
+      "candidate": "oga metal scrape/hit mapping",
+      "acquiredProxy": "oga-100-cc0-metal-wood-sfx"
+    },
+    "ambience": {
+      "candidate": "oga-100-cc0-sfx-2 street/highway loops",
+      "acquiredProxy": "oga-100-cc0-sfx-2"
+    },
+    "ui": {
+      "candidate": "kenney-interface-sounds",
+      "acquiredProxy": "kenney-interface-sounds"
+    }
+  },
+  "readinessVerdict": "asset-gap",
+  "readinessDetail": "Source library is useful (HDRI, PBR, audio proxies, rubber, blockout). Hero board, shoes, professional plaza, and runtime-approved audio remain gaps. Do not claim build-complete assets."
+}

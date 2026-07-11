@@ -1,0 +1,424 @@
+{
+  "catalogVersion": 3,
+  "cycle": "03-production",
+  "accessedDate": "2026-07-10",
+  "sources": [
+    {
+      "id": "ms-dotnet-support-policy",
+      "title": ".NET and .NET Core official support policy",
+      "canonicalUrl": "https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core",
+      "publisher": "Microsoft",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "C3-HOST-NET10",
+        ".NET 10 LTS EOS 2028-11-14",
+        ".NET 8 EOS 2026-11-10"
+      ],
+      "limitations": "Dates subject to Microsoft policy updates"
+    },
+    {
+      "id": "ms-dotnet-lifecycle",
+      "title": "Microsoft .NET and .NET Core lifecycle",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/lifecycle/products/microsoft-net-and-net-core",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "C3-HOST-NET10"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "ms-dotnet-8-9-eos-blog",
+      "title": ".NET 8 and .NET 9 end of support announcement",
+      "canonicalUrl": "https://devblogs.microsoft.com/dotnet/dotnet-8-9-end-of-support/",
+      "publisher": "Microsoft .NET Blog",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "Recommend upgrade to .NET 10"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "nuget-webview2",
+      "title": "Microsoft.Web.WebView2 NuGet package",
+      "canonicalUrl": "https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.4078.44",
+      "publisher": "NuGet / Microsoft",
+      "sourceType": "registry",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "C3-WEBVIEW2-PIN",
+        "version 1.0.4078.44"
+      ],
+      "limitations": "Versions change over time; re-pin at implement if security requires"
+    },
+    {
+      "id": "ms-webview2-release-notes",
+      "title": "WebView2 SDK release notes",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/microsoft-edge/webview2/release-notes/",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "Release SDK 1.0.4078.44 for Runtime 150 (Jul 7 2026)"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "npm-registry-2026-07-10",
+      "title": "npm view re-query of selected packages",
+      "canonicalUrl": "https://www.npmjs.com/",
+      "publisher": "npm registry",
+      "sourceType": "registry",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "C3-JS-TOOLCHAIN",
+        "exact versions in dependency-lock.json"
+      ],
+      "limitations": "Latest drifts; lockfile freezes at implement"
+    },
+    {
+      "id": "js-smoke-cycle03",
+      "title": "Disposable Rapier+Three determinism smoke",
+      "canonicalUrl": "preproduction/evidence/cycle-03/js-toolchain-smoke.log",
+      "publisher": "SlackPad cycle-3",
+      "sourceType": "local-evidence",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "identical 120-step hashes",
+        "Three resolve",
+        "Node package graph only (not Vite production build)"
+      ],
+      "limitations": "Not full game determinism; single machine"
+    },
+    {
+      "id": "c2-audit-p1-dotnet",
+      "title": "Codex audit cycle 02 — .NET 8 drift finding",
+      "canonicalUrl": "preproduction/reviews/02-adversarial-codex-audit.md",
+      "publisher": "Codex audit",
+      "sourceType": "audit",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "Correct host to net10.0-windows"
+      ],
+      "limitations": "Audit recommendation; validated against MS policy"
+    },
+    {
+      "id": "root-readme",
+      "title": "SlackPad 360 root README",
+      "canonicalUrl": "README.md",
+      "publisher": "project",
+      "sourceType": "project",
+      "accessDate": "2026-07-10",
+      "classification": "product-intent",
+      "supports": [
+        "product fantasy",
+        "dual-foot",
+        "hybrid"
+      ],
+      "limitations": "Not empirical proof of fun"
+    },
+    {
+      "id": "c2-product-scope",
+      "title": "Cycle 2 product and scope",
+      "canonicalUrl": "preproduction/cycles/02-adversarial/product-and-scope-spec.md",
+      "publisher": "cycle-2",
+      "sourceType": "spec",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "slice vs ship",
+        "boardslide first ship"
+      ],
+      "limitations": "Historical; final package supersedes"
+    },
+    {
+      "id": "c2-tech-arch",
+      "title": "Cycle 2 technical architecture",
+      "canonicalUrl": "preproduction/cycles/02-adversarial/technical-architecture.md",
+      "publisher": "cycle-2",
+      "sourceType": "spec",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "module boundaries",
+        "WebView2 transport"
+      ],
+      "limitations": "Host TFM corrected in cycle 3"
+    },
+    {
+      "id": "c2-physics",
+      "title": "Cycle 2 physics animation camera",
+      "canonicalUrl": "preproduction/cycles/02-adversarial/physics-animation-and-camera-spec.md",
+      "publisher": "cycle-2",
+      "sourceType": "spec",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "Model A",
+        "assist math",
+        "60 Hz"
+      ],
+      "limitations": "Constants hypothesis until G2"
+    },
+    {
+      "id": "c2-input",
+      "title": "Cycle 2 input platform and device",
+      "canonicalUrl": "preproduction/cycles/02-adversarial/input-platform-and-device-spec.md",
+      "publisher": "cycle-2",
+      "sourceType": "spec",
+      "accessDate": "2026-07-10",
+      "classification": "mixed",
+      "supports": [
+        "dual adapter",
+        "device matrix"
+      ],
+      "limitations": "G1 unresolved"
+    },
+    {
+      "id": "c2-autonomy",
+      "title": "Cycle 2 autonomy and gate plan",
+      "canonicalUrl": "preproduction/cycles/02-adversarial/autonomy-and-gate-plan.md",
+      "publisher": "cycle-2",
+      "sourceType": "spec",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "pause/continue/pivot"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "c2-audit",
+      "title": "Codex audit cycle 02 full",
+      "canonicalUrl": "preproduction/reviews/02-adversarial-codex-audit.md",
+      "publisher": "Codex audit",
+      "sourceType": "audit",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "cycle-3 exit standard"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "contact-frame-schema",
+      "title": "ContactFrame schema v1",
+      "canonicalUrl": "research/probes/contact-frame.schema.json",
+      "publisher": "research",
+      "sourceType": "schema",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "sole input path"
+      ],
+      "limitations": "v1 may extend with versioning"
+    },
+    {
+      "id": "oss-godot-skate",
+      "title": "Godot_Skate study",
+      "canonicalUrl": "https://github.com/3deric/Godot_Skate",
+      "publisher": "3deric",
+      "sourceType": "oss-study",
+      "accessDate": "2026-07-10",
+      "classification": "study",
+      "supports": [
+        "grind latch idea study-only"
+      ],
+      "limitations": "Kinematic character ≠ board body; wrong input"
+    },
+    {
+      "id": "oss-gevp",
+      "title": "Godot-Easy-Vehicle-Physics study",
+      "canonicalUrl": "https://github.com/DAShoe1/Godot-Easy-Vehicle-Physics",
+      "publisher": "DAShoe1",
+      "sourceType": "oss-study",
+      "accessDate": "2026-07-10",
+      "classification": "study",
+      "supports": [
+        "Model B raycast pattern"
+      ],
+      "limitations": "Godot/Jolt not product runtime"
+    },
+    {
+      "id": "asset-readiness",
+      "title": "Cycle 3 asset readiness ledger",
+      "canonicalUrl": "preproduction/cycles/03-production/asset-readiness.json",
+      "publisher": "cycle-3",
+      "sourceType": "local-evidence",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "C3-ASSET-GAPS"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "audio-acq-c3",
+      "title": "Cycle 3 audio acquisition evidence",
+      "canonicalUrl": "preproduction/evidence/cycle-03/audio-acquisition.md",
+      "publisher": "cycle-3",
+      "sourceType": "local-evidence",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "CC0 audio packs acquired",
+        "Freesound auth-gated negative"
+      ],
+      "limitations": "Proxies not skate field quality"
+    },
+    {
+      "id": "kenney-interface-sounds",
+      "title": "Kenney Interface Sounds",
+      "canonicalUrl": "https://kenney.nl/assets/interface-sounds",
+      "publisher": "Kenney",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "CC0 UI audio"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "kenney-impact-sounds",
+      "title": "Kenney Impact Sounds",
+      "canonicalUrl": "https://kenney.nl/assets/impact-sounds",
+      "publisher": "Kenney",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "CC0 impact proxies"
+      ],
+      "limitations": "Not skate-specific"
+    },
+    {
+      "id": "oga-metal-wood",
+      "title": "100 CC0 metal and wood SFX",
+      "canonicalUrl": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+      "publisher": "rubberduck / OpenGameArt",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "CC0 metal/wood proxies"
+      ],
+      "limitations": "Canonical OGA Author field: rubberduck (not OwlishMedia). Cycle-3 verification fix corrected misattribution."
+    },
+    {
+      "id": "oga-sfx-2",
+      "title": "100 CC0 SFX #2",
+      "canonicalUrl": "https://opengameart.org/content/100-cc0-sfx-2",
+      "publisher": "rubberduck / OpenGameArt",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "ambience candidates"
+      ],
+      "limitations": "Canonical OGA Author field: rubberduck (not OwlishMedia). Cycle-3 verification fix corrected misattribution."
+    },
+    {
+      "id": "acg-rubber004",
+      "title": "ambientCG Rubber004",
+      "canonicalUrl": "https://ambientcg.com/view?id=Rubber004",
+      "publisher": "ambientCG",
+      "sourceType": "asset-page",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "CC0 rubber material"
+      ],
+      "limitations": "Not grip tape"
+    },
+    {
+      "id": "ms-register-touchpad",
+      "title": "RegisterTouchpadCapableWindow",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows/win32/input-precisiontouchpad/registertouchpadcapable",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "pointer path docs"
+      ],
+      "limitations": "Free dual-plant not proven"
+    },
+    {
+      "id": "ms-ptp",
+      "title": "Precision Touchpad HID",
+      "canonicalUrl": "https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection",
+      "publisher": "Microsoft Learn",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "Raw Input HID fields"
+      ],
+      "limitations": "Target device still G1"
+    },
+    {
+      "id": "rapier-determinism-docs",
+      "title": "Rapier JS determinism guide",
+      "canonicalUrl": "https://rapier.rs/docs/user_guides/javascript/determinism/",
+      "publisher": "dimforge",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "snapshot determinism caveats"
+      ],
+      "limitations": "App must avoid nondeterministic inputs"
+    },
+    {
+      "id": "internet-stop-log",
+      "title": "Cycle 3 internet stop log",
+      "canonicalUrl": "preproduction/cycles/03-production/internet-stop-log.md",
+      "publisher": "cycle-3",
+      "sourceType": "process",
+      "accessDate": "2026-07-10",
+      "classification": "recommendation",
+      "supports": [
+        "C3-INTERNET-STOP"
+      ],
+      "limitations": null
+    },
+    {
+      "id": "oga-author-rubberduck-verify",
+      "title": "OpenGameArt author field verification for acquired OGA packs",
+      "canonicalUrl": "https://opengameart.org/users/rubberduck",
+      "publisher": "OpenGameArt",
+      "sourceType": "primary-docs",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "author rubberduck on 100-cc0-metal-and-wood-sfx and 100-cc0-sfx-2"
+      ],
+      "limitations": "OwlishMedia is a different OGA user; not pack author"
+    },
+    {
+      "id": "vite-build-smoke-c3",
+      "title": "Vite 8.1.4 production build smoke Three+Rapier",
+      "canonicalUrl": "preproduction/evidence/cycle-03/vite-build-smoke.md",
+      "publisher": "SlackPad cycle-3",
+      "sourceType": "local-evidence",
+      "accessDate": "2026-07-10",
+      "classification": "confirmed-fact",
+      "supports": [
+        "Vite 8.1.4 exit 0 production build of three@0.185.1 + rapier-compat@0.19.3"
+      ],
+      "limitations": "Not WebView2 runtime proof"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# Cycle 3 Review Checklist
+
+- [x] Cycles 1 and 2 preserved (no rewrites)
+- [x] Every cycle-2 Codex finding disposed in `audit-findings.md`
+- [x] `delta-from-cycle-02.md` present with Added/Changed/Rejected/Deferred
+- [x] Cross-cycle decision log present
+- [x] Host TFM is `net10.0-windows` (not .NET 8 as final)
+- [x] WebView2 SDK pinned `1.0.4078.44`
+- [x] npm pins + Node engines recorded
+- [x] JS Rapier+Three smoke evidence present
+- [x] .NET smoke run or explicit prereq recorded
+- [x] One normative architecture (no parallel forks)
+- [x] Input/trick grammar consolidated
+- [x] Physics/assist/grind/camera consolidated
+- [x] Asset readiness with honest asset-gap verdict
+- [x] Audio positive/negative results recorded
+- [x] Isolated Blender contract with ownership check
+- [x] Milestones M0–M10 with gates
+- [x] Unresolved gates owned with accept/reject/fallback
+- [x] Internet stop topic-by-topic
+- [x] `preproduction/final/` navigation package
+- [x] `AUTONOMOUS_BUILD_GOAL.md` starts with `/goal` and required rules
+- [x] Validators cycle-03 + final
+- [x] No production game implementation paths
+- [x] `assets/runtime/` empty

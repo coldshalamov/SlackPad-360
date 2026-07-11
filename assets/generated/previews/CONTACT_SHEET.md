@@ -1,14 +1,21 @@
-# Asset Previews Contact Sheet Index
+# Asset preview contact sheet
 
-Generated: 2026-07-10
-Purpose: Inspectable previews for cycle-2 preproduction library. Sources remain unmodified under assets/source/vendor/.
+Generated for cycle-3 readiness inspection. Previews are for review only; not runtime assets.
 
-| Asset ID | Preview path | Role |
-| --- | --- | --- |
-| ph-kloppenheim-05-puresky | previews/ph-kloppenheim-05-puresky/tonemapped.jpg | Daylight HDRI reference |
-| acg-concrete-040 | previews/acg-concrete-040/color.jpg | Concrete material color map |
-| acg-metal-006 | previews/acg-metal-006/color.jpg | Metal material color map |
-| acg-wood-floor-043 | previews/acg-wood-floor-043/color.jpg | Wood material color map |
-| kenney-mini-skate | previews/kenney-mini-skate/* | Blockout kit only (not final look) |
+## Existing (cycle 2)
+- ph-kloppenheim-05-puresky/tonemapped.jpg
+- acg-concrete-040/color.jpg
+- acg-metal-006/color.jpg
+- acg-wood-floor-043/color.jpg
+- kenney-mini-skate/colormap.png
 
-Hero board and shoes: no suitable high-quality redistributable source found; see asset-selection-and-gap-plan.md Blender brief. Blender authoring deferred (process owned by unrelated work).
+## Added (cycle 3)
+- acg-rubber-004/color.jpg — rubber sole/grip material candidate
+- kenney-interface-sounds/SUMMARY.md — UI SFX file list
+- kenney-impact-sounds/SUMMARY.md — impact/foley proxy file list
+
+## Runtime
+assets/runtime/ remains empty until quality + license + runtime-format review.
+
+- oga-100-cc0-metal-wood-sfx/SUMMARY.md
+- oga-100-cc0-sfx-2/SUMMARY.md

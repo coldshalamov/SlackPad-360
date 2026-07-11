@@ -1,0 +1,148 @@
+{
+  "lockVersion": 1,
+  "cycle": "03-production",
+  "accessedDate": "2026-07-10",
+  "baselineCommit": "e4abb6e30bbbeec2280d56cbf18f6f91d1ac2e42",
+  "description": "Exact selected production pins for first implement. Re-pin only with re-golden of G4 and evidence under preproduction/evidence/.",
+  "host": {
+    "language": "C#",
+    "tfm": "net10.0-windows",
+    "sdk": ".NET 10 LTS",
+    "supportEnd": "2028-11-14",
+    "supersedes": {
+      "cycle2": "net8.0-windows / .NET 8",
+      "reason": ".NET 8 EOS 2026-11-10 per Microsoft support policy; new host must not target maintenance-only LTS with <5 months remaining"
+    },
+    "webview2Sdk": {
+      "packageId": "Microsoft.Web.WebView2",
+      "version": "1.0.4078.44",
+      "channel": "release",
+      "notSelected": [
+        "1.0.4126-prerelease"
+      ]
+    },
+    "runtime": "WebView2 Evergreen",
+    "uiShell": "WinForms or WPF WebView2 host (either OK; pick one at M0 and keep)",
+    "downgradeTrigger": "Only if measured touchpad/WebView2 interop fails on net10.0-windows; document evidence before any net8.0-windows fallback"
+  },
+  "node": {
+    "engines": "^20.19.0 || >=22.12.0",
+    "recommendedLine": "22.x LTS",
+    "smokeNode": "v24.15.0",
+    "packageManager": "npm"
+  },
+  "packages": [
+    {
+      "id": "three",
+      "name": "three",
+      "version": "0.185.1",
+      "license": "MIT",
+      "kind": "runtime",
+      "decision": "adopt",
+      "pinRule": "exact"
+    },
+    {
+      "id": "rapier",
+      "name": "@dimforge/rapier3d-deterministic-compat",
+      "version": "0.19.3",
+      "license": "Apache-2.0",
+      "kind": "runtime",
+      "decision": "adopt",
+      "pinRule": "exact; re-golden G4 on upgrade",
+      "import": "import RAPIER from '@dimforge/rapier3d-deterministic-compat'; await RAPIER.init();"
+    },
+    {
+      "id": "vite",
+      "name": "vite",
+      "version": "8.1.4",
+      "license": "MIT",
+      "kind": "tooling",
+      "decision": "adopt",
+      "pinRule": "exact",
+      "engines": "^20.19.0 || >=22.12.0"
+    },
+    {
+      "id": "typescript",
+      "name": "typescript",
+      "version": "5.9.3",
+      "license": "Apache-2.0",
+      "kind": "tooling",
+      "decision": "adopt",
+      "pinRule": "exact; registry also has 7.0.2 — optional upgrade after smoke"
+    },
+    {
+      "id": "vitest",
+      "name": "vitest",
+      "version": "4.1.10",
+      "license": "MIT",
+      "kind": "dev",
+      "decision": "adopt",
+      "pinRule": "exact"
+    },
+    {
+      "id": "fast-check",
+      "name": "fast-check",
+      "version": "4.9.0",
+      "license": "MIT",
+      "kind": "dev",
+      "decision": "adopt",
+      "pinRule": "exact"
+    },
+    {
+      "id": "three-mesh-bvh",
+      "name": "three-mesh-bvh",
+      "version": "0.9.11",
+      "license": "MIT",
+      "kind": "runtime-optional",
+      "decision": "adopt-optional",
+      "pinRule": "exact if used; must not replace Rapier"
+    },
+    {
+      "id": "gltf-transform-cli",
+      "name": "@gltf-transform/cli",
+      "version": "4.4.1",
+      "license": "MIT",
+      "kind": "pipeline",
+      "decision": "adopt",
+      "pinRule": "exact"
+    },
+    {
+      "id": "gltf-transform-core",
+      "name": "@gltf-transform/core",
+      "version": "4.4.1",
+      "license": "MIT",
+      "kind": "pipeline",
+      "decision": "adopt",
+      "pinRule": "exact"
+    }
+  ],
+  "smokeEvidence": {
+    "jsDeterminism": "preproduction/evidence/cycle-03/js-toolchain-smoke.log",
+    "jsDeterminismResult": "ok=true; identical 120-step Rapier pose hashes; Three import ok",
+    "viteProductionBuild": "preproduction/evidence/cycle-03/vite-build-smoke.md",
+    "viteProductionBuildLog": "preproduction/evidence/cycle-03/vite-build-smoke.log",
+    "viteProductionBuildResult": "exit 0; dist total 2422516 bytes; vite 8.1.4 + three 0.185.1 + rapier-compat 0.19.3",
+    "packageResolveOnly": "preproduction/evidence/cycle-03/js-resolve.log — NOT build proof",
+    "viteResolvedClaim": "removed/relabeled; was require.resolve only",
+    "dotnet": "preproduction/evidence/cycle-03/dotnet-webview2-smoke.md",
+    "dotnetResult": "not_run_no_sdk; install .NET 10 then run documented commands"
+  },
+  "rejectedAsPrimary": [
+    {
+      "name": ".NET 8 / net8.0-windows",
+      "reason": "EOS 2026-11-10; cycle-2 drift corrected"
+    },
+    {
+      "name": "@dimforge/rapier3d (non-deterministic-labeled)",
+      "reason": "prefer deterministic-compat for goldens"
+    },
+    {
+      "name": "cannon-es",
+      "reason": "Rapier selected"
+    },
+    {
+      "name": "Electron as primary host",
+      "reason": "WebView2 primary; Electron packaging fallback only"
+    }
+  ]
+}

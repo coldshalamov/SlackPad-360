@@ -1,0 +1,30 @@
+using deprecated parameters for the initialization function; pass a single object instead
+(node:5188) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "ok": true,
+  "rapierPackage": "@dimforge/rapier3d-deterministic-compat@0.19.3",
+  "threePackage": "three@185",
+  "threeOk": true,
+  "steps": 120,
+  "runA": {
+    "hash": "9093f5c3b52324488f1d71b32c6b0f7495fcdf0bb28006af1d40a9a8efd3157c",
+    "translation": {
+      "x": 10.44225025177002,
+      "y": -0.13367553055286407,
+      "z": 3.4954190254211426
+    }
+  },
+  "runB": {
+    "hash": "9093f5c3b52324488f1d71b32c6b0f7495fcdf0bb28006af1d40a9a8efd3157c",
+    "translation": {
+      "x": 10.44225025177002,
+      "y": -0.13367553055286407,
+      "z": 3.4954190254211426
+    }
+  },
+  "hashesMatch": true,
+  "node": "v24.15.0",
+  "vitePackageResolveOnly": true,
+  "vitePackageResolveNote": "require.resolve('vite') only — NOT a production build proof. See vite-build-smoke.md"
+}

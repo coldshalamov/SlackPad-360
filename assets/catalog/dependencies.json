@@ -1,8 +1,8 @@
 {
-  "catalogVersion": 2,
-  "cycle": "02-adversarial",
+  "catalogVersion": 3,
+  "cycle": "03-production",
   "accessedDate": "2026-07-10",
-  "description": "Code/tool dependency ledger (not art). Exact npm/registry evidence as of 2026-07-10. Re-pin at implementation.",
+  "description": "Code/tool dependency ledger. Cycle 3 corrects host to net10.0-windows, pins WebView2 1.0.4078.44, re-verifies npm versions, records Node engines.",
   "dependencies": [
     {
       "id": "dep-three",
@@ -21,7 +21,7 @@
       "selectedAlternative": null,
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": "https://threejs.org/"
+      "notes": "https://threejs.org/ Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-rapier3d-deterministic-compat",
@@ -44,7 +44,7 @@
       "importStrategy": "import RAPIER from '@dimforge/rapier3d-deterministic-compat'; await RAPIER.init();",
       "determinismCaveats": "Official JS guide: WASM/TS Rapier is fully cross-platform deterministic when same version, same construction order, same initial conditions; transcendental JS Math not deterministic across platforms — avoid Math.sin/cos for sim inputs; snapshot MD5 comparable across machines.",
       "cycle1DefectNote": "Cycle 1 often wrote bare '@dimforge/rapier3d-deterministic' while linking the -compat npm URL. Both packages exist on npm at 0.19.3; cycle 2 selects -compat explicitly for Vite/WebView2 inlined WASM.",
-      "notes": "Do not use nonexistent or ambiguous package names in new specs."
+      "notes": "Do not use nonexistent or ambiguous package names in new specs. Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-rapier3d-deterministic-noncompat",
@@ -101,7 +101,7 @@
       "selectedAlternative": null,
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": null
+      "notes": " Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-fast-check",
@@ -120,7 +120,7 @@
       "selectedAlternative": null,
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": "devDependency only"
+      "notes": "devDependency only Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-vitest",
@@ -139,7 +139,7 @@
       "selectedAlternative": null,
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": "Planned when game package exists"
+      "notes": "Planned when game package exists Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-three-mesh-bvh",
@@ -158,7 +158,7 @@
       "selectedAlternative": null,
       "decision": "adopt-optional",
       "rejectionReason": null,
-      "notes": null
+      "notes": " Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-gltf-transform",
@@ -177,7 +177,7 @@
       "selectedAlternative": null,
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": null
+      "notes": " Cycle-3 re-verified npm 2026-07-10."
     },
     {
       "id": "dep-meshoptimizer-gltfpack",
@@ -237,13 +237,13 @@
     {
       "id": "dep-webview2",
       "name": "Microsoft Edge WebView2 Runtime",
-      "installIdentifier": "WebView2 Evergreen Runtime + Microsoft.Web.WebView2 NuGet for .NET host",
+      "installIdentifier": "WebView2 Evergreen Runtime + Microsoft.Web.WebView2 NuGet 1.0.4078.44",
       "kind": "host",
       "sourceUrl": "https://developer.microsoft.com/microsoft-edge/webview2/",
       "license": "Microsoft software license / evergreen runtime",
       "spdx": null,
-      "selectedVersion": "evergreen",
-      "versionPin": "evergreen + pin WebView2 SDK NuGet at implement",
+      "selectedVersion": "evergreen + SDK 1.0.4078.44",
+      "versionPin": "evergreen runtime; SDK pin 1.0.4078.44",
       "ownershipBoundary": "Native host shell Chromium view; messaging to game",
       "maintenanceEvidence": "Microsoft supported",
       "integrationRisk": "low-medium — packaging/bootstrap",
@@ -254,21 +254,22 @@
     },
     {
       "id": "dep-dotnet-host",
-      "name": ".NET 8 Windows host",
-      "installIdentifier": "net8.0-windows + WinForms/WPF/WinUI WebView2 host project",
+      "name": ".NET 10 Windows host",
+      "installIdentifier": "net10.0-windows + WinForms/WPF/WinUI WebView2 host project",
       "kind": "host",
       "sourceUrl": "https://dotnet.microsoft.com/",
       "license": "MIT (.NET) + Microsoft terms",
       "spdx": "MIT",
-      "selectedVersion": ".NET 8 LTS line",
-      "versionPin": "net8.0-windows at implement; re-check LTS",
+      "selectedVersion": ".NET 10 LTS",
+      "versionPin": "net10.0-windows; support through 2028-11-14; recheck lifecycle at implement",
       "ownershipBoundary": "Touchpad bridge, packaging, focus, host APIs — not game sim",
-      "maintenanceEvidence": "Microsoft LTS",
+      "maintenanceEvidence": "Microsoft LTS Active; .NET 8 EOS 2026-11-10 — not selected for new host",
       "integrationRisk": "low",
       "selectedAlternative": "Rust host + WebView2 bindings (switch trigger: HID memory-safety dominates)",
       "decision": "adopt",
       "rejectionReason": null,
-      "notes": "Primary host language decision C2-HOST-LANG"
+      "notes": "Cycle-3 CORRECTION of cycle-2 .NET 8 selection per Microsoft support policy. Downgrade to net8.0-windows only if measured interop incompatibility with WebView2/touchpad spike.",
+      "registryUrl": "https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core"
     },
     {
       "id": "dep-rawinput-touchpad-sample",
@@ -377,6 +378,63 @@
       "decision": "study",
       "rejectionReason": "Godot vehicle stack not selected runtime",
       "notes": "See reuse-and-dependency-audit.md §5.2"
+    },
+    {
+      "id": "dep-webview2-nuget",
+      "name": "Microsoft.Web.WebView2 NuGet SDK",
+      "installIdentifier": "Microsoft.Web.WebView2",
+      "kind": "host",
+      "sourceUrl": "https://www.nuget.org/packages/Microsoft.Web.WebView2",
+      "registryUrl": "https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.4078.44",
+      "docsUrl": "https://learn.microsoft.com/en-us/microsoft-edge/webview2/release-notes/",
+      "license": "Microsoft software license",
+      "spdx": null,
+      "selectedVersion": "1.0.4078.44",
+      "versionPin": "1.0.4078.44 exact (Release SDK for Runtime 150, 2026-07-07); do not use 1.0.4126-prerelease",
+      "ownershipBoundary": "Native host WebView2 control APIs",
+      "maintenanceEvidence": "NuGet stable latest non-prerelease 2026-07-10",
+      "integrationRisk": "low",
+      "selectedAlternative": null,
+      "decision": "adopt",
+      "rejectionReason": null,
+      "notes": "Evergreen runtime separate; pin SDK package for reproducible builds."
+    },
+    {
+      "id": "dep-typescript",
+      "name": "typescript",
+      "installIdentifier": "typescript",
+      "kind": "tooling",
+      "sourceUrl": "https://www.typescriptlang.org/",
+      "registryUrl": "https://www.npmjs.com/package/typescript",
+      "license": "Apache-2.0",
+      "spdx": "Apache-2.0",
+      "selectedVersion": "5.9.3",
+      "versionPin": "5.9.3 production pin (ecosystem-stable); registry also lists 7.0.2 — re-evaluate at implement",
+      "ownershipBoundary": "Typecheck only",
+      "maintenanceEvidence": "npm 5.9.3 + 7.0.2 available 2026-07-10",
+      "integrationRisk": "low",
+      "selectedAlternative": "typescript@7.0.2",
+      "decision": "adopt",
+      "rejectionReason": null,
+      "notes": "Prefer 5.9.3 for Vitest/Vite ecosystem maturity; allow 7.x after smoke."
+    },
+    {
+      "id": "dep-node",
+      "name": "Node.js",
+      "installIdentifier": "node",
+      "kind": "tooling",
+      "sourceUrl": "https://nodejs.org/",
+      "license": "MIT",
+      "spdx": "MIT",
+      "selectedVersion": "22.x LTS or 20.19+ / >=22.12.0",
+      "versionPin": "engines: ^20.19.0 || >=22.12.0 (Vite 8.1.4 requirement); recommend Node 22 LTS",
+      "ownershipBoundary": "Dev/build runtime",
+      "maintenanceEvidence": "Vite 8.1.4 engines field 2026-07-10",
+      "integrationRisk": "low",
+      "selectedAlternative": null,
+      "decision": "adopt",
+      "rejectionReason": null,
+      "notes": "Cycle-3 smoke used Node v24.15.0 successfully."
     }
   ]
 }

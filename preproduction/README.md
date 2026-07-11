@@ -13,5 +13,13 @@ remain visible in Git.
 3. `03-production`: consolidate the final build architecture, milestone plan,
    acceptance tests, and autonomous implementation goal.
 
+**Authoritative navigation after cycle 3:** `preproduction/final/`
+
+**Autonomous implementer prompt:** `preproduction/final/AUTONOMOUS_BUILD_GOAL.md`
+
+**Cycle-3 validators:** `preproduction/probes/validate-cycle-03.mjs`, `validate-final.mjs`
+
 Production code must not begin until all three cycles have been reviewed and
-the remaining uncertainties are represented by explicit prototype gates.
+the remaining uncertainties are represented by explicit prototype gates
+(see `preproduction/final/RISK_AND_GATES.md`). Cycles 1–2 remain immutable
+history; do not rewrite them to clean up the final package.
