@@ -34,8 +34,17 @@ export function gridSurface({ rows, cols, pointFn, flip = false, uvFn }) {
       const jm = P[i][Math.max(0, j - 1)];
       const jp = P[i][Math.min(cols, j + 1)];
       const du = vec3.sub(ip, im);
-      const dv = vec3.sub(jp, jm);
-      let n = vec3.normalize(vec3.cross(du, dv));
+      let dv = vec3.sub(jp, jm);
+      let n = vec3.cross(du, dv);
+      if (vec3.dot(n, n) < 1e-16) {
+        // Degenerate row (all columns coincide — e.g. a converging tip):
+        // borrow the width-derivative from the nearest non-degenerate row so
+        // the tip shades smoothly instead of getting a zero normal.
+        const i2 = i === 0 ? 1 : i === rows ? rows - 1 : Math.min(rows, i + 1);
+        dv = vec3.sub(P[i2][Math.min(cols, j + 1)], P[i2][Math.max(0, j - 1)]);
+        n = vec3.cross(du, dv);
+      }
+      n = vec3.normalize(n);
       if (flip) n = vec3.scale(n, -1);
       rowN.push(n);
     }
@@ -59,8 +68,12 @@ export function gridSurface({ rows, cols, pointFn, flip = false, uvFn }) {
       const b = idx[i][j + 1];
       const c = idx[i + 1][j + 1];
       const d = idx[i + 1][j];
-      if (flip) mb.quad(a, d, c, b);
-      else mb.quad(a, b, c, d);
+      // Winding must match the analytic normal du×dv (+ for flip=false):
+      // rows advance along du, cols along dv, so CCW seen from +normal is
+      // a→d→c→b. (The original a→b→c→d emitted front faces opposite the
+      // stored normals — the M8a culled-surfaces defect.)
+      if (flip) mb.quad(a, b, c, d);
+      else mb.quad(a, d, c, b);
     }
   }
   return mb;

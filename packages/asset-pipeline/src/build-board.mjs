@@ -78,7 +78,12 @@ function deckPoint(u, tn, surface) {
   const s = -BOARD.length / 2 + u * BOARD.length; // Z
   const w = halfWidthAt(s);
   const x = tn * w;
-  const concave = BOARD.concaveRise * tn * tn;
+  // Concave scales with the local width fraction so it collapses to zero as
+  // the plan outline converges at the tips. Without this, the tip vertex ring
+  // fans vertically (same x/z, different y per column) — the "nose spike"
+  // artifact flagged in M8a visual review (defect #5).
+  const widthFrac = w / (BOARD.width / 2);
+  const concave = BOARD.concaveRise * tn * tn * widthFrac;
   const kick = kickAt(s);
   const baseY = surface === 'top' ? BOARD.thickness / 2 : -BOARD.thickness / 2;
   return [x, baseY + concave + kick, s];
@@ -98,19 +103,23 @@ export function buildDeckParts(lodIndex) {
   const rows = L.deckRows;
   const cols = L.deckCols;
 
+  // UV note (review defect #4): texture X must run along the deck LENGTH.
+  // uvFn receives (u=lengthParam, v=widthParam); we emit [u, v]-style UVs.
+  // Wood (1024×512, planks along texture X) tiles 2× lengthwise so grain
+  // reads at deck scale; the bottom graphic (1024×256) maps exactly once.
   const top = gridSurface({
     rows,
     cols,
     pointFn: (i, j) => deckPoint(i / rows, -1 + 2 * (j / cols), 'top'),
     flip: false,
-    uvFn: (u, v) => [v, u],
+    uvFn: (u, v) => [u * 2, v],
   });
   const bottom = gridSurface({
     rows,
     cols,
     pointFn: (i, j) => deckPoint(i / rows, -1 + 2 * (j / cols), 'bottom'),
     flip: true,
-    uvFn: (u, v) => [v, u],
+    uvFn: (u, v) => [u, v],
   });
 
   // Rim: connect top & bottom outline (left rail v=0, right rail v=cols) with a

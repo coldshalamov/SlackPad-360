@@ -182,6 +182,43 @@ export class MeshBuilder {
     return this;
   }
 
+  /**
+   * Align triangle winding with the STORED vertex normals: for each triangle
+   * whose geometric (winding) normal opposes the average stored normal, swap
+   * two indices. Stored normals are the analytic intent in this toolkit;
+   * winding must follow them or front faces get backface-culled (M8a review:
+   * deck top/grip culled from above exposing the bottom graphic through the
+   * deck; wheels showing their interiors — the "translucent glass" defect).
+   * Idempotent; no-op for parts whose normals were recomputed from winding.
+   */
+  harmonizeWinding() {
+    for (let t = 0; t < this.indices.length; t += 3) {
+      const a = this.indices[t];
+      const b = this.indices[t + 1];
+      const c = this.indices[t + 2];
+      const ax = this.positions[a * 3];
+      const ay = this.positions[a * 3 + 1];
+      const az = this.positions[a * 3 + 2];
+      const e1x = this.positions[b * 3] - ax;
+      const e1y = this.positions[b * 3 + 1] - ay;
+      const e1z = this.positions[b * 3 + 2] - az;
+      const e2x = this.positions[c * 3] - ax;
+      const e2y = this.positions[c * 3 + 1] - ay;
+      const e2z = this.positions[c * 3 + 2] - az;
+      const gx = e1y * e2z - e1z * e2y;
+      const gy = e1z * e2x - e1x * e2z;
+      const gz = e1x * e2y - e1y * e2x;
+      const sx = this.normals[a * 3] + this.normals[b * 3] + this.normals[c * 3];
+      const sy = this.normals[a * 3 + 1] + this.normals[b * 3 + 1] + this.normals[c * 3 + 1];
+      const sz = this.normals[a * 3 + 2] + this.normals[b * 3 + 2] + this.normals[c * 3 + 2];
+      if (gx * sx + gy * sy + gz * sz < 0) {
+        this.indices[t + 1] = c;
+        this.indices[t + 2] = b;
+      }
+    }
+    return this;
+  }
+
   /** Typed-array view for glTF accessors. Uint16 indices when possible. */
   toTypedArrays() {
     const vcount = this.vertexCount();

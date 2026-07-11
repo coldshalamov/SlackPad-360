@@ -483,25 +483,25 @@
       "provenance": "procedural-authored",
       "retrievalDate": "2026-07-11",
       "originalFilename": null,
-      "checksum": "sha256:d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
-      "sha256": "d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
+      "checksum": "sha256:ab3f6ba721b5584f46b8ef18086e5b870e49417718e688a2d45a8db001611f50",
+      "sha256": "ab3f6ba721b5584f46b8ef18086e5b870e49417718e688a2d45a8db001611f50",
       "files": [
         {
           "file": "assets/generated/authored/staged/hero-board.lod0.glb",
-          "sha256": "d01b6ddde1aaf36987900d5a082572f92d775be0a223c278c56e18381f4e306a",
-          "bytes": 4322828,
+          "sha256": "ab3f6ba721b5584f46b8ef18086e5b870e49417718e688a2d45a8db001611f50",
+          "bytes": 3823060,
           "lod": 0
         },
         {
           "file": "assets/generated/authored/staged/hero-board.lod1.glb",
-          "sha256": "c04f85f519a78e19a8b095b0daff09b5cf91add662b268429e676b9015e21b95",
-          "bytes": 43872,
+          "sha256": "7753ac6a0debf0bf6e95fa969d6259b4b60624af7b1e4ff90288d26e63821376",
+          "bytes": 45320,
           "lod": 1
         },
         {
           "file": "assets/generated/authored/staged/hero-board.lod2.glb",
-          "sha256": "3f541494e44d592d6e20cb715c865cf93bbf1fd4d94b89e37163476a0d345fc0",
-          "bytes": 26104,
+          "sha256": "06f217a195d39547fdc69763dd7ba248511f08d977160a94c6bdd98ded097966",
+          "bytes": 26940,
           "lod": 2
         }
       ],
@@ -531,25 +531,25 @@
       "provenance": "procedural-authored",
       "retrievalDate": "2026-07-11",
       "originalFilename": null,
-      "checksum": "sha256:2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
-      "sha256": "2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
+      "checksum": "sha256:ca0eb5dee219dd290dcb3ff958b152ebbed863518dc83f221314c91546773ae3",
+      "sha256": "ca0eb5dee219dd290dcb3ff958b152ebbed863518dc83f221314c91546773ae3",
       "files": [
         {
           "file": "assets/generated/authored/staged/shoes.lod0.glb",
-          "sha256": "2736807af33c5de37ef1bba05475820dc01e3c4e7135588555b3ce8a8c15a442",
-          "bytes": 4379016,
+          "sha256": "ca0eb5dee219dd290dcb3ff958b152ebbed863518dc83f221314c91546773ae3",
+          "bytes": 4299856,
           "lod": 0
         },
         {
           "file": "assets/generated/authored/staged/shoes.lod1.glb",
-          "sha256": "fd56b2ae7a1ed12c0d3e254a01997da4931e7c1002c3b116a523564bb3569875",
-          "bytes": 46964,
+          "sha256": "ec1666abdd5d8b52c228926bba2c82a10d8e0c5a94538cdac006ec1beccf3242",
+          "bytes": 48204,
           "lod": 1
         },
         {
           "file": "assets/generated/authored/staged/shoes.lod2.glb",
-          "sha256": "feedd99afebd2a316fd4ac9c247d55ab19be108d5c0cd8cc3a46214be9ab5c4f",
-          "bytes": 15840,
+          "sha256": "44e074aa2b8c857ce2dea479660a5b4f83c0983b839e795c57750bf6bb0bcbdc",
+          "bytes": 17652,
           "lod": 2
         }
       ],
@@ -579,13 +579,13 @@
       "provenance": "procedural-authored",
       "retrievalDate": "2026-07-11",
       "originalFilename": null,
-      "checksum": "sha256:1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
-      "sha256": "1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
+      "checksum": "sha256:8078907863e817948dbfc3d04c4b673ef59b021495b90e9a55de23473747fec6",
+      "sha256": "8078907863e817948dbfc3d04c4b673ef59b021495b90e9a55de23473747fec6",
       "files": [
         {
           "file": "assets/generated/authored/staged/plaza-modules.glb",
-          "sha256": "1dedc67b7606cbad1325551f6723deb82deedbbc0ea3e29fd8f3e02320a917db",
-          "bytes": 6743160,
+          "sha256": "8078907863e817948dbfc3d04c4b673ef59b021495b90e9a55de23473747fec6",
+          "bytes": 6285808,
           "lod": 0
         }
       ],

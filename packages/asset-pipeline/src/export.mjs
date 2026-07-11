@@ -115,6 +115,10 @@ export function buildDocument({ materials, nodes, sceneName }) {
   }
 
   const makePrimitive = (builder, matKey) => {
+    // Universal guarantee: front faces follow the authored normals (M8a
+    // review winding-inversion defect — culled deck top / see-through
+    // wheels). Idempotent choke point covering every builder.
+    builder.harmonizeWinding();
     const { position, normal, texcoord, indices } = builder.toTypedArrays();
     const pos = doc.createAccessor().setType('VEC3').setArray(position).setBuffer(buffer);
     const nrm = doc.createAccessor().setType('VEC3').setArray(normal).setBuffer(buffer);

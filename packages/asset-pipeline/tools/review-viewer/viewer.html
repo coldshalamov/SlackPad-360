@@ -1,0 +1,109 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>SlackPad staged-asset review viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #86909c; }
+  #hud { position: fixed; top: 8px; left: 8px; color: #fff; font: 12px monospace; background: rgba(0,0,0,.45); padding: 6px 8px; border-radius: 4px; white-space: pre; }
+</style>
+<div id="hud">loading…</div>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const params = new URLSearchParams(location.search);
+  const file = params.get('file') || 'assets/generated/authored/staged/hero-board.lod0.glb';
+  const cam = params.get('cam') || 'top34'; // top34 | under | side | front | macro
+  const hud = document.getElementById('hud');
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fb4c8); // neutral daylight sky stand-in
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  // Soft sun + fill so shadows/readability match the rubric's daylight intent.
+  const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+  sun.position.set(3, 6, 4);
+  scene.add(sun, new THREE.AmbientLight(0xdfe8ff, 0.35));
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(30, 48).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x8b95a1, roughness: 0.95, metalness: 0 }),
+  );
+  scene.add(ground);
+
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100);
+
+  new GLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
+    .load(
+      '/' + file,
+      (gltf) => {
+        // Hide colliders (extras flags / naming convention).
+        gltf.scene.traverse((o) => {
+          const ex = o.userData || {};
+          if (ex.collider || /^COL_|_Col_\d+$/.test(o.name)) o.visible = false;
+        });
+        scene.add(gltf.scene);
+
+        // Rest the model on the ground plane.
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        gltf.scene.position.y -= box.min.y;
+        box.setFromObject(gltf.scene);
+        const c = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const R = Math.max(size.x, size.y, size.z);
+
+        const views = {
+          top34: [c.x + R * 1.2, c.y + R * 0.9, c.z + R * 1.2, c.x, c.y, c.z],
+          under: [c.x + R * 0.9, c.y + R * 0.75, c.z + R * 0.9, c.x, c.y, c.z], // model flipped below
+          side: [c.x + R * 1.6, c.y + size.y * 0.6, c.z, c.x, c.y, c.z],
+          front: [c.x, c.y + size.y * 0.8, c.z + R * 1.7, c.x, c.y, c.z],
+          macro: [c.x + R * 0.45, c.y + R * 0.3, c.z + R * 0.5, c.x, c.y * 0.5, c.z],
+        };
+        if (cam === 'under') {
+          // flip the model over to inspect the underside resting up
+          gltf.scene.rotation.z = Math.PI;
+          const b2 = new THREE.Box3().setFromObject(gltf.scene);
+          gltf.scene.position.y -= b2.min.y;
+        }
+        const v = views[cam] || views.top34;
+        camera.position.set(v[0], v[1], v[2]);
+        camera.lookAt(v[3], v[4], v[5]);
+
+        hud.textContent = `${file}\ncam=${cam}  size=${size.x.toFixed(3)}×${size.y.toFixed(3)}×${size.z.toFixed(3)}`;
+        renderer.render(scene, camera);
+        window.__scene = scene;
+        window.__model = gltf.scene;
+        window.__camera = camera;
+        window.__render = () => renderer.render(scene, camera);
+        window.__ready = true;
+      },
+      undefined,
+      (err) => { hud.textContent = 'ERROR: ' + err; window.__error = String(err); },
+    );
+
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.render(scene, camera);
+  });
+</script>

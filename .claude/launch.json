@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "-w", "@slackpad/game"],
       "port": 5173
+    },
+    {
+      "name": "asset-review-viewer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["packages/asset-pipeline/tools/review-viewer/serve.mjs", "8137"],
+      "port": 8137
     }
   ]
 }

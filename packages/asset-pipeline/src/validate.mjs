@@ -126,8 +126,49 @@ export async function validateFile(file, spec) {
     }
   }
 
+  // Winding consistency: triangle winding must agree with stored normals or
+  // front faces get culled (M8a review defect — deck top/grip invisible from
+  // above, wheels rendering their interiors as "translucent glass").
+  {
+    let inverted = 0;
+    let total = 0;
+    for (const mesh of root.listMeshes()) {
+      for (const prim of mesh.listPrimitives()) {
+        const pos = prim.getAttribute('POSITION')?.getArray();
+        const nrm = prim.getAttribute('NORMAL')?.getArray();
+        const idxAcc = prim.getIndices();
+        if (!pos || !nrm || !idxAcc) continue;
+        const idx = idxAcc.getArray();
+        for (let t = 0; t < idx.length; t += 3) {
+          const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
+          const ax = pos[a * 3];
+          const ay = pos[a * 3 + 1];
+          const az = pos[a * 3 + 2];
+          const e1x = pos[b * 3] - ax;
+          const e1y = pos[b * 3 + 1] - ay;
+          const e1z = pos[b * 3 + 2] - az;
+          const e2x = pos[c * 3] - ax;
+          const e2y = pos[c * 3 + 1] - ay;
+          const e2z = pos[c * 3 + 2] - az;
+          const gx = e1y * e2z - e1z * e2y;
+          const gy = e1z * e2x - e1x * e2z;
+          const gz = e1x * e2y - e1y * e2x;
+          const sx = nrm[a * 3] + nrm[b * 3] + nrm[c * 3];
+          const sy = nrm[a * 3 + 1] + nrm[b * 3 + 1] + nrm[c * 3 + 1];
+          const sz = nrm[a * 3 + 2] + nrm[b * 3 + 2] + nrm[c * 3 + 2];
+          total++;
+          if (gx * sx + gy * sy + gz * sz < 0) inverted++;
+        }
+      }
+    }
+    ok('winding-matches-normals', inverted === 0, `${inverted}/${total} inverted`);
+  }
+
   // Dimension checks.
-  if (spec.dims) spec.dims(root, ok, { findNode, boundsSize, boundsCenter, within });
+  if (spec.dims) spec.dims(root, ok, { findNode, boundsSize, boundsCenter, within, getBounds });
+
+  // Material look-target checks (async: decodes embedded MR textures).
+  if (spec.materialTargets) await spec.materialTargets(root, ok);
 
   return { file: path.basename(file), checks };
 }
@@ -145,6 +186,11 @@ function boardDims(root, ok, h) {
     const s = h.boundsSize(deck);
     ok('dim:deck-length(Z)~0.8', h.within(s[2], 0.8), s[2].toFixed(4));
     ok('dim:deck-width(X)~0.2', h.within(s[0], 0.2), s[0].toFixed(4));
+    // Spike guard (review defect #5): deck top must not exceed base + kick
+    // rise. A converging-tip fin previously poked ~0.012 above the kick.
+    const { getBounds } = h;
+    const b = getBounds(deck);
+    ok('geom:no-tip-spike (deck maxY<=0.0635)', b.max[1] <= 0.0635, b.max[1].toFixed(4));
   }
   const fr = h.findNode(root, 'Wheel_FR');
   const rr = h.findNode(root, 'Wheel_RR');
@@ -153,6 +199,66 @@ function boardDims(root, ok, h) {
     ok('dim:wheelbase~0.43', h.within(wb, 0.43), wb.toFixed(4));
     const d = h.boundsSize(fr)[1];
     ok('dim:wheel-diameter 0.054-0.060', d >= 0.054 && d <= 0.06, d.toFixed(4));
+  }
+}
+
+/**
+ * Material look-targets from the M8a visual review (defects #1–#3, #7).
+ * EFFECTIVE roughness = roughnessFactor × meanG(MR texture); likewise
+ * metalness. Locks: grip near-black matte, wheels opaque warm, trucks
+ * galvanized, deck-bottom graphic present.
+ */
+async function boardMaterialTargets(root, ok, textured) {
+  const matByName = Object.fromEntries(root.listMaterials().map((m) => [m.getName(), m]));
+
+  const meanChannel = async (tex, ch) => {
+    if (!tex) return null;
+    const { default: sharp } = await import('sharp');
+    const { data, info } = await sharp(Buffer.from(tex.getImage())).raw().toBuffer({ resolveWithObject: true });
+    let sum = 0;
+    const n = info.width * info.height;
+    for (let i = 0; i < n; i++) sum += data[i * info.channels + ch];
+    return sum / n / 255;
+  };
+  const effRough = async (m) =>
+    m.getRoughnessFactor() * ((await meanChannel(m.getMetallicRoughnessTexture(), 1)) ?? 1);
+  const effMetal = async (m) =>
+    m.getMetallicFactor() * ((await meanChannel(m.getMetallicRoughnessTexture(), 2)) ?? 1);
+
+  const grip = matByName.grip;
+  if (grip) {
+    const r = await effRough(grip);
+    const mtl = await effMetal(grip);
+    ok('mat:grip-matte (effRough>=0.9)', r >= 0.9, r.toFixed(3));
+    ok('mat:grip-nonmetal', mtl <= 0.05, mtl.toFixed(3));
+  } else ok('mat:grip-matte (effRough>=0.9)', false, 'grip material missing');
+
+  const ure = matByName.urethane;
+  if (ure) {
+    const bc = ure.getBaseColorFactor();
+    const r = await effRough(ure);
+    ok('mat:wheel-opaque', ure.getAlphaMode() === 'OPAQUE' && bc[3] === 1, `${ure.getAlphaMode()} a=${bc[3]}`);
+    ok('mat:wheel-soft-specular (0.3<=effRough<=0.65)', r >= 0.3 && r <= 0.65, r.toFixed(3));
+    ok('mat:wheel-warm-offwhite (r>=g>=b)', bc[0] >= bc[1] && bc[1] >= bc[2] && bc[0] > 0.7, bc.slice(0, 3).map((v) => v.toFixed(2)).join(','));
+  } else ok('mat:wheel-opaque', false, 'urethane material missing');
+
+  const truck = matByName.truckMetal;
+  if (truck) {
+    const mtl = await effMetal(truck);
+    const r = await effRough(truck);
+    ok('mat:truck-metallic (effMetal>=0.8)', mtl >= 0.8, mtl.toFixed(3));
+    ok('mat:truck-specular-streak (0.3<=effRough<=0.6)', r >= 0.3 && r <= 0.6, r.toFixed(3));
+  } else ok('mat:truck-metallic (effMetal>=0.8)', false, 'truckMetal material missing');
+
+  if (textured) {
+    const graphic = matByName.deckGraphic;
+    if (graphic) {
+      const tex = graphic.getBaseColorTexture();
+      const size = tex ? tex.getSize() : null;
+      ok('mat:deck-bottom-graphic-present (1024x256)', !!size && size[0] === 1024 && size[1] === 256, size ? size.join('x') : 'no texture');
+      const bc = graphic.getBaseColorFactor();
+      ok('mat:deck-graphic-not-double-darkened', bc[0] >= 0.9 && bc[1] >= 0.9 && bc[2] >= 0.9, bc.slice(0, 3).map((v) => v.toFixed(2)).join(','));
+    } else ok('mat:deck-bottom-graphic-present (1024x256)', false, 'deckGraphic material missing');
   }
 }
 
@@ -166,6 +272,7 @@ const boardSpec = (lod) => ({
         ? { Deck: 2600, Wheel_FR: 520, Truck_F: 1200 }
         : { Deck: 1000, Wheel_FR: 320, Truck_F: 720 },
   dims: boardDims,
+  materialTargets: (root, ok) => boardMaterialTargets(root, ok, lod === 0),
 });
 
 const shoeSpec = (lod) => ({
@@ -178,6 +285,10 @@ const shoeSpec = (lod) => ({
     if (shoe) {
       const s = h.boundsSize(shoe);
       ok('dim:shoe-length(Z)~0.29', h.within(s[2], 0.29, 0.05), s[2].toFixed(4));
+      // Review defect #6c: low-profile skate shoe, not a bread loaf. Overall
+      // AABB height stays under 0.07 (collar peak) and width reads wide.
+      ok('dim:shoe-low-profile (height<=0.07)', s[1] <= 0.07, s[1].toFixed(4));
+      ok('dim:shoe-width 0.095-0.115', s[0] >= 0.095 && s[0] <= 0.115, s[0].toFixed(4));
     }
   },
 });
