@@ -17,6 +17,7 @@ import type { RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
 import type { Quat, SimConfig, Vec3 } from '@slackpad/shared';
 import { getLevelBuilder } from './levels/index';
 import type { Rng } from './levels/types';
+import type { GroundCommand } from '../control/GroundCommand';
 
 /** Full rigid-body observation (position, orientation, linear/angular velocity). */
 export interface BoardPose {
@@ -163,6 +164,106 @@ export class SimWorld {
   }
 
   /**
+   * Ground-proximity read (M3). True when the board center is within
+   * `physics.groundedTolerance` of its resting height (truckDropY + truck
+   * half-height). During the spawn drop the board is high, so this reads false
+   * until it settles — the controller applies no ground forces mid-air. This is
+   * the narrow query BoardController may consult; it never exposes the body.
+   */
+  isGrounded(): boolean {
+    const body = this.requireBoard();
+    const phys = this.config.physics;
+    const restHeight = phys.truckDropY + phys.truckHalfExtents.y;
+    const y = body.translation().y;
+    return Number.isFinite(y) && y <= restHeight + phys.groundedTolerance;
+  }
+
+  /**
+   * Apply a GroundCommand to the board (M3). This is the ONLY place ground
+   * intents touch the body: every component is validated + clamped from config,
+   * velocity caps are enforced as FORCE limiting (no hard velocity writes, no
+   * teleports), and any non-finite input is dropped. BoardController never gets
+   * body/world access — it produces the plain-data command; SimWorld applies it.
+   *
+   * Must be called BEFORE step() so the impulses integrate this tick.
+   */
+  applyGroundForces(cmd: GroundCommand): void {
+    if (!cmd.active) return;
+    const body = this.requireBoard();
+    const phys = this.config.physics;
+    const loco = this.config.locomotion;
+    const dt = 1 / phys.hz;
+    const mass = phys.boardMass;
+
+    const lv = body.linvel();
+    const av = body.angvel();
+    const q = body.rotation();
+    // Bail on any non-finite body state rather than propagate NaN into step().
+    for (const v of [lv.x, lv.y, lv.z, av.x, av.y, av.z, q.x, q.y, q.z, q.w]) {
+      if (!Number.isFinite(v)) return;
+    }
+
+    // Board-forward (+Z nose) in world space, projected onto the horizontal
+    // plane so ground drive/push never push the board into or out of the floor.
+    const fwd = quatRotate(q, 0, 0, 1);
+    const fh = Math.hypot(fwd.x, fwd.z);
+    const hasForward = fh > 1e-4;
+    const fx = hasForward ? fwd.x / fh : 0;
+    const fz = hasForward ? fwd.z / fh : 0;
+    const fwdSpeed = lv.x * fx + lv.z * fz;
+
+    const impulse = { x: 0, y: 0, z: 0 };
+
+    // --- Rolling friction: horizontal, speed-proportional coast drag ---------
+    // Gives a physical terminal speed (drive = drag) and stops push coasting
+    // from feeling like ice, without a hard velocity clamp.
+    const rf = clampNum(phys.rollingFriction, 0, 4);
+    impulse.x -= rf * mass * lv.x * dt;
+    impulse.z -= rf * mass * lv.z * dt;
+
+    // --- Cruise drive: force-based saturation toward cruiseTargetSpeed --------
+    if (hasForward && loco.cruiseTargetSpeed > 1e-4) {
+      const drive = clampNum(cmd.driveForce, 0, loco.cruiseDriveForce);
+      const scale = clampNum(1 - fwdSpeed / loco.cruiseTargetSpeed, 0, 1);
+      const mag = drive * scale * dt;
+      impulse.x += fx * mag;
+      impulse.z += fz * mag;
+    }
+
+    // --- Push pulse: one-shot impulse, momentum-capped at maxGroundSpeed ------
+    if (hasForward) {
+      const push = clampNum(cmd.pushImpulse, 0, phys.pushImpulse);
+      if (push > 0) {
+        const allowed = Math.max(0, (phys.maxGroundSpeed - fwdSpeed) * mass);
+        const applied = Math.min(push, allowed);
+        impulse.x += fx * applied;
+        impulse.z += fz * applied;
+      }
+    }
+
+    if (Number.isFinite(impulse.x) && Number.isFinite(impulse.z)) {
+      body.applyImpulse({ x: impulse.x, y: 0, z: impulse.z }, true);
+    }
+
+    // --- Steering: torque servo toward the clamped target yaw rate ------------
+    const targetYaw = clampNum(cmd.targetYawRate, -phys.steerYawRateMax, phys.steerYawRateMax);
+    const yawErr = targetYaw - av.y;
+    const yawTorque = clampNum(loco.steerServoGain * yawErr, -loco.steerMaxTorque, loco.steerMaxTorque);
+    const yawImpulse = yawTorque * dt;
+
+    // --- Lean roll: small clamped torque about the board-forward axis ---------
+    const rollTorque = clampNum(cmd.rollTorque, -loco.leanMaxRollTorque, loco.leanMaxRollTorque);
+    const rollImpulse = rollTorque * dt;
+
+    const tx = fwd.x * rollImpulse;
+    const ty = yawImpulse + fwd.y * rollImpulse;
+    const tz = fwd.z * rollImpulse;
+    if (Number.isFinite(tx) && Number.isFinite(ty) && Number.isFinite(tz)) {
+      body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
+    }
+  }
+
+  /**
    * Render pose interpolated between the previous and current step by alpha in
    * [0, 1]. Renderer only — never feeds back into the sim.
    */
@@ -205,6 +306,24 @@ export class SimWorld {
     if (!this.#board) throw new Error('SimWorld.reset() must run before use');
     return this.#board;
   }
+}
+
+function clampNum(v: number, lo: number, hi: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Rotate the vector (x,y,z) by quaternion q. Returns a plain Vec3. */
+function quatRotate(q: Quat, x: number, y: number, z: number): Vec3 {
+  // v' = v + 2*w*(qv × v) + 2*(qv × (qv × v))
+  const tx = 2 * (q.y * z - q.z * y);
+  const ty = 2 * (q.z * x - q.x * z);
+  const tz = 2 * (q.x * y - q.y * x);
+  return {
+    x: x + q.w * tx + (q.y * tz - q.z * ty),
+    y: y + q.w * ty + (q.z * tx - q.x * tz),
+    z: z + q.w * tz + (q.x * ty - q.y * tx),
+  };
 }
 
 /** Normalized quaternion lerp (shortest arc). Cosmetic render interpolation. */

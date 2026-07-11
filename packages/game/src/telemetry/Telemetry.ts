@@ -20,6 +20,13 @@ export type TelemetryEvent =
   | { type: 'sourceRegistered'; source: string }
   | { type: 'recordingStarted'; step: number }
   | { type: 'recordingStopped'; step: number; frames: number; checkpoints: number }
+  // --- M3 recognizer/controller events -----------------------------------
+  | { type: 'footRebind'; reason: string; role?: 'nose' | 'tail'; step?: number; dropped?: number }
+  | { type: 'kick'; step: number; mask: 'nose' | 'tail' | 'both' | 'none' }
+  | { type: 'push'; step: number; mask: string }
+  | { type: 'recenter'; reason: string }
+  | { type: 'groundControl'; step: number; drive: number; yaw: number; bothPlanted: boolean }
+  | { type: 'profileChanged'; patch: Record<string, unknown> }
   // Escape hatch for ad-hoc diagnostic events (never used for gameplay logic).
   | { type: string; [key: string]: unknown };
 

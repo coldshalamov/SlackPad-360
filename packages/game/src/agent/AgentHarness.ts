@@ -23,11 +23,13 @@ import {
   DEFAULT_INPUT_PROFILE,
   DEFAULT_SIM_CONFIG,
   REPLAY_VERSION,
+  deepFreezeConfig,
   fnv1a,
 } from '@slackpad/shared';
 import type {
   ContactFrame,
   ContactFrameSource,
+  InputProfile,
   ObserveState,
   ReplayCheckpoint,
   ReplayHeader,
@@ -38,7 +40,13 @@ import { SimWorld } from '../sim/SimWorld';
 import type { BoardPose, RenderPose } from '../sim/SimWorld';
 import { InputHub } from '../input/InputHub';
 import { Telemetry } from '../telemetry/Telemetry';
+import { FootTracker } from '../input/FootTracker';
+import type { FeetState } from '../input/FootTracker';
+import { BoardController } from '../control/BoardController';
 import { DEFAULT_LEVEL_ID } from '../sim/levels/index';
+
+/** Reads the current InputProfile snapshot on each reset (dev ProfileStore). */
+export type ProfileProvider = () => InputProfile;
 
 /** Pinned versions recorded in replay headers (must match package.json). */
 export const GAME_VERSION = '0.1.0';
@@ -83,6 +91,13 @@ export class AgentHarness {
   #telemetry: Telemetry;
   #config: SimConfig;
 
+  // M3 recognizer/controller pipeline (runs inside #advance, single-step auth).
+  #profileProvider: ProfileProvider | null;
+  #profile: InputProfile;
+  #footTracker: FootTracker;
+  #boardController: BoardController;
+  #feetState: FeetState | null = null;
+
   // Placeholder maneuver/observation state (recognition + assist arrive later).
   #assistLevel: 0 | 1 | 2;
   #lastInputSource: ContactFrameSource | null = null;
@@ -98,12 +113,42 @@ export class AgentHarness {
 
   #screenshotProvider: ScreenshotProvider | null = null;
 
-  constructor(config: SimConfig = DEFAULT_SIM_CONFIG) {
+  constructor(config: SimConfig = DEFAULT_SIM_CONFIG, profileProvider: ProfileProvider | null = null) {
     this.#config = config;
     this.#telemetry = new Telemetry(config.runtime.telemetry.ringCapacity);
     this.#world = new SimWorld(config);
     this.#inputHub = new InputHub(this.#telemetry);
-    this.#assistLevel = DEFAULT_INPUT_PROFILE.assistLevel;
+    this.#profileProvider = profileProvider;
+    // Init from DEFAULT here; the provider (if any) is read on reset() only, so
+    // construction never depends on a store that is wired up after the harness.
+    this.#profile = deepFreezeConfig(structuredClone(DEFAULT_INPUT_PROFILE));
+    this.#assistLevel = this.#profile.assistLevel;
+    this.#footTracker = this.#makeFootTracker();
+    this.#boardController = this.#makeBoardController();
+  }
+
+  /** Deep-frozen private copy of the current profile — trackers only read it. */
+  #snapshotProfile(): InputProfile {
+    const src = this.#profileProvider ? this.#profileProvider() : DEFAULT_INPUT_PROFILE;
+    return deepFreezeConfig(structuredClone(src));
+  }
+
+  #makeFootTracker(): FootTracker {
+    return new FootTracker(
+      this.#config.footTracker,
+      this.#config.recognition.plantSpeedEps,
+      this.#profile,
+      this.#telemetry,
+    );
+  }
+
+  #makeBoardController(): BoardController {
+    return new BoardController(
+      this.#config.locomotion,
+      this.#config.physics,
+      this.#profile,
+      this.#telemetry,
+    );
   }
 
   /** One-time engine init (idempotent). reset() also awaits this. */
@@ -123,6 +168,13 @@ export class AgentHarness {
     this.#recordedCheckpoints = [];
     this.#lastInputSource = null;
     this.#inputDigest = INPUT_DIGEST_SEED;
+    // Re-read the profile immutably and rebuild the recognizer/controller so a
+    // dev profile edit (stance/calibration/assist) applies from step 0.
+    this.#profile = this.#snapshotProfile();
+    this.#assistLevel = this.#profile.assistLevel;
+    this.#footTracker = this.#makeFootTracker();
+    this.#boardController = this.#makeBoardController();
+    this.#feetState = null;
     this.#telemetry.log({ type: 'reset', step: 0, seed, levelId });
   }
 
@@ -149,8 +201,6 @@ export class AgentHarness {
   /** observe(): read-only, deep-copied ObserveState (exact shared shape). */
   observe(): ObserveState {
     const pose = this.#world.boardPose();
-    const inset = this.#config.physics.truckInsetZ;
-    const deckTop = this.#config.physics.deckThickness / 2;
     return {
       step: this.#world.getStep(),
       seed: this.#world.getSeed(),
@@ -164,13 +214,39 @@ export class AgentHarness {
       label: null,
       assistLevel: this.#assistLevel,
       feet: {
-        nose: { planted: false, offset: { x: 0, y: deckTop, z: inset } },
-        tail: { planted: false, offset: { x: 0, y: deckTop, z: -inset } },
+        nose: this.#footObservation('nose'),
+        tail: this.#footObservation('tail'),
       },
       grind: null,
       score: 0,
       lastFailReason: null,
       inputSource: this.#lastInputSource,
+    };
+  }
+
+  /**
+   * Project the internal FeetState onto the ObserveState.feet contract — ONLY
+   * {planted, board-local socket offset}. The rich FeetState (velocity, segment,
+   * offsetFromRest) stays internal; leaking extra keys would break the agent
+   * contract. Calibrated pad offset-from-rest maps to a board-local socket
+   * offset by locomotion.padToBoardScale (presentation only).
+   */
+  #footObservation(role: 'nose' | 'tail'): { planted: boolean; offset: { x: number; y: number; z: number } } {
+    const inset = this.#config.physics.truckInsetZ;
+    const deckTop = this.#config.physics.deckThickness / 2;
+    const baseZ = role === 'nose' ? inset : -inset;
+    const foot = this.#feetState ? this.#feetState[role] : null;
+    if (!foot || !foot.planted) {
+      return { planted: false, offset: { x: 0, y: deckTop, z: baseZ } };
+    }
+    const scale = this.#config.locomotion.padToBoardScale;
+    return {
+      planted: true,
+      offset: {
+        x: scale * foot.offsetFromRest.x,
+        y: deckTop,
+        z: baseZ + scale * foot.offsetFromRest.y,
+      },
     };
   }
 
@@ -354,15 +430,24 @@ export class AgentHarness {
   }
 
   /**
-   * Recognizer hook placeholder. M2 has no GestureFSM/ManeuverAssist yet, so
-   * this only records which source last fed the sim (observability). It never
-   * writes board pose — recognition drives impulses within clamps in M4/M5.
+   * The M3 per-step recognizer/controller pipeline, run between drain and
+   * world.step() (single-step authority): FootTracker.update(frames) →
+   * BoardController.applyGroundControl(...) → SimWorld.applyGroundForces(cmd).
+   * Impulses are applied before the step so they integrate this tick. It never
+   * writes board pose directly — SimWorld clamps every command component.
    */
   #runRecognizer(frames: ContactFrame[]): void {
     if (frames.length > 0) {
       const last = frames[frames.length - 1];
       if (last) this.#lastInputSource = last.source;
     }
+    const step = this.#world.getStep();
+    const feet = this.#footTracker.update(frames, step);
+    const kicks = this.#footTracker.drainKicks();
+    const grounded = this.#world.isGrounded();
+    const cmd = this.#boardController.applyGroundControl(feet, kicks, grounded, step);
+    this.#world.applyGroundForces(cmd);
+    this.#feetState = feet;
   }
 
   #validateReplayHeader(trace: SessionTrace): void {

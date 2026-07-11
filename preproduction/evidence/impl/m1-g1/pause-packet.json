@@ -18,7 +18,7 @@
     "metrics.json",
     "traces/*.jsonl"
   ],
-  "resume_commit": "<fill at commit>",
+  "resume_commit": "195677e (feat(m1): dual adapter ContactFrame spike)",
   "next_milestone": "M6 G2 prep / M8 content unlock",
   "notes": [
     "The host never fabricates hardware evidence: metrics.json is written ONLY at the end of an actual recording session with >=1 frame. Unit tests use fixtures under host/SlackPad.Host.Tests/fixtures/ and write only to temp dirs.",

@@ -53,13 +53,19 @@ export const flatDev: LevelBuilder = (rapier, world, config, rng) => {
   );
 
   // Two truck boxes below the deck at ±truckInsetZ (massless collision geo).
+  // The trucks are the ground-contact geometry and use the low `truckFriction`
+  // so the board ROLLS (M3 ground locomotion); the deck keeps `boardFriction`.
   const t = phys.truckHalfExtents;
   for (const insetZ of [phys.truckInsetZ, -phys.truckInsetZ]) {
     world.createCollider(
       rapier.ColliderDesc.cuboid(t.x, t.y, t.z)
         .setTranslation(0, -phys.truckDropY, insetZ)
         .setDensity(0)
-        .setFriction(phys.boardFriction)
+        .setFriction(phys.truckFriction)
+        // Min combine rule: the trucks glide at THEIR low friction regardless of
+        // the (grippy) ground, so cruise/push forces are not eaten by the
+        // averaged coefficient (Average would give ~0.48 → ~11 N of drag).
+        .setFrictionCombineRule(rapier.CoefficientCombineRule.Min)
         .setRestitution(phys.boardRestitution),
       board,
     );

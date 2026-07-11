@@ -69,6 +69,26 @@ export interface FootTrackerConfig {
   dualLiftClearMs: number;
   /** Max reassignments/min while held before tracker degrades gracefully. */
   idThrashWarnPerMin: number;
+  // --- M3 additions -----------------------------------------------------
+  /**
+   * EMA smoothing factor (0..1) for foot velocity, segment angular velocity and
+   * midpoint velocity finite differences. Higher = snappier / noisier, lower =
+   * smoother / laggier. New sample weight per update.
+   */
+  velEmaAlpha: number;
+  /**
+   * Spatial rebind radius in CALIBRATED pad units. On re-plant after a lift a
+   * contact rebinds to a remembered role only if within this distance of that
+   * role's last position; otherwise it is a fresh assignment.
+   */
+  rebindRadius: number;
+  /**
+   * Soft-recenter drift rate, 1/s. Once both feet have been planted and nearly
+   * still for `recenterHoldMs`, the rest pose eases toward the current pose at
+   * this rate (per second), never in a sudden jump. `restNew = rest + (cur -
+   * rest) * clamp(recenterRateHz * dt, 0, 1)`.
+   */
+  recenterRateHz: number;
 }
 
 export interface PopConfig {
@@ -171,8 +191,22 @@ export interface PhysicsConfig {
    * seed so that different seeds diverge (M2 determinism / cross-seed golden).
    */
   spawnJitter: number;
-  /** Board collider friction coefficient. */
+  /** Board (deck) collider friction coefficient. Deck grips rails/ledges. */
   boardFriction: number;
+  /**
+   * Truck collider friction coefficient (M3). The trucks are the ground-contact
+   * geometry; keeping them low-friction models the wheels/trucks ROLLING so
+   * gentle cruise forces are not pinned by static friction (μN ≈ 20 N at
+   * boardMass). Deck keeps `boardFriction` for rail/ledge grip.
+   */
+  truckFriction: number;
+  /**
+   * Ground-proximity tolerance, m (M3). `isGrounded()` reports true when the
+   * board center height is within this margin of its resting height
+   * (truckDropY + truckHalfExtents.y). During the spawn drop the board is high,
+   * so it reads NOT grounded until it settles — no ground forces mid-air.
+   */
+  groundedTolerance: number;
   /** Board collider restitution (bounce). */
   boardRestitution: number;
   /** Board rigid-body linear/angular damping (settles the drop). */
@@ -183,6 +217,65 @@ export interface PhysicsConfig {
     halfExtents: { x: number; y: number; z: number };
     friction: number;
   };
+}
+
+/**
+ * Ground-locomotion control gains (M3). These are CONTROLLER tunables (how
+ * input maps to intent), distinct from the raw body/collider properties in
+ * PhysicsConfig. BoardController emits body-state-free intents; SimWorld applies
+ * them inside these clamps against live linear/angular velocity. All are
+ * hypothesis defaults for G2 tuning.
+ */
+export interface LocomotionConfig {
+  /**
+   * Cruise asymptotic ground speed, m/s. Holding both feet planted drives the
+   * board toward this speed (below the hard `physics.maxGroundSpeed` cap that
+   * push pulses respect). Feel target ~4 m/s.
+   */
+  cruiseTargetSpeed: number;
+  /**
+   * Base forward drive force for cruise, N. SimWorld scales it by
+   * `(1 - forwardSpeed / cruiseTargetSpeed)` so drive fades to zero at the
+   * target — force-based saturation, never a hard velocity write.
+   */
+  cruiseDriveForce: number;
+  /** Minimum sim steps between push pulses (cooldown) so a held click is one push. */
+  pushCooldownSteps: number;
+  /**
+   * Segment angular velocity (rad/s) → target board yaw rate scale. The primary
+   * steering signal. Result is clamped to `physics.steerYawRateMax`.
+   */
+  steerYawGain: number;
+  /**
+   * Sustained segment angle-from-rest (rad) → added heading-bias yaw rate, 1/s.
+   * Smaller than the angular-velocity term so a slow deliberate hold still
+   * steers.
+   */
+  steerHeadingBiasGain: number;
+  /**
+   * Yaw servo gain, N·m per (rad/s) of yaw-rate error. SimWorld drives angular
+   * velocity toward the (clamped) target yaw rate with a torque limited by
+   * `steerMaxTorque` — no direct angular-velocity writes.
+   */
+  steerServoGain: number;
+  /** Steering torque clamp, N·m. */
+  steerMaxTorque: number;
+  /**
+   * Midpoint lateral offset-from-rest (calibrated pad units) → mild carve yaw
+   * rate contribution, 1/s. Lets a lateral lean add a gentle turn.
+   */
+  leanCarveGain: number;
+  /** Midpoint lateral offset → cosmetic roll torque, N·m per unit offset. */
+  leanRollGain: number;
+  /** Roll torque clamp, N·m (kept small so lean can never flip the board). */
+  leanMaxRollTorque: number;
+  /**
+   * Scale mapping a calibrated pad offset-from-rest to a board-local shoe socket
+   * offset (m) for ObserveState.feet. Presentation only; never drives physics.
+   */
+  padToBoardScale: number;
+  /** Emit a sampled `groundControl` telemetry event every N sim steps (throttle). */
+  groundControlLogEvery: number;
 }
 
 /**
@@ -215,6 +308,7 @@ export interface SimConfig {
   land: LandConfig;
   grind: GrindConfig;
   physics: PhysicsConfig;
+  locomotion: LocomotionConfig;
   runtime: RuntimeConfig;
 }
 
@@ -239,6 +333,9 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     ballisticPredictMs: 200,
     dualLiftClearMs: 500,
     idThrashWarnPerMin: 2,
+    velEmaAlpha: 0.4,
+    rebindRadius: 0.18,
+    recenterRateHz: 1.5,
   },
   pop: {
     jMin: 2.2,
@@ -278,7 +375,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     boardWidth: 0.2,
     wheelbase: 0.43,
     boardMass: 2.4,
-    pushImpulse: 1.6,
+    pushImpulse: 2.9,
     maxGroundSpeed: 8.0,
     steerYawRateMax: 2.6,
     rollingFriction: 0.18,
@@ -290,6 +387,8 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     spawnHeight: 0.6,
     spawnJitter: 0.02,
     boardFriction: 0.8,
+    truckFriction: 0.06,
+    groundedTolerance: 0.06,
     boardRestitution: 0.1,
     linearDamping: 0.05,
     angularDamping: 0.2,
@@ -297,6 +396,20 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
       halfExtents: { x: 25, y: 0.1, z: 25 },
       friction: 0.9,
     },
+  },
+  locomotion: {
+    cruiseTargetSpeed: 5.5,
+    cruiseDriveForce: 20,
+    pushCooldownSteps: 12,
+    steerYawGain: 1.2,
+    steerHeadingBiasGain: 2.5,
+    steerServoGain: 3.0,
+    steerMaxTorque: 2.6,
+    leanCarveGain: 1.4,
+    leanRollGain: 0.6,
+    leanMaxRollTorque: 0.25,
+    padToBoardScale: 0.6,
+    groundControlLogEvery: 15,
   },
   runtime: {
     loop: { maxFrameMs: 250, maxStepsPerFrame: 5 },

@@ -215,7 +215,13 @@ describe('replay-hash golden (G4)', () => {
   afterAll(() => {
     if (UPDATE_GOLDENS) {
       mkdirSync(dirname(BASELINE_PATH), { recursive: true });
-      writeFileSync(BASELINE_PATH, `${JSON.stringify(newBaselines, null, 2)}\n`, 'utf8');
+      // Merge, don't overwrite: ground-golden.test.ts shares this file. Under
+      // the forks pool, regenerate with --no-file-parallelism so the two
+      // writers cannot race (read-modify-write is only serialized then).
+      const current: Record<string, string> = existsSync(BASELINE_PATH)
+        ? (JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as Record<string, string>)
+        : {};
+      writeFileSync(BASELINE_PATH, `${JSON.stringify({ ...current, ...newBaselines }, null, 2)}\n`, 'utf8');
     }
     const dir = process.env.GOLDEN_REPORT_DIR;
     if (!dir) return;
