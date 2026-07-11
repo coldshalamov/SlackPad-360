@@ -25,7 +25,7 @@ export interface InputProfile {
   };
 }
 
-export const DEFAULT_INPUT_PROFILE: InputProfile = {
+export const DEFAULT_INPUT_PROFILE: InputProfile = deepFreezeConfig({
   stance: 'regular',
   padYawOffset: 0,
   swapFeet: false,
@@ -36,7 +36,7 @@ export const DEFAULT_INPUT_PROFILE: InputProfile = {
     reducedMotion: false,
     highContrastHud: false,
   },
-};
+} as InputProfile);
 
 export interface RecognitionConfig {
   /** Confidence to open a label (hypothesis 0.55). */
@@ -141,6 +141,69 @@ export interface PhysicsConfig {
   rollingFriction: number;
   /** Collision impulse above which maneuvers interrupt (T_col). */
   interruptCollisionImpulse: number;
+
+  // --- Model A rigid body construction (M2) -----------------------------
+  /**
+   * Deck cuboid thickness, m (final-physics-animation-camera-spec §1: deck
+   * cuboid ~0.05 thick). Long axis is local +Z, width is local X.
+   */
+  deckThickness: number;
+  /** Half-extents of each truck box collider, m. */
+  truckHalfExtents: { x: number; y: number; z: number };
+  /**
+   * |Z| offset of each truck box from board center, m. Two trucks at ±this
+   * along the long axis (defaults to wheelbase / 2).
+   */
+  truckInsetZ: number;
+  /**
+   * Downward offset (m) of each truck box center below the deck center. With
+   * truckDropY 0.055 and truck half-height 0.03 the truck undersides sit
+   * 0.085 m below board center, so the resting board-center height is
+   * ~0.085 m (observed ~0.084 with contact slop) — the spec's "deck height
+   * ~0.09 m" class.
+   */
+  truckDropY: number;
+  /** Board center height at spawn/reset, m (board drops onto the ground). */
+  spawnHeight: number;
+  /**
+   * Seeded reset variation magnitude. Position jitter is up to this many m and
+   * angular-velocity jitter up to this many rad/s, both derived from the reset
+   * seed so that different seeds diverge (M2 determinism / cross-seed golden).
+   */
+  spawnJitter: number;
+  /** Board collider friction coefficient. */
+  boardFriction: number;
+  /** Board collider restitution (bounce). */
+  boardRestitution: number;
+  /** Board rigid-body linear/angular damping (settles the drop). */
+  linearDamping: number;
+  angularDamping: number;
+  /** Static ground plane collider. Top surface sits at world y = 0. */
+  ground: {
+    halfExtents: { x: number; y: number; z: number };
+    friction: number;
+  };
+}
+
+/**
+ * App/runtime engine tunables introduced in M2. Not physics laws; these govern
+ * the fixed-timestep loop, telemetry retention, and replay checkpoint cadence.
+ */
+export interface RuntimeConfig {
+  loop: {
+    /** Max real time (ms) folded into the accumulator per frame (anti-spiral). */
+    maxFrameMs: number;
+    /** Max fixed steps executed per rendered frame (anti-spiral clamp). */
+    maxStepsPerFrame: number;
+  };
+  telemetry: {
+    /** Bounded ring-log capacity (events beyond this drop oldest-first). */
+    ringCapacity: number;
+  };
+  replay: {
+    /** Emit a checkpoint hash every N sim steps while recording. */
+    checkpointEverySteps: number;
+  };
 }
 
 export interface SimConfig {
@@ -152,9 +215,13 @@ export interface SimConfig {
   land: LandConfig;
   grind: GrindConfig;
   physics: PhysicsConfig;
+  runtime: RuntimeConfig;
 }
 
-export const DEFAULT_SIM_CONFIG: SimConfig = {
+// Deep-frozen at definition: the shared defaults are a contract, not a
+// scratchpad. Tampering (including by injected agent code) throws in strict
+// mode. Runs needing tweaked values must clone first (e.g. structuredClone).
+export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
   recognition: {
     cEnter: 0.55,
     cExit: 0.4,
@@ -216,8 +283,27 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
     steerYawRateMax: 2.6,
     rollingFriction: 0.18,
     interruptCollisionImpulse: 8.0,
+    deckThickness: 0.05,
+    truckHalfExtents: { x: 0.05, y: 0.03, z: 0.03 },
+    truckInsetZ: 0.215,
+    truckDropY: 0.055,
+    spawnHeight: 0.6,
+    spawnJitter: 0.02,
+    boardFriction: 0.8,
+    boardRestitution: 0.1,
+    linearDamping: 0.05,
+    angularDamping: 0.2,
+    ground: {
+      halfExtents: { x: 25, y: 0.1, z: 25 },
+      friction: 0.9,
+    },
   },
-};
+  runtime: {
+    loop: { maxFrameMs: 250, maxStepsPerFrame: 5 },
+    telemetry: { ringCapacity: 10000 },
+    replay: { checkpointEverySteps: 30 },
+  },
+} as SimConfig);
 
 /** Fields the adaptive tuner may move, each within ±20% of default. */
 export const AUTO_ADJUSTABLE_FIELDS = [

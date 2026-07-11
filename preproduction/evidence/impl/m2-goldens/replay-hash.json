@@ -1,0 +1,23 @@
+[
+  {
+    "suite": "replay-hash-repro",
+    "passed": true,
+    "hashExpected": "30:b1084bd1|60:c4e19be1|90:d75aaabb|120:43065db3|150:f47eb52e|180:b579923e|210:878c6d60|240:393634b7",
+    "hashActual": "30:b1084bd1|60:c4e19be1|90:d75aaabb|120:43065db3|150:f47eb52e|180:b579923e|210:878c6d60|240:393634b7",
+    "steps": 240
+  },
+  {
+    "suite": "replay-hash-dual-run",
+    "passed": true,
+    "hashExpected": "30:dc7dd15d|60:b7dde8e4|90:d73efb28|120:c307c605|150:172cc004|180:28296794|210:6e386f0e|240:2f06ff05",
+    "hashActual": "30:dc7dd15d|60:b7dde8e4|90:d73efb28|120:c307c605|150:172cc004|180:28296794|210:6e386f0e|240:2f06ff05",
+    "steps": 240
+  },
+  {
+    "suite": "replay-hash-cross-seed",
+    "passed": true,
+    "hashExpected": "30:d5a6c573|60:0f506d37|90:60837ea9|120:536f245d|150:e62e377c|180:4067182c|210:7e082636|240:24b27ecd",
+    "hashActual": "30:ef6f4f93|60:c798b6e1|90:1e76dfd9|120:0b26e50d|150:97e5ca2c|180:a884499c|210:ab451aa6|240:632defbd",
+    "steps": 240
+  }
+]

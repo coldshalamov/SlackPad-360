@@ -33,6 +33,7 @@ run('validators: research followup', 'node research/probes/validate-followup.mjs
 run('validators: final package', 'node preproduction/probes/validate-final.mjs');
 run('typecheck', 'npm run typecheck');
 run('unit tests', 'npx vitest run');
+run('golden reports (G4 evidence)', 'node scripts/run-goldens.mjs');
 run('game production build', 'npm run build -w @slackpad/game');
 
 let hasNet10 = false;
