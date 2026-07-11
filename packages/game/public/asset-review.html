@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SlackPad 360 — Asset Review (dev tool)</title>
+<style>
+  body { margin: 0; background: #14171c; color: #dde; font: 13px system-ui; }
+  #hud { position: fixed; top: 8px; left: 8px; z-index: 2; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="hud">asset-review — use window.review.* from console/driver</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/@fs/C:/Users/93rob/Documents/GitHub/SlackPad%20360/node_modules/three/build/three.module.js",
+    "three/addons/": "/@fs/C:/Users/93rob/Documents/GitHub/SlackPad%20360/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const W = 960, H = 540;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a2f36);
+const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 100);
+
+// Neutral studio: soft key + fill + rim, grey ground disc.
+const key = new THREE.DirectionalLight(0xfff4e6, 3.2);
+key.position.set(2.5, 3.5, 2.0); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -2; key.shadow.camera.right = 2;
+key.shadow.camera.top = 2; key.shadow.camera.bottom = -2;
+const fill = new THREE.DirectionalLight(0xbcd4ff, 1.1); fill.position.set(-3, 2, -1.5);
+const rim = new THREE.DirectionalLight(0xffffff, 1.6); rim.position.set(0.5, 2.5, -3);
+scene.add(key, fill, rim, new THREE.AmbientLight(0x445566, 0.7));
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(4, 64).rotateX(-Math.PI / 2),
+  new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.9 })
+);
+ground.receiveShadow = true;
+scene.add(ground);
+
+let hdriLoaded = false;
+async function loadHdri() {
+  if (hdriLoaded) return;
+  try {
+    const hdr = await new RGBELoader().loadAsync(
+      '/@fs/C:/Users/93rob/Documents/GitHub/SlackPad 360/assets/source/vendor/ph-kloppenheim-05-puresky/kloppenheim_05_puresky_1k.hdr'
+    );
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = hdr;
+    scene.background = hdr;
+    hdriLoaded = true;
+  } catch (e) { console.warn('hdri load failed', e); }
+}
+
+const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
+let current = null;
+const STAGED = '/@fs/C:/Users/93rob/Documents/GitHub/SlackPad 360/assets/generated/authored/staged/';
+
+async function load(name, opts = {}) {
+  if (current) { scene.remove(current); current = null; }
+  const gltf = await loader.loadAsync(STAGED + name);
+  current = gltf.scene;
+  current.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.name.startsWith('COL_') || /_Col_/.test(o.name)) o.visible = false;
+    }
+  });
+  // Rest the model on the ground plane: shift so its AABB minY sits at y=0.
+  if (opts.restOnGround !== false) {
+    const box = new THREE.Box3().setFromObject(current);
+    current.position.y -= box.min.y;
+  }
+  ground.visible = opts.ground !== false;
+  scene.add(current);
+  return describe(current);
+}
+
+function describe(root) {
+  const parts = [];
+  root.traverse((o) => { if (o.isMesh || o.type === 'Object3D') parts.push(o.name || o.type); });
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3(); box.getSize(size);
+  return { parts: parts.slice(0, 40), size: { x: +size.x.toFixed(3), y: +size.y.toFixed(3), z: +size.z.toFixed(3) } };
+}
+
+function frame(dist = 1.0, elevDeg = 22, azimDeg = 35, targetY = 0.06) {
+  const el = elevDeg * Math.PI / 180, az = azimDeg * Math.PI / 180;
+  camera.position.set(dist * Math.cos(el) * Math.sin(az), targetY + dist * Math.sin(el), dist * Math.cos(el) * Math.cos(az));
+  camera.lookAt(0, targetY, 0);
+}
+
+function shot() {
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL('image/jpeg', 0.85);
+}
+
+async function saveShot(name, dir = 'm8-review') {
+  const dataUrl = shot();
+  const res = await fetch('/__shot', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, dir, dataUrl }),
+  });
+  return res.json();
+}
+
+/** Load a second GLB additively (e.g. shoes onto the board). */
+async function loadAdd(name, offset = { x: 0, y: 0, z: 0 }) {
+  const gltf = await loader.loadAsync(STAGED + name);
+  const obj = gltf.scene;
+  obj.position.set(offset.x, offset.y, offset.z);
+  obj.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.name.startsWith('COL_') || /_Col_/.test(o.name)) o.visible = false;
+    }
+  });
+  scene.add(obj);
+  return obj;
+}
+
+function setRotation(x = 0, y = 0, z = 0) {
+  if (current) current.rotation.set(x, y, z);
+}
+
+window.review = { load, loadAdd, frame, shot, saveShot, setRotation, loadHdri, scene, camera, renderer, THREE };
+document.getElementById('hud').textContent = 'asset-review ready';
+</script>
+</body>
+</html>
