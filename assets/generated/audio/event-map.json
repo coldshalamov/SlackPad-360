@@ -1,0 +1,635 @@
+{
+  "mapVersion": 1,
+  "status": "proxy-pending-listen-pass",
+  "method": "Objective selection from astats peak/RMS inventory (scripts/audio-inventory.mjs). gainDb = targetPeakDb - peakDb per variant. Subjective listen pass + G2 remain before runtime promotion (final-art-assets-world-audio-spec §3).",
+  "events": {
+    "roll": {
+      "strategy": "procedural",
+      "notes": "Speed-modulated filtered noise loop synthesized at runtime (no suitable field loop in acquired packs; real recording deferred per spec).",
+      "variants": []
+    },
+    "push": {
+      "strategy": "one-shot-variants",
+      "notes": "Soft scuff for a push stroke; footstep concrete reads as urethane-on-concrete scuff proxy.",
+      "targetPeakDb": -8,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_000.ogg",
+          "durationS": 0.106,
+          "peakDb": -0.925249,
+          "rmsDb": -20.850976,
+          "gainDb": -7.07
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_001.ogg",
+          "durationS": 0.108,
+          "peakDb": -1.209942,
+          "rmsDb": -22.359212,
+          "gainDb": -6.79
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_002.ogg",
+          "durationS": 0.113,
+          "peakDb": -0.993616,
+          "rmsDb": -22.663686,
+          "gainDb": -7.01
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_003.ogg",
+          "durationS": 0.11,
+          "peakDb": -1.084829,
+          "rmsDb": -21.654712,
+          "gainDb": -6.92
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_004.ogg",
+          "durationS": 0.114,
+          "peakDb": -0.997718,
+          "rmsDb": -21.15963,
+          "gainDb": -7
+        }
+      ]
+    },
+    "pop": {
+      "strategy": "one-shot-variants",
+      "notes": "Crisp tail-snap. impactWood medium has the right transient; pitch +2st at runtime for nollie.",
+      "targetPeakDb": -3,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_000.ogg",
+          "durationS": 0.333,
+          "peakDb": -1.034251,
+          "rmsDb": -22.564596,
+          "gainDb": -1.97
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_001.ogg",
+          "durationS": 0.333,
+          "peakDb": -1.045139,
+          "rmsDb": -22.514707,
+          "gainDb": -1.95
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_002.ogg",
+          "durationS": 0.333,
+          "peakDb": -1.078832,
+          "rmsDb": -22.579263,
+          "gainDb": -1.92
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_003.ogg",
+          "durationS": 0.333,
+          "peakDb": -1.036509,
+          "rmsDb": -22.705036,
+          "gainDb": -1.96
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_004.ogg",
+          "durationS": 0.333,
+          "peakDb": -1.129945,
+          "rmsDb": -22.12423,
+          "gainDb": -1.87
+        }
+      ]
+    },
+    "catch": {
+      "strategy": "one-shot-variants",
+      "notes": "Soft tick when feet re-pin the deck mid-air.",
+      "targetPeakDb": -9,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_000.ogg",
+          "durationS": 0.139,
+          "peakDb": -1.244923,
+          "rmsDb": -20.977018,
+          "gainDb": -7.76
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_001.ogg",
+          "durationS": 0.118,
+          "peakDb": -1.004983,
+          "rmsDb": -19.989201,
+          "gainDb": -8
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_002.ogg",
+          "durationS": 0.14,
+          "peakDb": -0.966436,
+          "rmsDb": -21.197292,
+          "gainDb": -8.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_003.ogg",
+          "durationS": 0.138,
+          "peakDb": -1.130735,
+          "rmsDb": -20.62373,
+          "gainDb": -7.87
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_004.ogg",
+          "durationS": 0.14,
+          "peakDb": -0.940666,
+          "rmsDb": -20.472764,
+          "gainDb": -8.06
+        }
+      ]
+    },
+    "land": {
+      "strategy": "one-shot-variants",
+      "notes": "Clean land = single variant; dirty land layers one wood_hit at −6. Scale gain by impact speed.",
+      "targetPeakDb": -3,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_000.ogg",
+          "durationS": 0.313,
+          "peakDb": -0.940491,
+          "rmsDb": -19.600156,
+          "gainDb": -2.06
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_001.ogg",
+          "durationS": 0.313,
+          "peakDb": -0.932777,
+          "rmsDb": -19.712229,
+          "gainDb": -2.07
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_002.ogg",
+          "durationS": 0.313,
+          "peakDb": -0.971426,
+          "rmsDb": -18.908409,
+          "gainDb": -2.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_003.ogg",
+          "durationS": 0.313,
+          "peakDb": -0.919942,
+          "rmsDb": -20.38974,
+          "gainDb": -2.08
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_004.ogg",
+          "durationS": 0.313,
+          "peakDb": -0.960797,
+          "rmsDb": -20.108563,
+          "gainDb": -2.04
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_01.ogg",
+          "durationS": 0.338,
+          "peakDb": -0.686189,
+          "rmsDb": -26.44537,
+          "gainDb": -2.31
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_02.ogg",
+          "durationS": 0.385,
+          "peakDb": 0.046837,
+          "rmsDb": -26.78757,
+          "gainDb": -3.05
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_03.ogg",
+          "durationS": 0.407,
+          "peakDb": -0.005787,
+          "rmsDb": -22.484105,
+          "gainDb": -2.99
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_04.ogg",
+          "durationS": 0.303,
+          "peakDb": -0.183474,
+          "rmsDb": -22.613369,
+          "gainDb": -2.82
+        }
+      ]
+    },
+    "bail": {
+      "strategy": "cluster",
+      "notes": "Layer punch_heavy + soft_heavy + a delayed wood_falling clatter (~120ms offset).",
+      "targetPeakDb": -2,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_000.ogg",
+          "durationS": 0.649,
+          "peakDb": -0.967794,
+          "rmsDb": -17.983106,
+          "gainDb": -1.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_001.ogg",
+          "durationS": 0.536,
+          "peakDb": -1.180115,
+          "rmsDb": -17.483592,
+          "gainDb": -0.82
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_002.ogg",
+          "durationS": 0.457,
+          "peakDb": -0.971524,
+          "rmsDb": -16.594266,
+          "gainDb": -1.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_003.ogg",
+          "durationS": 0.474,
+          "peakDb": -0.89129,
+          "rmsDb": -17.155537,
+          "gainDb": -1.11
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_004.ogg",
+          "durationS": 0.536,
+          "peakDb": -0.971475,
+          "rmsDb": -17.366262,
+          "gainDb": -1.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_000.ogg",
+          "durationS": 0.505,
+          "peakDb": -0.916688,
+          "rmsDb": -17.413937,
+          "gainDb": -1.08
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_001.ogg",
+          "durationS": 0.572,
+          "peakDb": -0.969316,
+          "rmsDb": -17.431821,
+          "gainDb": -1.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_002.ogg",
+          "durationS": 0.572,
+          "peakDb": -0.877341,
+          "rmsDb": -17.1398,
+          "gainDb": -1.12
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_003.ogg",
+          "durationS": 0.544,
+          "peakDb": -1.010133,
+          "rmsDb": -16.556785,
+          "gainDb": -0.99
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_004.ogg",
+          "durationS": 0.501,
+          "peakDb": -1.004579,
+          "rmsDb": -16.813079,
+          "gainDb": -1
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_01.ogg",
+          "durationS": 0.639,
+          "peakDb": 0.432545,
+          "rmsDb": -20.715188,
+          "gainDb": -2.43
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_02.ogg",
+          "durationS": 0.481,
+          "peakDb": -0.278249,
+          "rmsDb": -22.843278,
+          "gainDb": -1.72
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_03.ogg",
+          "durationS": 0.462,
+          "peakDb": 0.002183,
+          "rmsDb": -24.940797,
+          "gainDb": -2
+        }
+      ]
+    },
+    "grind-metal": {
+      "strategy": "granular-retrigger",
+      "notes": "PROXY: no true scrape loop acquired (Freesound 655371 auth-gated). Retrigger short metal hits at speed-scaled rate (18–40 Hz jittered) under a low-passed loop_machine bed at −16; crossfade out on exit.",
+      "targetPeakDb": -8,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_01.ogg",
+          "durationS": 0.269,
+          "peakDb": 0.023632,
+          "rmsDb": -20.502879,
+          "gainDb": -8.02
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_02.ogg",
+          "durationS": 0.435,
+          "peakDb": 0.073701,
+          "rmsDb": -24.067082,
+          "gainDb": -8.07
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_03.ogg",
+          "durationS": 0.395,
+          "peakDb": -5.948936,
+          "rmsDb": -23.59893,
+          "gainDb": -2.05
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_04.ogg",
+          "durationS": 0.373,
+          "peakDb": 0.063724,
+          "rmsDb": -22.889795,
+          "gainDb": -8.06
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_05.ogg",
+          "durationS": 0.329,
+          "peakDb": -0.035698,
+          "rmsDb": -26.318275,
+          "gainDb": -7.96
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_machine_01.ogg",
+          "durationS": 7.558,
+          "peakDb": -13.905795,
+          "rmsDb": -24.844339,
+          "gainDb": 5.91
+        }
+      ]
+    },
+    "grind-ledge": {
+      "strategy": "granular-retrigger",
+      "notes": "Wood/concrete ledge slide proxy: wood_misc shorts retriggered, denser with speed.",
+      "targetPeakDb": -9,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_01.ogg",
+          "durationS": 0.42,
+          "peakDb": 0.01499,
+          "rmsDb": -20.539937,
+          "gainDb": -9.01
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_02.ogg",
+          "durationS": 0.343,
+          "peakDb": 0.018092,
+          "rmsDb": -22.69348,
+          "gainDb": -9.02
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_03.ogg",
+          "durationS": 0.452,
+          "peakDb": 0.017577,
+          "rmsDb": -20.21052,
+          "gainDb": -9.02
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_04.ogg",
+          "durationS": 0.469,
+          "peakDb": 0.12342,
+          "rmsDb": -22.61113,
+          "gainDb": -9.12
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_05.ogg",
+          "durationS": 0.304,
+          "peakDb": 0.066017,
+          "rmsDb": -27.369899,
+          "gainDb": -9.07
+        }
+      ]
+    },
+    "ambience": {
+      "strategy": "loop-bed",
+      "notes": "Plaza daylight bed: loop_ambient birds/air + distant highway at −20 for city context.",
+      "targetPeakDb": -16,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_01.ogg",
+          "durationS": 10.086,
+          "peakDb": -8.770755,
+          "rmsDb": -25.551134,
+          "gainDb": -7.23
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_02.ogg",
+          "durationS": 2.998,
+          "peakDb": -4.071475,
+          "rmsDb": -19.727406,
+          "gainDb": -11.93
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_03.ogg",
+          "durationS": 3.511,
+          "peakDb": -10.961732,
+          "rmsDb": -25.721474,
+          "gainDb": -5.04
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_04.ogg",
+          "durationS": 10.125,
+          "peakDb": -9.567017,
+          "rmsDb": -26.155384,
+          "gainDb": -6.43
+        },
+        {
+          "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_highway.ogg",
+          "durationS": 16.669,
+          "peakDb": -5.375292,
+          "rmsDb": -28.917695,
+          "gainDb": -10.62
+        }
+      ]
+    },
+    "ui-click": {
+      "strategy": "ui",
+      "notes": "Menu navigate.",
+      "targetPeakDb": -10,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_001.ogg",
+          "durationS": 0.1,
+          "peakDb": -1.353501,
+          "rmsDb": -26.396274,
+          "gainDb": -8.65
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_002.ogg",
+          "durationS": 0.01,
+          "peakDb": -0.852132,
+          "rmsDb": -16.159071,
+          "gainDb": -9.15
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_003.ogg",
+          "durationS": 0.01,
+          "peakDb": -1.361219,
+          "rmsDb": -14.581249,
+          "gainDb": -8.64
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_004.ogg",
+          "durationS": 0.01,
+          "peakDb": -1.229664,
+          "rmsDb": -18.626344,
+          "gainDb": -8.77
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_005.ogg",
+          "durationS": 0.01,
+          "peakDb": -1.216678,
+          "rmsDb": -11.553229,
+          "gainDb": -8.78
+        }
+      ]
+    },
+    "ui-confirm": {
+      "strategy": "ui",
+      "notes": "Challenge complete / confirm.",
+      "targetPeakDb": -8,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_001.ogg",
+          "durationS": 0.29,
+          "peakDb": -0.929787,
+          "rmsDb": -11.31276,
+          "gainDb": -7.07
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_002.ogg",
+          "durationS": 0.539,
+          "peakDb": -0.955889,
+          "rmsDb": -14.883515,
+          "gainDb": -7.04
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_003.ogg",
+          "durationS": 0.322,
+          "peakDb": -0.98001,
+          "rmsDb": -15.222832,
+          "gainDb": -7.02
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_004.ogg",
+          "durationS": 0.49,
+          "peakDb": -0.911832,
+          "rmsDb": -11.775762,
+          "gainDb": -7.09
+        }
+      ]
+    },
+    "ui-error": {
+      "strategy": "ui",
+      "notes": "Invalid / locked.",
+      "targetPeakDb": -10,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_001.ogg",
+          "durationS": 0.165,
+          "peakDb": -0.803246,
+          "rmsDb": -18.993115,
+          "gainDb": -9.2
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_002.ogg",
+          "durationS": 0.165,
+          "peakDb": 0.575699,
+          "rmsDb": -17.546031,
+          "gainDb": -10.58
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_003.ogg",
+          "durationS": 0.533,
+          "peakDb": -0.501032,
+          "rmsDb": -20.036356,
+          "gainDb": -9.5
+        }
+      ]
+    },
+    "ui-select": {
+      "strategy": "ui",
+      "notes": "Focus move.",
+      "targetPeakDb": -10,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_001.ogg",
+          "durationS": 0.043,
+          "peakDb": -1.125474,
+          "rmsDb": -17.327309,
+          "gainDb": -8.87
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_002.ogg",
+          "durationS": 0.043,
+          "peakDb": -0.967987,
+          "rmsDb": -15.877639,
+          "gainDb": -9.03
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_003.ogg",
+          "durationS": 0.383,
+          "peakDb": -0.817947,
+          "rmsDb": -18.766408,
+          "gainDb": -9.18
+        }
+      ]
+    },
+    "ui-toggle": {
+      "strategy": "ui",
+      "notes": "Settings toggle.",
+      "targetPeakDb": -10,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_001.ogg",
+          "durationS": 0.139,
+          "peakDb": -0.908787,
+          "rmsDb": -14.017647,
+          "gainDb": -9.09
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_002.ogg",
+          "durationS": 0.139,
+          "peakDb": -0.949069,
+          "rmsDb": -12.092431,
+          "gainDb": -9.05
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_003.ogg",
+          "durationS": 0.139,
+          "peakDb": -0.937127,
+          "rmsDb": -14.324759,
+          "gainDb": -9.06
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_004.ogg",
+          "durationS": 0.066,
+          "peakDb": -0.941181,
+          "rmsDb": -16.264391,
+          "gainDb": -9.06
+        }
+      ]
+    },
+    "score-pop": {
+      "strategy": "ui",
+      "notes": "Trick score toast.",
+      "targetPeakDb": -9,
+      "variants": [
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_001.ogg",
+          "durationS": 0.023,
+          "peakDb": -0.804959,
+          "rmsDb": -21.479588,
+          "gainDb": -8.2
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_002.ogg",
+          "durationS": 0.023,
+          "peakDb": -1.208576,
+          "rmsDb": -16.643974,
+          "gainDb": -7.79
+        },
+        {
+          "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_004.ogg",
+          "durationS": 0.055,
+          "peakDb": -0.854949,
+          "rmsDb": -15.852242,
+          "gainDb": -8.15
+        }
+      ]
+    }
+  }
+}

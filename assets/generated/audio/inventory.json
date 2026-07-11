@@ -1,0 +1,3015 @@
+{
+  "generated": "audio-inventory.mjs",
+  "clips": [
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_carpet_000.ogg",
+      "durationS": 0.145,
+      "rmsDb": -23.66287,
+      "peakDb": -1.090971
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_carpet_001.ogg",
+      "durationS": 0.145,
+      "rmsDb": -19.624183,
+      "peakDb": -1.123918
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_carpet_002.ogg",
+      "durationS": 0.145,
+      "rmsDb": -19.624183,
+      "peakDb": -1.123918
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_carpet_003.ogg",
+      "durationS": 0.145,
+      "rmsDb": -22.855907,
+      "peakDb": -1.146218
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_carpet_004.ogg",
+      "durationS": 0.145,
+      "rmsDb": -22.855907,
+      "peakDb": -1.146218
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_000.ogg",
+      "durationS": 0.106,
+      "rmsDb": -20.850976,
+      "peakDb": -0.925249
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_001.ogg",
+      "durationS": 0.108,
+      "rmsDb": -22.359212,
+      "peakDb": -1.209942
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_002.ogg",
+      "durationS": 0.113,
+      "rmsDb": -22.663686,
+      "peakDb": -0.993616
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_003.ogg",
+      "durationS": 0.11,
+      "rmsDb": -21.654712,
+      "peakDb": -1.084829
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_concrete_004.ogg",
+      "durationS": 0.114,
+      "rmsDb": -21.15963,
+      "peakDb": -0.997718
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_grass_000.ogg",
+      "durationS": 0.778,
+      "rmsDb": -29.865842,
+      "peakDb": -1.057765
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_grass_001.ogg",
+      "durationS": 0.674,
+      "rmsDb": -28.811896,
+      "peakDb": -1.18622
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_grass_002.ogg",
+      "durationS": 0.692,
+      "rmsDb": -29.475797,
+      "peakDb": -1.054188
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_grass_003.ogg",
+      "durationS": 0.669,
+      "rmsDb": -29.443603,
+      "peakDb": -0.926986
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_grass_004.ogg",
+      "durationS": 0.59,
+      "rmsDb": -28.507626,
+      "peakDb": -1.092846
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_snow_000.ogg",
+      "durationS": 0.374,
+      "rmsDb": -22.312163,
+      "peakDb": -0.880935
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_snow_001.ogg",
+      "durationS": 0.374,
+      "rmsDb": -18.67798,
+      "peakDb": -1.009526
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_snow_002.ogg",
+      "durationS": 0.374,
+      "rmsDb": -18.76169,
+      "peakDb": -0.961999
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_snow_003.ogg",
+      "durationS": 0.374,
+      "rmsDb": -23.02529,
+      "peakDb": -0.913986
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_snow_004.ogg",
+      "durationS": 0.374,
+      "rmsDb": -21.851827,
+      "peakDb": -1.054772
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_wood_000.ogg",
+      "durationS": 0.25,
+      "rmsDb": -21.156227,
+      "peakDb": -0.924699
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_wood_001.ogg",
+      "durationS": 0.252,
+      "rmsDb": -20.025999,
+      "peakDb": -0.997428
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_wood_002.ogg",
+      "durationS": 0.251,
+      "rmsDb": -19.421629,
+      "peakDb": -0.90447
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_wood_003.ogg",
+      "durationS": 0.252,
+      "rmsDb": -21.475823,
+      "peakDb": -1.080861
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/footstep_wood_004.ogg",
+      "durationS": 0.248,
+      "rmsDb": -19.515602,
+      "peakDb": -0.960068
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactBell_heavy_000.ogg",
+      "durationS": 1.48,
+      "rmsDb": -26.262983,
+      "peakDb": -1.136878
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactBell_heavy_001.ogg",
+      "durationS": 1.741,
+      "rmsDb": -24.567471,
+      "peakDb": -1.162265
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactBell_heavy_002.ogg",
+      "durationS": 0.697,
+      "rmsDb": -23.815615,
+      "peakDb": -0.790293
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactBell_heavy_003.ogg",
+      "durationS": 0.654,
+      "rmsDb": -24.567342,
+      "peakDb": -1.012464
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactBell_heavy_004.ogg",
+      "durationS": 0.301,
+      "rmsDb": -22.247781,
+      "peakDb": -1.135722
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_000.ogg",
+      "durationS": 0.139,
+      "rmsDb": -20.977018,
+      "peakDb": -1.244923
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_001.ogg",
+      "durationS": 0.118,
+      "rmsDb": -19.989201,
+      "peakDb": -1.004983
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_002.ogg",
+      "durationS": 0.14,
+      "rmsDb": -21.197292,
+      "peakDb": -0.966436
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_003.ogg",
+      "durationS": 0.138,
+      "rmsDb": -20.62373,
+      "peakDb": -1.130735
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGeneric_light_004.ogg",
+      "durationS": 0.14,
+      "rmsDb": -20.472764,
+      "peakDb": -0.940666
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_heavy_000.ogg",
+      "durationS": 0.241,
+      "rmsDb": -22.385599,
+      "peakDb": -1.078627
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_heavy_001.ogg",
+      "durationS": 0.429,
+      "rmsDb": -25.271742,
+      "peakDb": -0.961753
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_heavy_002.ogg",
+      "durationS": 0.247,
+      "rmsDb": -23.113277,
+      "peakDb": -0.922884
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_heavy_003.ogg",
+      "durationS": 0.172,
+      "rmsDb": -19.548122,
+      "peakDb": -0.925867
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_heavy_004.ogg",
+      "durationS": 0.399,
+      "rmsDb": -24.122735,
+      "peakDb": -1.243911
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_light_000.ogg",
+      "durationS": 0.21,
+      "rmsDb": -21.776103,
+      "peakDb": -1.563119
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_light_001.ogg",
+      "durationS": 0.21,
+      "rmsDb": -21.295588,
+      "peakDb": -0.898556
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_light_002.ogg",
+      "durationS": 0.21,
+      "rmsDb": -19.927272,
+      "peakDb": -1.182686
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_light_003.ogg",
+      "durationS": 0.21,
+      "rmsDb": -21.013958,
+      "peakDb": -1.082317
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_light_004.ogg",
+      "durationS": 0.21,
+      "rmsDb": -20.471025,
+      "peakDb": -0.819258
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_medium_000.ogg",
+      "durationS": 0.543,
+      "rmsDb": -25.42821,
+      "peakDb": -1.163641
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_medium_001.ogg",
+      "durationS": 0.543,
+      "rmsDb": -25.245552,
+      "peakDb": -0.910008
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_medium_002.ogg",
+      "durationS": 0.543,
+      "rmsDb": -25.629322,
+      "peakDb": -1.005999
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_medium_003.ogg",
+      "durationS": 0.543,
+      "rmsDb": -25.549598,
+      "peakDb": -1.257501
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactGlass_medium_004.ogg",
+      "durationS": 0.543,
+      "rmsDb": -24.539268,
+      "peakDb": -1.384357
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_heavy_000.ogg",
+      "durationS": 0.168,
+      "rmsDb": -20.428586,
+      "peakDb": -0.929171
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_heavy_001.ogg",
+      "durationS": 0.359,
+      "rmsDb": -23.588343,
+      "peakDb": -1.093061
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_heavy_002.ogg",
+      "durationS": 0.117,
+      "rmsDb": -18.63602,
+      "peakDb": -1.186399
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_heavy_003.ogg",
+      "durationS": 0.207,
+      "rmsDb": -21.216301,
+      "peakDb": -0.984443
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_heavy_004.ogg",
+      "durationS": 0.134,
+      "rmsDb": -19.415325,
+      "peakDb": -1.28415
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_light_000.ogg",
+      "durationS": 0.351,
+      "rmsDb": -21.064112,
+      "peakDb": -0.962014
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_light_001.ogg",
+      "durationS": 0.252,
+      "rmsDb": -19.99141,
+      "peakDb": -0.945205
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_light_002.ogg",
+      "durationS": 0.236,
+      "rmsDb": -20.558866,
+      "peakDb": -1.375125
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_light_003.ogg",
+      "durationS": 0.482,
+      "rmsDb": -20.741822,
+      "peakDb": -1.481367
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_light_004.ogg",
+      "durationS": 0.213,
+      "rmsDb": -20.614779,
+      "peakDb": -1.286938
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_medium_000.ogg",
+      "durationS": 0.272,
+      "rmsDb": -21.549248,
+      "peakDb": -1.156266
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_medium_001.ogg",
+      "durationS": 0.143,
+      "rmsDb": -19.52049,
+      "peakDb": -1.222438
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_medium_002.ogg",
+      "durationS": 0.119,
+      "rmsDb": -21.09392,
+      "peakDb": -1.09377
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_medium_003.ogg",
+      "durationS": 0.254,
+      "rmsDb": -21.732495,
+      "peakDb": -1.446135
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMetal_medium_004.ogg",
+      "durationS": 0.109,
+      "rmsDb": -20.40712,
+      "peakDb": -1.026174
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMining_000.ogg",
+      "durationS": 0.937,
+      "rmsDb": -20.586627,
+      "peakDb": -1.060717
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMining_001.ogg",
+      "durationS": 0.869,
+      "rmsDb": -21.059061,
+      "peakDb": -0.998992
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMining_002.ogg",
+      "durationS": 0.805,
+      "rmsDb": -22.914526,
+      "peakDb": -1.194407
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMining_003.ogg",
+      "durationS": 0.992,
+      "rmsDb": -23.413252,
+      "peakDb": -1.018804
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactMining_004.ogg",
+      "durationS": 0.83,
+      "rmsDb": -19.757132,
+      "peakDb": -0.909663
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlank_medium_000.ogg",
+      "durationS": 0.779,
+      "rmsDb": -23.877814,
+      "peakDb": -1.217403
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlank_medium_001.ogg",
+      "durationS": 0.779,
+      "rmsDb": -20.634961,
+      "peakDb": -1.013417
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlank_medium_002.ogg",
+      "durationS": 0.779,
+      "rmsDb": -20.991619,
+      "peakDb": -0.96588
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlank_medium_003.ogg",
+      "durationS": 0.779,
+      "rmsDb": -21.656813,
+      "peakDb": -0.998077
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlank_medium_004.ogg",
+      "durationS": 0.779,
+      "rmsDb": -25.220796,
+      "peakDb": -0.946286
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_heavy_000.ogg",
+      "durationS": 0.489,
+      "rmsDb": -22.634338,
+      "peakDb": -0.972181
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_heavy_001.ogg",
+      "durationS": 0.352,
+      "rmsDb": -17.380337,
+      "peakDb": -0.883634
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_heavy_002.ogg",
+      "durationS": 0.494,
+      "rmsDb": -21.78974,
+      "peakDb": -1.43911
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_heavy_003.ogg",
+      "durationS": 0.347,
+      "rmsDb": -17.815391,
+      "peakDb": -1.15066
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_heavy_004.ogg",
+      "durationS": 0.559,
+      "rmsDb": -21.663855,
+      "peakDb": -0.599526
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_light_000.ogg",
+      "durationS": 0.542,
+      "rmsDb": -25.462479,
+      "peakDb": -1.004942
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_light_001.ogg",
+      "durationS": 0.655,
+      "rmsDb": -27.372943,
+      "peakDb": -1.317371
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_light_002.ogg",
+      "durationS": 0.489,
+      "rmsDb": -25.254618,
+      "peakDb": -0.92812
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_light_003.ogg",
+      "durationS": 0.528,
+      "rmsDb": -24.452078,
+      "peakDb": -1.160145
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_light_004.ogg",
+      "durationS": 0.657,
+      "rmsDb": -26.326945,
+      "peakDb": -1.320983
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_medium_000.ogg",
+      "durationS": 0.609,
+      "rmsDb": -25.591036,
+      "peakDb": -1.354844
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_medium_001.ogg",
+      "durationS": 0.616,
+      "rmsDb": -24.406266,
+      "peakDb": -1.084416
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_medium_002.ogg",
+      "durationS": 0.515,
+      "rmsDb": -24.204655,
+      "peakDb": -1.087099
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_medium_003.ogg",
+      "durationS": 0.654,
+      "rmsDb": -22.26037,
+      "peakDb": -1.216172
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPlate_medium_004.ogg",
+      "durationS": 0.534,
+      "rmsDb": -21.712755,
+      "peakDb": -1.034205
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_000.ogg",
+      "durationS": 0.649,
+      "rmsDb": -17.983106,
+      "peakDb": -0.967794
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_001.ogg",
+      "durationS": 0.536,
+      "rmsDb": -17.483592,
+      "peakDb": -1.180115
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_002.ogg",
+      "durationS": 0.457,
+      "rmsDb": -16.594266,
+      "peakDb": -0.971524
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_003.ogg",
+      "durationS": 0.474,
+      "rmsDb": -17.155537,
+      "peakDb": -0.89129
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_heavy_004.ogg",
+      "durationS": 0.536,
+      "rmsDb": -17.366262,
+      "peakDb": -0.971475
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_medium_000.ogg",
+      "durationS": 0.431,
+      "rmsDb": -17.178735,
+      "peakDb": -1.109458
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_medium_001.ogg",
+      "durationS": 0.405,
+      "rmsDb": -16.864983,
+      "peakDb": -1.137363
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_medium_002.ogg",
+      "durationS": 0.541,
+      "rmsDb": -18.720271,
+      "peakDb": -0.84973
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_medium_003.ogg",
+      "durationS": 0.455,
+      "rmsDb": -18.21639,
+      "peakDb": -0.936829
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactPunch_medium_004.ogg",
+      "durationS": 0.543,
+      "rmsDb": -18.57077,
+      "peakDb": -0.997296
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_000.ogg",
+      "durationS": 0.505,
+      "rmsDb": -17.413937,
+      "peakDb": -0.916688
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_001.ogg",
+      "durationS": 0.572,
+      "rmsDb": -17.431821,
+      "peakDb": -0.969316
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_002.ogg",
+      "durationS": 0.572,
+      "rmsDb": -17.1398,
+      "peakDb": -0.877341
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_003.ogg",
+      "durationS": 0.544,
+      "rmsDb": -16.556785,
+      "peakDb": -1.010133
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_heavy_004.ogg",
+      "durationS": 0.501,
+      "rmsDb": -16.813079,
+      "peakDb": -1.004579
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_medium_000.ogg",
+      "durationS": 0.118,
+      "rmsDb": -14.227435,
+      "peakDb": -0.961126
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_medium_001.ogg",
+      "durationS": 0.183,
+      "rmsDb": -14.847484,
+      "peakDb": -0.927323
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_medium_002.ogg",
+      "durationS": 0.135,
+      "rmsDb": -14.114346,
+      "peakDb": -0.99353
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_medium_003.ogg",
+      "durationS": 0.14,
+      "rmsDb": -14.239829,
+      "peakDb": -0.945168
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactSoft_medium_004.ogg",
+      "durationS": 0.147,
+      "rmsDb": -14.430341,
+      "peakDb": -0.963421
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactTin_medium_000.ogg",
+      "durationS": 0.159,
+      "rmsDb": -20.855819,
+      "peakDb": -0.964136
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactTin_medium_001.ogg",
+      "durationS": 0.174,
+      "rmsDb": -22.520548,
+      "peakDb": -1.493152
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactTin_medium_002.ogg",
+      "durationS": 0.134,
+      "rmsDb": -21.485292,
+      "peakDb": -1.108447
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactTin_medium_003.ogg",
+      "durationS": 0.215,
+      "rmsDb": -23.131696,
+      "peakDb": -1.104322
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactTin_medium_004.ogg",
+      "durationS": 0.179,
+      "rmsDb": -23.090865,
+      "peakDb": -1.2128
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_000.ogg",
+      "durationS": 0.313,
+      "rmsDb": -19.600156,
+      "peakDb": -0.940491
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_001.ogg",
+      "durationS": 0.313,
+      "rmsDb": -19.712229,
+      "peakDb": -0.932777
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_002.ogg",
+      "durationS": 0.313,
+      "rmsDb": -18.908409,
+      "peakDb": -0.971426
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_003.ogg",
+      "durationS": 0.313,
+      "rmsDb": -20.38974,
+      "peakDb": -0.919942
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_heavy_004.ogg",
+      "durationS": 0.313,
+      "rmsDb": -20.108563,
+      "peakDb": -0.960797
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_light_000.ogg",
+      "durationS": 0.266,
+      "rmsDb": -22.263329,
+      "peakDb": -1.118104
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_light_001.ogg",
+      "durationS": 0.266,
+      "rmsDb": -24.010527,
+      "peakDb": -0.937896
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_light_002.ogg",
+      "durationS": 0.266,
+      "rmsDb": -22.045776,
+      "peakDb": -1.124543
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_light_003.ogg",
+      "durationS": 0.266,
+      "rmsDb": -23.706407,
+      "peakDb": -0.926982
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_light_004.ogg",
+      "durationS": 0.266,
+      "rmsDb": -24.677005,
+      "peakDb": -1.187887
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_000.ogg",
+      "durationS": 0.333,
+      "rmsDb": -22.564596,
+      "peakDb": -1.034251
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_001.ogg",
+      "durationS": 0.333,
+      "rmsDb": -22.514707,
+      "peakDb": -1.045139
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_002.ogg",
+      "durationS": 0.333,
+      "rmsDb": -22.579263,
+      "peakDb": -1.078832
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_003.ogg",
+      "durationS": 0.333,
+      "rmsDb": -22.705036,
+      "peakDb": -1.036509
+    },
+    {
+      "pack": "kenney-impact-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-impact-sounds/Audio/impactWood_medium_004.ogg",
+      "durationS": 0.333,
+      "rmsDb": -22.12423,
+      "peakDb": -1.129945
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/back_001.ogg",
+      "durationS": 0.064,
+      "rmsDb": -21.247617,
+      "peakDb": -0.955628
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/back_002.ogg",
+      "durationS": 0.07,
+      "rmsDb": -17.020988,
+      "peakDb": -0.962372
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/back_003.ogg",
+      "durationS": 0.093,
+      "rmsDb": -19.607101,
+      "peakDb": -0.899147
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/back_004.ogg",
+      "durationS": 0.073,
+      "rmsDb": -17.78525,
+      "peakDb": -0.938629
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/bong_001.ogg",
+      "durationS": 0.123,
+      "rmsDb": -16.201796,
+      "peakDb": -0.890893
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_001.ogg",
+      "durationS": 0.1,
+      "rmsDb": -26.396274,
+      "peakDb": -1.353501
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_002.ogg",
+      "durationS": 0.01,
+      "rmsDb": -16.159071,
+      "peakDb": -0.852132
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_003.ogg",
+      "durationS": 0.01,
+      "rmsDb": -14.581249,
+      "peakDb": -1.361219
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_004.ogg",
+      "durationS": 0.01,
+      "rmsDb": -18.626344,
+      "peakDb": -1.229664
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/click_005.ogg",
+      "durationS": 0.01,
+      "rmsDb": -11.553229,
+      "peakDb": -1.216678
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/close_001.ogg",
+      "durationS": 0.148,
+      "rmsDb": -14.770482,
+      "peakDb": -0.919016
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/close_002.ogg",
+      "durationS": 0.314,
+      "rmsDb": -16.364539,
+      "peakDb": -1.033419
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/close_003.ogg",
+      "durationS": 0.314,
+      "rmsDb": -15.146931,
+      "peakDb": -0.91911
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/close_004.ogg",
+      "durationS": 0.323,
+      "rmsDb": -17.363089,
+      "peakDb": -1.011065
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_001.ogg",
+      "durationS": 0.29,
+      "rmsDb": -11.31276,
+      "peakDb": -0.929787
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_002.ogg",
+      "durationS": 0.539,
+      "rmsDb": -14.883515,
+      "peakDb": -0.955889
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_003.ogg",
+      "durationS": 0.322,
+      "rmsDb": -15.222832,
+      "peakDb": -0.98001
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/confirmation_004.ogg",
+      "durationS": 0.49,
+      "rmsDb": -11.775762,
+      "peakDb": -0.911832
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/drop_001.ogg",
+      "durationS": 0.11,
+      "rmsDb": -21.177591,
+      "peakDb": -0.890359
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/drop_002.ogg",
+      "durationS": 0.191,
+      "rmsDb": -19.75957,
+      "peakDb": -1.057548
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/drop_003.ogg",
+      "durationS": 0.191,
+      "rmsDb": -19.601116,
+      "peakDb": -1.11216
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/drop_004.ogg",
+      "durationS": 0.287,
+      "rmsDb": -20.652078,
+      "peakDb": -0.863375
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_001.ogg",
+      "durationS": 0.165,
+      "rmsDb": -18.993115,
+      "peakDb": -0.803246
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_002.ogg",
+      "durationS": 0.165,
+      "rmsDb": -17.546031,
+      "peakDb": 0.575699
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_003.ogg",
+      "durationS": 0.533,
+      "rmsDb": -20.036356,
+      "peakDb": -0.501032
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_004.ogg",
+      "durationS": 0.103,
+      "rmsDb": -16.374068,
+      "peakDb": -1.251018
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_005.ogg",
+      "durationS": 0.5,
+      "rmsDb": -18.713037,
+      "peakDb": -0.958574
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_006.ogg",
+      "durationS": 0.5,
+      "rmsDb": -18.00375,
+      "peakDb": -0.778656
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_007.ogg",
+      "durationS": 0.192,
+      "rmsDb": -13.088225,
+      "peakDb": -0.892793
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/error_008.ogg",
+      "durationS": 0.139,
+      "rmsDb": -20.551934,
+      "peakDb": -0.955604
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_001.ogg",
+      "durationS": 0.278,
+      "rmsDb": -20.044234,
+      "peakDb": -1.025947
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_002.ogg",
+      "durationS": 0.125,
+      "rmsDb": -18.934292,
+      "peakDb": -1.038956
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_003.ogg",
+      "durationS": 0.124,
+      "rmsDb": -16.252866,
+      "peakDb": -0.946646
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_004.ogg",
+      "durationS": 0.692,
+      "rmsDb": -17.97274,
+      "peakDb": -1.115163
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_005.ogg",
+      "durationS": 0.111,
+      "rmsDb": -20.573585,
+      "peakDb": -0.934623
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glass_006.ogg",
+      "durationS": 0.111,
+      "rmsDb": -19.40974,
+      "peakDb": -0.975792
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glitch_001.ogg",
+      "durationS": 0.02,
+      "rmsDb": -9.786214,
+      "peakDb": -0.99326
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glitch_002.ogg",
+      "durationS": 0.03,
+      "rmsDb": -13.667331,
+      "peakDb": -1.159645
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glitch_003.ogg",
+      "durationS": 0.01,
+      "rmsDb": -12.224595,
+      "peakDb": -0.499022
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/glitch_004.ogg",
+      "durationS": 0.023,
+      "rmsDb": -15.582493,
+      "peakDb": -0.928853
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_001.ogg",
+      "durationS": 0.258,
+      "rmsDb": -13.010037,
+      "peakDb": -0.970683
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_002.ogg",
+      "durationS": 0.258,
+      "rmsDb": -10.291977,
+      "peakDb": -0.916852
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_003.ogg",
+      "durationS": 0.212,
+      "rmsDb": -20.25798,
+      "peakDb": -0.946256
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_004.ogg",
+      "durationS": 0.418,
+      "rmsDb": -15.150236,
+      "peakDb": -0.939442
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_005.ogg",
+      "durationS": 0.526,
+      "rmsDb": -16.545212,
+      "peakDb": -0.911007
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_006.ogg",
+      "durationS": 0.38,
+      "rmsDb": -14.195429,
+      "peakDb": -0.92755
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_007.ogg",
+      "durationS": 0.186,
+      "rmsDb": -13.573269,
+      "peakDb": -0.979922
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_008.ogg",
+      "durationS": 0.225,
+      "rmsDb": -12.713585,
+      "peakDb": -0.911453
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/maximize_009.ogg",
+      "durationS": 0.225,
+      "rmsDb": -10.567041,
+      "peakDb": -0.927898
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_001.ogg",
+      "durationS": 0.258,
+      "rmsDb": -13.006429,
+      "peakDb": -0.930804
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_002.ogg",
+      "durationS": 0.258,
+      "rmsDb": -10.303296,
+      "peakDb": -0.898839
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_003.ogg",
+      "durationS": 0.212,
+      "rmsDb": -20.258042,
+      "peakDb": -0.995698
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_004.ogg",
+      "durationS": 0.418,
+      "rmsDb": -15.145109,
+      "peakDb": -0.940305
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_005.ogg",
+      "durationS": 0.526,
+      "rmsDb": -16.55438,
+      "peakDb": -0.820899
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_006.ogg",
+      "durationS": 0.38,
+      "rmsDb": -14.18196,
+      "peakDb": -0.963079
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_007.ogg",
+      "durationS": 0.186,
+      "rmsDb": -14.169474,
+      "peakDb": -1.309933
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_008.ogg",
+      "durationS": 0.225,
+      "rmsDb": -12.728819,
+      "peakDb": -0.943633
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/minimize_009.ogg",
+      "durationS": 0.225,
+      "rmsDb": -10.571389,
+      "peakDb": -0.925813
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/open_001.ogg",
+      "durationS": 0.148,
+      "rmsDb": -14.780822,
+      "peakDb": -0.86239
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/open_002.ogg",
+      "durationS": 0.314,
+      "rmsDb": -16.363149,
+      "peakDb": -0.923591
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/open_003.ogg",
+      "durationS": 0.314,
+      "rmsDb": -15.162298,
+      "peakDb": -0.974914
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/open_004.ogg",
+      "durationS": 0.323,
+      "rmsDb": -17.370347,
+      "peakDb": -0.951075
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/pluck_001.ogg",
+      "durationS": 0.102,
+      "rmsDb": -20.43228,
+      "peakDb": 0.425684
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/pluck_002.ogg",
+      "durationS": 0.165,
+      "rmsDb": -21.743319,
+      "peakDb": -0.463692
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/question_001.ogg",
+      "durationS": 0.491,
+      "rmsDb": -11.766201,
+      "peakDb": -0.902185
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/question_002.ogg",
+      "durationS": 0.333,
+      "rmsDb": -10.024053,
+      "peakDb": -0.908813
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/question_003.ogg",
+      "durationS": 0.332,
+      "rmsDb": -10.016225,
+      "peakDb": -0.942518
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/question_004.ogg",
+      "durationS": 0.332,
+      "rmsDb": -10.049865,
+      "peakDb": -0.940426
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scratch_001.ogg",
+      "durationS": 0.139,
+      "rmsDb": -12.287567,
+      "peakDb": -0.924293
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scratch_002.ogg",
+      "durationS": 0.139,
+      "rmsDb": -11.662709,
+      "peakDb": -1.011589
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scratch_003.ogg",
+      "durationS": 0.123,
+      "rmsDb": -18.095037,
+      "peakDb": -0.984736
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scratch_004.ogg",
+      "durationS": 0.325,
+      "rmsDb": -20.476248,
+      "peakDb": -0.958696
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scratch_005.ogg",
+      "durationS": 0.325,
+      "rmsDb": -15.383258,
+      "peakDb": -0.991003
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scroll_001.ogg",
+      "durationS": 1,
+      "rmsDb": -21.229786,
+      "peakDb": -0.861999
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scroll_002.ogg",
+      "durationS": 1,
+      "rmsDb": -21.967332,
+      "peakDb": -0.918627
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scroll_003.ogg",
+      "durationS": 1,
+      "rmsDb": -21.885264,
+      "peakDb": -0.926468
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scroll_004.ogg",
+      "durationS": 1,
+      "rmsDb": -20.109935,
+      "peakDb": -0.898553
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/scroll_005.ogg",
+      "durationS": 1,
+      "rmsDb": -18.029909,
+      "peakDb": -0.915244
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_001.ogg",
+      "durationS": 0.043,
+      "rmsDb": -17.327309,
+      "peakDb": -1.125474
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_002.ogg",
+      "durationS": 0.043,
+      "rmsDb": -15.877639,
+      "peakDb": -0.967987
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_003.ogg",
+      "durationS": 0.383,
+      "rmsDb": -18.766408,
+      "peakDb": -0.817947
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_004.ogg",
+      "durationS": 0.383,
+      "rmsDb": -19.197149,
+      "peakDb": -0.732689
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_005.ogg",
+      "durationS": 0.383,
+      "rmsDb": -18.684703,
+      "peakDb": -1.318392
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_006.ogg",
+      "durationS": 1.944,
+      "rmsDb": -22.471537,
+      "peakDb": -0.766354
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_007.ogg",
+      "durationS": 0.047,
+      "rmsDb": -14.659749,
+      "peakDb": -0.957827
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/select_008.ogg",
+      "durationS": 0.047,
+      "rmsDb": -20.173939,
+      "peakDb": -0.996412
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_001.ogg",
+      "durationS": 0.618,
+      "rmsDb": -27.324603,
+      "peakDb": -0.951577
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_002.ogg",
+      "durationS": 0.611,
+      "rmsDb": -25.038724,
+      "peakDb": -0.94691
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_003.ogg",
+      "durationS": 0.5,
+      "rmsDb": -15.295223,
+      "peakDb": -0.90978
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_004.ogg",
+      "durationS": 0.5,
+      "rmsDb": -23.856251,
+      "peakDb": -0.957809
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_005.ogg",
+      "durationS": 0.612,
+      "rmsDb": -22.610077,
+      "peakDb": -0.906658
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_006.ogg",
+      "durationS": 0.611,
+      "rmsDb": -24.581973,
+      "peakDb": -0.919605
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/switch_007.ogg",
+      "durationS": 0.614,
+      "rmsDb": -25.003009,
+      "peakDb": -0.953916
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_001.ogg",
+      "durationS": 0.023,
+      "rmsDb": -21.479588,
+      "peakDb": -0.804959
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_002.ogg",
+      "durationS": 0.023,
+      "rmsDb": -16.643974,
+      "peakDb": -1.208576
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/tick_004.ogg",
+      "durationS": 0.055,
+      "rmsDb": -15.852242,
+      "peakDb": -0.854949
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_001.ogg",
+      "durationS": 0.139,
+      "rmsDb": -14.017647,
+      "peakDb": -0.908787
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_002.ogg",
+      "durationS": 0.139,
+      "rmsDb": -12.092431,
+      "peakDb": -0.949069
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_003.ogg",
+      "durationS": 0.139,
+      "rmsDb": -14.324759,
+      "peakDb": -0.937127
+    },
+    {
+      "pack": "kenney-interface-sounds",
+      "file": "assets/generated/audio/unpacked/kenney-interface-sounds/Audio/toggle_004.ogg",
+      "durationS": 0.066,
+      "rmsDb": -16.264391,
+      "peakDb": -0.941181
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/door_open_01.ogg",
+      "durationS": 0.433,
+      "rmsDb": -24.581956,
+      "peakDb": -0.443617
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/hammer_01.ogg",
+      "durationS": 0.504,
+      "rmsDb": -22.423563,
+      "peakDb": 0.022959
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/hammer_02.ogg",
+      "durationS": 0.237,
+      "rmsDb": -23.356749,
+      "peakDb": 0.064864
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/hammer_03.ogg",
+      "durationS": 0.227,
+      "rmsDb": -24.425333,
+      "peakDb": 0.042122
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/hammer_04.ogg",
+      "durationS": 0.259,
+      "rmsDb": -23.579116,
+      "peakDb": 0.026393
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_01.ogg",
+      "durationS": 0.41,
+      "rmsDb": -26.544931,
+      "peakDb": -1.21645
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_02.ogg",
+      "durationS": 0.459,
+      "rmsDb": -19.262236,
+      "peakDb": 0.039019
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_03.ogg",
+      "durationS": 0.482,
+      "rmsDb": -20.303023,
+      "peakDb": -0.431228
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_04.ogg",
+      "durationS": 0.379,
+      "rmsDb": -19.931407,
+      "peakDb": 0.056391
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_05.ogg",
+      "durationS": 0.57,
+      "rmsDb": -19.058784,
+      "peakDb": 4.101608
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_06.ogg",
+      "durationS": 0.637,
+      "rmsDb": -18.079194,
+      "peakDb": 3.973879
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/keys_07.ogg",
+      "durationS": 0.569,
+      "rmsDb": -17.289212,
+      "peakDb": 4.37568
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/lock_open_01.ogg",
+      "durationS": 0.737,
+      "rmsDb": -24.475623,
+      "peakDb": 0.002089
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_close_01.ogg",
+      "durationS": 0.869,
+      "rmsDb": -24.696019,
+      "peakDb": -0.001982
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_falling_01.ogg",
+      "durationS": 1.786,
+      "rmsDb": -21.901865,
+      "peakDb": -0.020869
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_falling_02.ogg",
+      "durationS": 0.956,
+      "rmsDb": -17.812764,
+      "peakDb": 0.073013
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_01.ogg",
+      "durationS": 0.269,
+      "rmsDb": -20.502879,
+      "peakDb": 0.023632
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_02.ogg",
+      "durationS": 0.435,
+      "rmsDb": -24.067082,
+      "peakDb": 0.073701
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_03.ogg",
+      "durationS": 0.395,
+      "rmsDb": -23.59893,
+      "peakDb": -5.948936
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_04.ogg",
+      "durationS": 0.373,
+      "rmsDb": -22.889795,
+      "peakDb": 0.063724
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_hit_05.ogg",
+      "durationS": 0.329,
+      "rmsDb": -26.318275,
+      "peakDb": -0.035698
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_open_01.ogg",
+      "durationS": 1.15,
+      "rmsDb": -27.476493,
+      "peakDb": 0.038698
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_01.ogg",
+      "durationS": 0.442,
+      "rmsDb": -22.392377,
+      "peakDb": 0.029429
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_02.ogg",
+      "durationS": 0.432,
+      "rmsDb": -21.043135,
+      "peakDb": 0.064101
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_03.ogg",
+      "durationS": 0.577,
+      "rmsDb": -17.269445,
+      "peakDb": -0.025798
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_04.ogg",
+      "durationS": 0.4,
+      "rmsDb": -23.793919,
+      "peakDb": 0.050264
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_05.ogg",
+      "durationS": 0.271,
+      "rmsDb": -17.26879,
+      "peakDb": 0.072415
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_sheet_06.ogg",
+      "durationS": 0.616,
+      "rmsDb": -21.161942,
+      "peakDb": -1.278891
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_slam_01.ogg",
+      "durationS": 0.573,
+      "rmsDb": -22.937854,
+      "peakDb": 0.033722
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_spring_01.ogg",
+      "durationS": 0.585,
+      "rmsDb": -29.121541,
+      "peakDb": -1.862565
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/metal_spring_02.ogg",
+      "durationS": 0.473,
+      "rmsDb": -22.804181,
+      "peakDb": -0.775428
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_01.ogg",
+      "durationS": 0.955,
+      "rmsDb": -18.56908,
+      "peakDb": 0.050496
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_02.ogg",
+      "durationS": 0.307,
+      "rmsDb": -18.268695,
+      "peakDb": 0.067961
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_03.ogg",
+      "durationS": 0.623,
+      "rmsDb": -20.612571,
+      "peakDb": 0.063293
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_04.ogg",
+      "durationS": 0.593,
+      "rmsDb": -20.000451,
+      "peakDb": 0.109667
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_05.ogg",
+      "durationS": 0.678,
+      "rmsDb": -21.90719,
+      "peakDb": 0.053015
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_06.ogg",
+      "durationS": 0.911,
+      "rmsDb": -21.934023,
+      "peakDb": 0.076839
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_07.ogg",
+      "durationS": 0.946,
+      "rmsDb": -20.622264,
+      "peakDb": 0.031352
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_08.ogg",
+      "durationS": 0.375,
+      "rmsDb": -23.553466,
+      "peakDb": 0.090885
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_09.ogg",
+      "durationS": 0.742,
+      "rmsDb": -20.505483,
+      "peakDb": -0.920149
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_10.ogg",
+      "durationS": 0.526,
+      "rmsDb": -24.02127,
+      "peakDb": -0.833852
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_11.ogg",
+      "durationS": 0.563,
+      "rmsDb": -24.837833,
+      "peakDb": 0.047467
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_12.ogg",
+      "durationS": 0.322,
+      "rmsDb": -23.99392,
+      "peakDb": 0.063917
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_13.ogg",
+      "durationS": 0.37,
+      "rmsDb": -16.290983,
+      "peakDb": 0.046839
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_14.ogg",
+      "durationS": 0.506,
+      "rmsDb": -18.884737,
+      "peakDb": 0.047345
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_15.ogg",
+      "durationS": 0.49,
+      "rmsDb": -24.462228,
+      "peakDb": 0.076335
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_16.ogg",
+      "durationS": 0.416,
+      "rmsDb": -18.589491,
+      "peakDb": 0.032671
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/misc_17.ogg",
+      "durationS": 0.29,
+      "rmsDb": -19.92595,
+      "peakDb": 0.048781
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_01.ogg",
+      "durationS": 0.594,
+      "rmsDb": -22.266108,
+      "peakDb": -0.870027
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_02.ogg",
+      "durationS": 0.45,
+      "rmsDb": -23.250188,
+      "peakDb": -2.447412
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_03.ogg",
+      "durationS": 0.474,
+      "rmsDb": -20.70516,
+      "peakDb": -1.602519
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_04.ogg",
+      "durationS": 0.809,
+      "rmsDb": -25.119219,
+      "peakDb": -1.145855
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_05.ogg",
+      "durationS": 0.45,
+      "rmsDb": -20.155048,
+      "peakDb": 0.078288
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_06.ogg",
+      "durationS": 0.521,
+      "rmsDb": -17.402874,
+      "peakDb": 0.022941
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_07.ogg",
+      "durationS": 0.388,
+      "rmsDb": -16.378727,
+      "peakDb": -0.132636
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_08.ogg",
+      "durationS": 0.503,
+      "rmsDb": -20.151048,
+      "peakDb": 0.025601
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_09.ogg",
+      "durationS": 0.592,
+      "rmsDb": -22.710807,
+      "peakDb": 0.034865
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_10.ogg",
+      "durationS": 0.573,
+      "rmsDb": -21.569941,
+      "peakDb": -0.91359
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_11.ogg",
+      "durationS": 0.398,
+      "rmsDb": -20.937976,
+      "peakDb": 0.021125
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/tools_12.ogg",
+      "durationS": 0.412,
+      "rmsDb": -16.29614,
+      "peakDb": 0.079772
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_breaking_01.ogg",
+      "durationS": 0.565,
+      "rmsDb": -20.79712,
+      "peakDb": 0.246488
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_breaking_02.ogg",
+      "durationS": 0.568,
+      "rmsDb": -22.491832,
+      "peakDb": 0.040564
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_close_01.ogg",
+      "durationS": 0.397,
+      "rmsDb": -21.497827,
+      "peakDb": 0.045378
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_close_02.ogg",
+      "durationS": 0.44,
+      "rmsDb": -20.249793,
+      "peakDb": 0.06129
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_cracking_01.ogg",
+      "durationS": 0.185,
+      "rmsDb": -30.905199,
+      "peakDb": -4.364508
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_cracking_02.ogg",
+      "durationS": 0.251,
+      "rmsDb": -29.195143,
+      "peakDb": -2.413358
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_cracking_03.ogg",
+      "durationS": 0.314,
+      "rmsDb": -27.760813,
+      "peakDb": -1.743364
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_cracking_04.ogg",
+      "durationS": 0.25,
+      "rmsDb": -24.415546,
+      "peakDb": -0.796791
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_01.ogg",
+      "durationS": 0.639,
+      "rmsDb": -20.715188,
+      "peakDb": 0.432545
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_02.ogg",
+      "durationS": 0.481,
+      "rmsDb": -22.843278,
+      "peakDb": -0.278249
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_03.ogg",
+      "durationS": 0.462,
+      "rmsDb": -24.940797,
+      "peakDb": 0.002183
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_04.ogg",
+      "durationS": 0.362,
+      "rmsDb": -20.801788,
+      "peakDb": 0.017617
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_05.ogg",
+      "durationS": 0.681,
+      "rmsDb": -22.043654,
+      "peakDb": 0.068356
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_falling_06.ogg",
+      "durationS": 0.655,
+      "rmsDb": -24.249202,
+      "peakDb": 0.010414
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hammer_01.ogg",
+      "durationS": 0.313,
+      "rmsDb": -18.002224,
+      "peakDb": 0.043497
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hammer_02.ogg",
+      "durationS": 0.232,
+      "rmsDb": -17.565126,
+      "peakDb": 0.051056
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_01.ogg",
+      "durationS": 0.338,
+      "rmsDb": -26.44537,
+      "peakDb": -0.686189
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_02.ogg",
+      "durationS": 0.385,
+      "rmsDb": -26.78757,
+      "peakDb": 0.046837
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_03.ogg",
+      "durationS": 0.407,
+      "rmsDb": -22.484105,
+      "peakDb": -0.005787
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_04.ogg",
+      "durationS": 0.303,
+      "rmsDb": -22.613369,
+      "peakDb": -0.183474
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_05.ogg",
+      "durationS": 0.308,
+      "rmsDb": -24.505271,
+      "peakDb": -0.485883
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_06.ogg",
+      "durationS": 0.284,
+      "rmsDb": -27.038589,
+      "peakDb": -2.802686
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_07.ogg",
+      "durationS": 0.288,
+      "rmsDb": -17.334872,
+      "peakDb": 0.094432
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_08.ogg",
+      "durationS": 0.367,
+      "rmsDb": -20.846088,
+      "peakDb": 0.078434
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_hit_09.ogg",
+      "durationS": 0.258,
+      "rmsDb": -16.087429,
+      "peakDb": 0.093987
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_01.ogg",
+      "durationS": 0.42,
+      "rmsDb": -20.539937,
+      "peakDb": 0.01499
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_02.ogg",
+      "durationS": 0.343,
+      "rmsDb": -22.69348,
+      "peakDb": 0.018092
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_03.ogg",
+      "durationS": 0.452,
+      "rmsDb": -20.21052,
+      "peakDb": 0.017577
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_04.ogg",
+      "durationS": 0.469,
+      "rmsDb": -22.61113,
+      "peakDb": 0.12342
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_05.ogg",
+      "durationS": 0.304,
+      "rmsDb": -27.369899,
+      "peakDb": 0.066017
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_06.ogg",
+      "durationS": 0.426,
+      "rmsDb": -15.419036,
+      "peakDb": 0.026522
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_07.ogg",
+      "durationS": 0.441,
+      "rmsDb": -16.269069,
+      "peakDb": -1.06357
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_08.ogg",
+      "durationS": 0.295,
+      "rmsDb": -19.751822,
+      "peakDb": 0.037682
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_misc_09.ogg",
+      "durationS": 0.738,
+      "rmsDb": -22.620145,
+      "peakDb": 0.067142
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_slam_01.ogg",
+      "durationS": 0.377,
+      "rmsDb": -25.481442,
+      "peakDb": -1.549781
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_slam_02.ogg",
+      "durationS": 0.483,
+      "rmsDb": -20.246448,
+      "peakDb": -1.290481
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_slam_03.ogg",
+      "durationS": 0.444,
+      "rmsDb": -22.757307,
+      "peakDb": 0.051261
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_slam_04.ogg",
+      "durationS": 0.39,
+      "rmsDb": -22.869773,
+      "peakDb": -3.936473
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_squeak_01.ogg",
+      "durationS": 0.478,
+      "rmsDb": -26.861368,
+      "peakDb": -0.678122
+    },
+    {
+      "pack": "oga-100-cc0-metal-wood-sfx",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-metal-wood-sfx/wood_squeak_02.ogg",
+      "durationS": 0.386,
+      "rmsDb": -26.578795,
+      "peakDb": 0.036828
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_air_01.ogg",
+      "durationS": 2.638,
+      "rmsDb": -22.902023,
+      "peakDb": -7.18328
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_air_02.ogg",
+      "durationS": 1.105,
+      "rmsDb": -19.949223,
+      "peakDb": -4.43872
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_air_03.ogg",
+      "durationS": 0.285,
+      "rmsDb": -18.965964,
+      "peakDb": -1.142986
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_door_01.ogg",
+      "durationS": 0.415,
+      "rmsDb": -24.709318,
+      "peakDb": -0.821328
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_door_02.ogg",
+      "durationS": 0.304,
+      "rmsDb": -27.796121,
+      "peakDb": -0.302413
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_door_03.ogg",
+      "durationS": 0.753,
+      "rmsDb": -19.851709,
+      "peakDb": -1.143846
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_door_04.ogg",
+      "durationS": 0.201,
+      "rmsDb": -23.315534,
+      "peakDb": -2.298161
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_door_05.ogg",
+      "durationS": 0.306,
+      "rmsDb": -25.898272,
+      "peakDb": -0.896099
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_01.ogg",
+      "durationS": 0.417,
+      "rmsDb": -34.120021,
+      "peakDb": -13.784506
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_02.ogg",
+      "durationS": 0.355,
+      "rmsDb": -30.33227,
+      "peakDb": -8.918459
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wet_01.ogg",
+      "durationS": 0.283,
+      "rmsDb": -37.32964,
+      "peakDb": -15.418898
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wet_02.ogg",
+      "durationS": 0.402,
+      "rmsDb": -34.318006,
+      "peakDb": -14.083619
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wet_03.ogg",
+      "durationS": 0.385,
+      "rmsDb": -34.587244,
+      "peakDb": -12.276838
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wood_01.ogg",
+      "durationS": 0.265,
+      "rmsDb": -29.618883,
+      "peakDb": -15.653513
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wood_02.ogg",
+      "durationS": 0.247,
+      "rmsDb": -37.665048,
+      "peakDb": -20.966651
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wood_03.ogg",
+      "durationS": 0.256,
+      "rmsDb": -32.875786,
+      "peakDb": -7.221888
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_footstep_wood_04.ogg",
+      "durationS": 0.373,
+      "rmsDb": -34.487475,
+      "peakDb": -10.02896
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_01.ogg",
+      "durationS": 0.364,
+      "rmsDb": -17.187366,
+      "peakDb": 0.021584
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_02.ogg",
+      "durationS": 0.665,
+      "rmsDb": -20.270296,
+      "peakDb": -0.545235
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_03.ogg",
+      "durationS": 0.609,
+      "rmsDb": -19.905977,
+      "peakDb": -0.12937
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_04.ogg",
+      "durationS": 0.235,
+      "rmsDb": -19.440981,
+      "peakDb": 0.065237
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_05.ogg",
+      "durationS": 0.547,
+      "rmsDb": -17.469434,
+      "peakDb": -0.001612
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_glass_06.ogg",
+      "durationS": 0.395,
+      "rmsDb": -18.350346,
+      "peakDb": -0.986919
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_hit_01.ogg",
+      "durationS": 0.481,
+      "rmsDb": -19.942897,
+      "peakDb": -0.618537
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_hit_02.ogg",
+      "durationS": 0.457,
+      "rmsDb": -25.758036,
+      "peakDb": 0.224137
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_hit_03.ogg",
+      "durationS": 0.224,
+      "rmsDb": -27.227676,
+      "peakDb": -0.86452
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_items_01.ogg",
+      "durationS": 0.57,
+      "rmsDb": -23.944386,
+      "peakDb": -3.014879
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_items_02.ogg",
+      "durationS": 0.508,
+      "rmsDb": -21.743801,
+      "peakDb": -1.790636
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_lock_open_01.ogg",
+      "durationS": 0.643,
+      "rmsDb": -31.286616,
+      "peakDb": -1.88387
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_01.ogg",
+      "durationS": 10.086,
+      "rmsDb": -25.551134,
+      "peakDb": -8.770755
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_02.ogg",
+      "durationS": 2.998,
+      "rmsDb": -19.727406,
+      "peakDb": -4.071475
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_03.ogg",
+      "durationS": 3.511,
+      "rmsDb": -25.721474,
+      "peakDb": -10.961732
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_ambient_04.ogg",
+      "durationS": 10.125,
+      "rmsDb": -26.155384,
+      "peakDb": -9.567017
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_construction_site.ogg",
+      "durationS": 14.52,
+      "rmsDb": -22.894669,
+      "peakDb": -6.841072
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_highway.ogg",
+      "durationS": 16.669,
+      "rmsDb": -28.917695,
+      "peakDb": -5.375292
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_machine_01.ogg",
+      "durationS": 7.558,
+      "rmsDb": -24.844339,
+      "peakDb": -13.905795
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_machine_02.ogg",
+      "durationS": 10.652,
+      "rmsDb": -29.443221,
+      "peakDb": -9.168617
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_machine_03.ogg",
+      "durationS": 1.839,
+      "rmsDb": -23.745063,
+      "peakDb": -9.690622
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_machine_04.ogg",
+      "durationS": 4.576,
+      "rmsDb": -16.328576,
+      "peakDb": -3.222119
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_water_01.ogg",
+      "durationS": 6.367,
+      "rmsDb": -26.606954,
+      "peakDb": -12.540426
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_water_02.ogg",
+      "durationS": 8.734,
+      "rmsDb": -31.6418,
+      "peakDb": -15.135518
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_loop_water_03.ogg",
+      "durationS": 9.707,
+      "rmsDb": -28.823799,
+      "peakDb": -7.707222
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_01.ogg",
+      "durationS": 0.58,
+      "rmsDb": -19.842728,
+      "peakDb": -1.947131
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_02.ogg",
+      "durationS": 0.319,
+      "rmsDb": -19.92085,
+      "peakDb": -0.296784
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_03.ogg",
+      "durationS": 0.285,
+      "rmsDb": -19.410593,
+      "peakDb": -0.59722
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_04.ogg",
+      "durationS": 0.382,
+      "rmsDb": -20.019725,
+      "peakDb": -1.471419
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_05.ogg",
+      "durationS": 0.475,
+      "rmsDb": -25.790877,
+      "peakDb": -0.540805
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_06.ogg",
+      "durationS": 0.287,
+      "rmsDb": -24.003584,
+      "peakDb": -0.964865
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_hit_01.ogg",
+      "durationS": 0.811,
+      "rmsDb": -25.015355,
+      "peakDb": -0.623642
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_metal_hit_02.ogg",
+      "durationS": 0.21,
+      "rmsDb": -28.324295,
+      "peakDb": -1.203051
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_01.ogg",
+      "durationS": 0.258,
+      "rmsDb": -23.73229,
+      "peakDb": -1.459008
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_02.ogg",
+      "durationS": 0.814,
+      "rmsDb": -18.422881,
+      "peakDb": -0.954449
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_03.ogg",
+      "durationS": 0.927,
+      "rmsDb": -26.174727,
+      "peakDb": 0.343339
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_04.ogg",
+      "durationS": 0.464,
+      "rmsDb": -27.99228,
+      "peakDb": -4.008559
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_05.ogg",
+      "durationS": 0.542,
+      "rmsDb": -20.869708,
+      "peakDb": -0.480296
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_06.ogg",
+      "durationS": 0.381,
+      "rmsDb": -22.509764,
+      "peakDb": -1.105655
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_07.ogg",
+      "durationS": 0.178,
+      "rmsDb": -21.099933,
+      "peakDb": -1.237312
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_08.ogg",
+      "durationS": 0.268,
+      "rmsDb": -23.155599,
+      "peakDb": -0.387285
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_09.ogg",
+      "durationS": 0.665,
+      "rmsDb": -29.426998,
+      "peakDb": -3.677185
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_10.ogg",
+      "durationS": 1.058,
+      "rmsDb": -31.127587,
+      "peakDb": -3.089382
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_11.ogg",
+      "durationS": 0.359,
+      "rmsDb": -32.286654,
+      "peakDb": -0.298302
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_12.ogg",
+      "durationS": 2.473,
+      "rmsDb": -16.568576,
+      "peakDb": -0.837504
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_13.ogg",
+      "durationS": 0.672,
+      "rmsDb": -28.82741,
+      "peakDb": -2.393701
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_14.ogg",
+      "durationS": 0.368,
+      "rmsDb": -30.204624,
+      "peakDb": -1.021142
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_15.ogg",
+      "durationS": 0.529,
+      "rmsDb": -26.031373,
+      "peakDb": -0.372158
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_16.ogg",
+      "durationS": 0.796,
+      "rmsDb": -26.998955,
+      "peakDb": -0.695494
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_17.ogg",
+      "durationS": 0.432,
+      "rmsDb": -29.958694,
+      "peakDb": -0.864121
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_18.ogg",
+      "durationS": 0.514,
+      "rmsDb": -26.448157,
+      "peakDb": -0.720828
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_19.ogg",
+      "durationS": 0.466,
+      "rmsDb": -28.261485,
+      "peakDb": -0.527601
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_20.ogg",
+      "durationS": 0.329,
+      "rmsDb": -26.613792,
+      "peakDb": -1.045631
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_21.ogg",
+      "durationS": 1.414,
+      "rmsDb": -26.191739,
+      "peakDb": -3.051287
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_22.ogg",
+      "durationS": 3.222,
+      "rmsDb": -26.426734,
+      "peakDb": -10.076659
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_23.ogg",
+      "durationS": 0.694,
+      "rmsDb": -27.889397,
+      "peakDb": -3.329577
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_24.ogg",
+      "durationS": 0.686,
+      "rmsDb": -22.708031,
+      "peakDb": -3.866322
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_25.ogg",
+      "durationS": 0.75,
+      "rmsDb": -22.290915,
+      "peakDb": -1.106134
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_26.ogg",
+      "durationS": 0.342,
+      "rmsDb": -23.337144,
+      "peakDb": -1.796791
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_27.ogg",
+      "durationS": 0.337,
+      "rmsDb": -22.678841,
+      "peakDb": -2.332461
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_28.ogg",
+      "durationS": 2.042,
+      "rmsDb": -22.813763,
+      "peakDb": -7.635866
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_29.ogg",
+      "durationS": 0.333,
+      "rmsDb": -25.630987,
+      "peakDb": -1.861103
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_30.ogg",
+      "durationS": 0.306,
+      "rmsDb": -24.153078,
+      "peakDb": -0.039842
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_31.ogg",
+      "durationS": 0.284,
+      "rmsDb": -30.35935,
+      "peakDb": -0.398776
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_32.ogg",
+      "durationS": 0.598,
+      "rmsDb": -23.690534,
+      "peakDb": -2.135028
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_33.ogg",
+      "durationS": 0.618,
+      "rmsDb": -27.508631,
+      "peakDb": -1.34333
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_34.ogg",
+      "durationS": 0.819,
+      "rmsDb": -22.889772,
+      "peakDb": -1.384308
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_35.ogg",
+      "durationS": 0.756,
+      "rmsDb": -26.922189,
+      "peakDb": -1.929791
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_36.ogg",
+      "durationS": 0.45,
+      "rmsDb": -29.142387,
+      "peakDb": -2.188393
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_misc_37.ogg",
+      "durationS": 4.854,
+      "rmsDb": -21.974584,
+      "peakDb": -2.070306
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_stones_01.ogg",
+      "durationS": 0.489,
+      "rmsDb": -31.13051,
+      "peakDb": -1.170837
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_stones_02.ogg",
+      "durationS": 0.555,
+      "rmsDb": -27.789754,
+      "peakDb": -1.58696
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_stones_03.ogg",
+      "durationS": 0.534,
+      "rmsDb": -30.617433,
+      "peakDb": -0.629
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_switch_01.ogg",
+      "durationS": 0.227,
+      "rmsDb": -31.176652,
+      "peakDb": -0.681199
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_switch_02.ogg",
+      "durationS": 0.233,
+      "rmsDb": -28.621672,
+      "peakDb": -0.408983
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_thunder_01.ogg",
+      "durationS": 5.265,
+      "rmsDb": -25.576131,
+      "peakDb": -3.49313
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_01.ogg",
+      "durationS": 0.532,
+      "rmsDb": -23.558087,
+      "peakDb": 0.079212
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_02.ogg",
+      "durationS": 0.451,
+      "rmsDb": -25.077566,
+      "peakDb": 0.052913
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_03.ogg",
+      "durationS": 0.678,
+      "rmsDb": -27.538145,
+      "peakDb": -2.270693
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_04.ogg",
+      "durationS": 0.227,
+      "rmsDb": -25.739636,
+      "peakDb": -1.314262
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_hit_01.ogg",
+      "durationS": 0.35,
+      "rmsDb": -17.455298,
+      "peakDb": -0.135665
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_hit_02.ogg",
+      "durationS": 0.357,
+      "rmsDb": -17.688725,
+      "peakDb": 0.123832
+    },
+    {
+      "pack": "oga-100-cc0-sfx-2",
+      "file": "assets/generated/audio/unpacked/oga-100-cc0-sfx-2/sfx100v2_wood_hit_03.ogg",
+      "durationS": 0.469,
+      "rmsDb": -23.594212,
+      "peakDb": 0.366402
+    }
+  ]
+}
