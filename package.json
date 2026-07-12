@@ -20,7 +20,8 @@
     "goldens": "node scripts/run-goldens.mjs",
     "typecheck": "tsc -b packages/shared packages/game",
     "validate": "node research/probes/validate-deliverables.mjs && node research/probes/validate-followup.mjs && node preproduction/probes/validate-cycle-01.mjs && node preproduction/probes/validate-cycle-02.mjs && node preproduction/probes/validate-cycle-03.mjs && node preproduction/probes/validate-final.mjs",
-    "ci:smoke": "node scripts/ci-smoke.mjs"
+    "ci:smoke": "node scripts/ci-smoke.mjs",
+    "package:win": "node scripts/package-win.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3",

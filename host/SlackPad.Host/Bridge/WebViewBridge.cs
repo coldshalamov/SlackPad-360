@@ -13,9 +13,16 @@ namespace SlackPad.Host.Bridge;
 /// </summary>
 internal sealed class WebViewBridge : IDisposable
 {
+    /// <summary>Virtual host the game dist is mapped to in game mode.</summary>
+    private const string GameVirtualHost = "slackpad.game";
+
+    /// <summary>Origin the game is served from (SetVirtualHostNameToFolderMapping).</summary>
+    private const string GameOrigin = "https://slackpad.game";
+
     private readonly WebView2 _webView;
     private string _pageOrigin = "about:blank";
     private bool _coreReady;
+    private bool _gameMode;
 
     public WebView2 Control => _webView;
     public bool Available { get; private set; }
@@ -69,6 +76,51 @@ internal sealed class WebViewBridge : IDisposable
         }
     }
 
+    /// <summary>
+    /// Game-mode init: map the built dist folder to the <c>slackpad.game</c> virtual
+    /// host and load it full-window. Uses an https origin (not file://) so the page
+    /// runs in a secure context and the origin check is exact. Locks down pinch zoom,
+    /// swipe-nav, context menus, and (unless requested) dev tools. Degrades to
+    /// <see cref="Available"/> = false when the Evergreen runtime is missing.
+    /// </summary>
+    public async Task InitializeGameAsync(HostInfoEnvelope hostInfo, string gameDistFolder, bool enableDevTools)
+    {
+        try
+        {
+            string userData = Path.Combine(Path.GetTempPath(), "SlackPadHostWebView2");
+            var env = await CoreWebView2Environment.CreateAsync(null, userData, null);
+            await _webView.EnsureCoreWebView2Async(env);
+
+            _coreReady = true;
+            Available = true;
+            _gameMode = true;
+
+            var s = _webView.CoreWebView2.Settings;
+            s.AreDefaultContextMenusEnabled = false;
+            s.IsStatusBarEnabled = false;
+            s.IsPinchZoomEnabled = false;        // trackpad pinch must not zoom the page
+            s.IsSwipeNavigationEnabled = false;  // no two-finger back/forward swipe
+            s.IsZoomControlEnabled = false;      // ctrl+wheel / ctrl+/- zoom off
+            s.AreDevToolsEnabled = enableDevTools;
+
+            _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            _webView.CoreWebView2.NavigationCompleted += (_, _) => PostHostInfo(hostInfo);
+
+            _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                GameVirtualHost, gameDistFolder, CoreWebView2HostResourceAccessKind.Allow);
+
+            _pageOrigin = GameOrigin;
+            _webView.CoreWebView2.Navigate(GameOrigin + "/index.html");
+            StatusMessage = $"WebView2 ready; game mapped to {GameOrigin} from {gameDistFolder}.";
+        }
+        catch (Exception ex)
+        {
+            Available = false;
+            _coreReady = false;
+            StatusMessage = $"WebView2 unavailable (Evergreen runtime missing?): {ex.GetType().Name}.";
+        }
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         // Origin validation (architecture §7): trust only the page we navigated to.
@@ -99,6 +151,14 @@ internal sealed class WebViewBridge : IDisposable
         if (string.IsNullOrEmpty(source))
         {
             return false;
+        }
+        if (_gameMode)
+        {
+            // Exact host match — https://slackpad.game only. A StartsWith check
+            // would also accept https://slackpad.game.evil.com/.
+            return Uri.TryCreate(source, UriKind.Absolute, out var uri) &&
+                   uri.Scheme == Uri.UriSchemeHttps &&
+                   string.Equals(uri.Host, GameVirtualHost, StringComparison.OrdinalIgnoreCase);
         }
         if (_pageOrigin == "about:blank")
         {

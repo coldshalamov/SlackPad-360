@@ -26,6 +26,7 @@ import { DebugHud } from './render/DebugHud';
 import { runSelfCheck, visualCheck } from './render/selfCheck';
 import { ProfileStore } from './input/ProfileStore';
 import { VirtualTrackpad } from './input/VirtualTrackpad';
+import { HostInputSource } from './input/HostInputSource';
 
 const BOOT_SEED = 0x5eed;
 const LEVEL_ID = 'flat-dev';
@@ -58,8 +59,21 @@ async function boot(): Promise<void> {
     respawnFadeMs: config.presentation.respawnFadeMs,
   });
 
+  // Native host bridge: when running inside the WebView2 GameForm, REAL trackpad
+  // frames stream in through the SAME InputHub. In a plain browser this is inert
+  // (window.chrome.webview is absent), so browser behavior is unchanged.
+  const hostSource = new HostInputSource(harness.getInputHub(), harness.getTelemetry());
+  const underHost = hostSource.active;
+  if (underHost) hostSource.attach();
+
   // DEV PAD: the browser input device. Frames flow through the real InputHub.
-  const virtualPad = new VirtualTrackpad(app, harness.getInputHub(), profileStore);
+  // Under the native host the real trackpad is live, so the DEV PAD is hidden by
+  // default (its synthetic frames would race the hardware stream through one
+  // InputHub) — opt back in with ?devpad=1 for debugging.
+  const showDevPad = !underHost || new URLSearchParams(window.location.search).has('devpad');
+  const virtualPad = showDevPad
+    ? new VirtualTrackpad(app, harness.getInputHub(), profileStore)
+    : undefined;
 
   // A profile change (stance/calibration/assist) is read immutably by the
   // harness on reset — re-reset so the dev edit applies immediately from step 0.

@@ -1,19 +1,26 @@
+using SlackPad.Host.Core;
 using SlackPad.Host.Ui;
 
 namespace SlackPad.Host;
 
 /// <summary>
-/// M1 entry point. Launches the dual-adapter P0 hardware spike:
-/// Raw Input HID digitizer (0x0D/0x05, primary) + Win11 pointer co-spike, emitting
-/// ContactFrame v1, recording JSONL traces, and computing G1 metrics from a human run.
+/// Host entry point.
+///   (default)  → GameForm: the built game full-window in WebView2, fed real
+///                trackpad ContactFrames. This is what play.bat launches.
+///   --spike    → SpikeForm: the M1 dual-adapter input diagnostic (dots + metrics).
+///   --devtools → allow WebView2 dev tools in game mode.
 /// </summary>
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        using var form = new SpikeForm();
+
+        var options = GameLaunchOptions.Parse(args);
+        using Form form = options.Mode == HostMode.Spike
+            ? new SpikeForm()
+            : new GameForm(options.DevTools);
         Application.Run(form);
     }
 }

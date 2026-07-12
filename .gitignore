@@ -18,3 +18,5 @@ Thumbs.db
 mcps/
 *.tsbuildinfo
 assets/generated/audio/unpacked/
+dist-release/
+GameDist/
