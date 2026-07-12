@@ -365,10 +365,43 @@ export class SimWorld {
         }
         break;
       }
+      case 'flipTorque': {
+        // Per-step flip/shuv PD torque about a board-local axis (spec §3.2).
+        // The axis is resolved to world from the LIVE orientation, the live
+        // angular velocity is projected onto it, and the clamped PD torque is
+        // applied as a torque impulse. Pure torque — no pose/velocity write.
+        const flip = this.config.flip;
+        const axis = flipAxisWorld(q, cmd.axis);
+        const omegaAxis = av.x * axis.x + av.y * axis.y + av.z * axis.z;
+        const omegaT = clampNum(cmd.omegaTarget, -flip.omegaFlipMax, flip.omegaFlipMax);
+        // Sane cap covers both the roll (tauMax) and yaw (shuvTauMax) clamps.
+        const tauCap = Math.max(flip.tauMax[2], flip.shuvTauMax[2]);
+        const tauMax = clampNum(cmd.tauMax, 0, tauCap);
+        let tau = flip.kp * (omegaT - omegaAxis) - flip.kd * omegaAxis;
+        tau = clampNum(tau, -tauMax, tauMax);
+        const imp = tau / phys.hz; // torque impulse = tau·dt
+        body.applyTorqueImpulse({ x: axis.x * imp, y: axis.y * imp, z: axis.z * imp }, true);
+        break;
+      }
       case 'catch': {
         // The spec's own equation: omega *= (1 - catchGain * assistScale).
         const factor = clampNum(cmd.angularFactor, 0, 1);
         body.setAngvel({ x: av.x * factor, y: av.y * factor, z: av.z * factor }, true);
+        break;
+      }
+      case 'catchQuantize': {
+        // Extra ON-AXIS catch damping (spec §3.4 quantize). Removes a fraction
+        // of the spin about the trick axis only, so the residual bleeds off and
+        // the trick settles on the level. Never a pose write / teleport.
+        const damp = clampNum(cmd.damp, 0, 1);
+        if (damp <= 0) break;
+        const axis = flipAxisWorld(q, cmd.axis);
+        const omegaAxis = av.x * axis.x + av.y * axis.y + av.z * axis.z;
+        const remove = damp * omegaAxis;
+        body.setAngvel(
+          { x: av.x - remove * axis.x, y: av.y - remove * axis.y, z: av.z - remove * axis.z },
+          true,
+        );
         break;
       }
       case 'landScrub': {
@@ -452,6 +485,19 @@ function quatRotate(q: Quat, x: number, y: number, z: number): Vec3 {
     y: y + q.w * ty + (q.z * tx - q.x * tz),
     z: z + q.w * tz + (q.x * ty - q.y * tx),
   };
+}
+
+/**
+ * World-space unit vector of a board-local trick axis (M5). 'long' = board long
+ * axis (+Z, nose) for flip roll; 'up' = board up (+Y) for shuv yaw. Both are
+ * unit in local space; the quaternion rotation preserves length, but we
+ * renormalize defensively so a denormalized body quat can never scale the torque.
+ */
+function flipAxisWorld(q: Quat, axis: 'long' | 'up'): Vec3 {
+  const local = axis === 'long' ? { x: 0, y: 0, z: 1 } : { x: 0, y: 1, z: 0 };
+  const w = quatRotate(q, local.x, local.y, local.z);
+  const len = Math.hypot(w.x, w.y, w.z) || 1;
+  return { x: w.x / len, y: w.y / len, z: w.z / len };
 }
 
 /** Normalized quaternion lerp (shortest arc). Cosmetic render interpolation. */

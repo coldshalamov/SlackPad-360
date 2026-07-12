@@ -33,11 +33,32 @@ export type TelemetryEvent =
   | { type: 'popFizzled'; step: number; label: string }
   | { type: 'kickArbitrated'; step: number; decision: string; mask: string }
   | { type: 'catch'; step: number; foot: 'nose' | 'tail' | 'both'; factor: number }
-  | { type: 'trickCompleted'; step: number; label: string; cleanliness: 'clean' | 'dirty'; thetaDeg: number }
-  | { type: 'bail'; step: number; reason: string }
+  | {
+      type: 'trickCompleted';
+      step: number;
+      label: string;
+      cleanliness: 'clean' | 'dirty';
+      thetaDeg: number;
+      // M5: signed measured rotation at land (feeds the M9 scorer).
+      flipRotations?: number;
+      shuvDegrees?: number;
+    }
+  | { type: 'bail'; step: number; reason: string; flipRotations?: number; shuvDegrees?: number }
   | { type: 'respawn'; step: number }
   | { type: 'contactImpulse'; step: number; impulse: number; grounded: boolean }
-  // M5 extension point: free-foot air gestures are routed + logged only in M4.
+  // --- M5 air-gesture (flick→flip / sweep→shuv) recognition ----------------
+  | {
+      type: 'flipRecognized' | 'shuvRecognized';
+      step: number;
+      label: string;
+      sign: number;
+      intensity: number;
+      confidence: number;
+      omegaTarget: number;
+      replaced?: boolean;
+    }
+  | { type: 'quantize'; step: number; axis: 'long' | 'up'; damp: number; residualDeg: number }
+  // Legacy M4 routing event (superseded by flip/shuvRecognized; kept for shape).
   | { type: 'airGesture'; step: number; foot: 'nose' | 'tail'; kind: string; speed: number }
   // Escape hatch for ad-hoc diagnostic events (never used for gameplay logic).
   | { type: string; [key: string]: unknown };

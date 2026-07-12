@@ -37,11 +37,13 @@
  * Math.random.
  */
 
-import type { SimConfig } from '@slackpad/shared';
+import type { SimConfig, Stance } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { FeetState } from '../input/FootTracker';
 import type { BoardPose } from '../sim/SimWorld';
 import type { PopRecognition } from './KickArbiter';
+import { AirGestureClassifier, labelFor } from './AirGestureClassifier';
+import type { AirGesture, AirGestureKind } from './AirGestureClassifier';
 
 export type GesturePhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'bail';
 
@@ -56,12 +58,34 @@ export interface RecognitionLabelState {
   expireStep: number;
   /** Pop prep quality (intensity input for ManeuverAssist). */
   q: number;
+  /**
+   * M5 open air gesture (flick→flip / sweep→shuv) recognized inside the window,
+   * or null. Carries the board-local axis + signed omegaTarget the per-step
+   * ManeuverAssist envelope drives. Null keeps the maneuver a plain ollie/nollie.
+   */
+  air: AirGesture | null;
 }
 
 export type FsmEvent =
   | { kind: 'pop'; label: 'ollie' | 'nollie'; q: number }
-  | { kind: 'catch'; foot: 'nose' | 'tail' | 'both' }
-  | { kind: 'land'; cleanliness: 'clean' | 'dirty'; thetaDeg: number; label: string | null }
+  | {
+      kind: 'catch';
+      foot: 'nose' | 'tail' | 'both';
+      /** Open air-gesture family at catch (drives quantize axis), or null. */
+      gesture: AirGestureKind | null;
+      /** Signed completed roll (turns) and yaw (deg) at the catch instant. */
+      flipRotations: number;
+      shuvDegrees: number;
+    }
+  | {
+      kind: 'land';
+      cleanliness: 'clean' | 'dirty';
+      thetaDeg: number;
+      label: string | null;
+      /** Signed measured rotation at land (for the M9 scorer). */
+      flipRotations: number;
+      shuvDegrees: number;
+    }
   | { kind: 'bail'; reason: FailReason }
   | { kind: 'popFizzled' };
 
@@ -102,11 +126,16 @@ export class GestureFSM {
   // Previous-step foot plants for replant/lift edge detection.
   #prevNosePlanted = false;
   #prevTailPlanted = false;
-  #prevNoseSpeed = 0;
-  #prevTailSpeed = 0;
 
   /** Rolling window of AIRBORNE contact impulses (interrupt rule §3.3). */
   #impulseWindow: number[] = [];
+
+  // --- M5 air-gesture recognition + rotation bookkeeping -------------------
+  #airClassifier: AirGestureClassifier;
+  /** Signed accumulated roll about the board long axis (+Z) since takeoff, rad. */
+  #rollAngle = 0;
+  /** Signed accumulated yaw about board up (+Y) since takeoff, rad. */
+  #shuvAngle = 0;
 
   private readonly airTrickWindowSteps: number;
   private readonly catchWindowSteps: number;
@@ -114,11 +143,13 @@ export class GestureFSM {
   constructor(
     private readonly config: SimConfig,
     private readonly assistLevel: 0 | 1 | 2,
+    stance: Stance,
     private readonly telemetry?: Telemetry,
   ) {
     const hz = config.physics.hz;
     this.airTrickWindowSteps = msToSteps(config.recognition.airTrickWindowMs, hz);
     this.catchWindowSteps = msToSteps(config.catch.windowMs, hz);
+    this.#airClassifier = new AirGestureClassifier(config, stance, telemetry);
   }
 
   /** Current phase (read by the KickArbiter gate and the checkpoint hash). */
@@ -127,7 +158,18 @@ export class GestureFSM {
   }
 
   get label(): RecognitionLabelState | null {
-    return this.#label ? { ...this.#label } : null;
+    if (!this.#label) return null;
+    return { ...this.#label, air: this.#label.air ? { ...this.#label.air } : null };
+  }
+
+  /** Signed completed roll (turns) since the pop — read by tests/telemetry. */
+  get flipRotations(): number {
+    return this.#rollAngle / (2 * Math.PI);
+  }
+
+  /** Signed completed yaw (degrees) since the pop. */
+  get shuvDegrees(): number {
+    return (this.#shuvAngle * 180) / Math.PI;
   }
 
   get lastFailReason(): FailReason | null {
@@ -180,13 +222,14 @@ export class GestureFSM {
         }
         if (this.#collisionInterrupt(inp, events)) break;
         if (this.#airTimeout(inp, events)) break;
+        this.#integrateRotation(inp);
         this.#trackApex(inp);
-        this.#logAirGestures(inp);
+        this.#classifyAir(inp);
         const hit = this.#catchAttempt(inp);
         if (hit) {
           this.#caught = true;
           this.#phase = 'catch';
-          events.push({ kind: 'catch', foot: hit });
+          events.push(this.#catchEvent(hit));
           this.telemetry?.log({ type: 'catch', step: inp.step, foot: hit, factor: this.#catchFactor() });
         }
         break;
@@ -198,6 +241,7 @@ export class GestureFSM {
           break;
         }
         if (this.#collisionInterrupt(inp, events)) break;
+        this.#integrateRotation(inp);
         this.#airTimeout(inp, events);
         break;
       }
@@ -221,8 +265,6 @@ export class GestureFSM {
 
     this.#prevNosePlanted = inp.feet.nose.planted;
     this.#prevTailPlanted = inp.feet.tail.planted;
-    this.#prevNoseSpeed = Math.hypot(inp.feet.nose.vel.x, inp.feet.nose.vel.y);
-    this.#prevTailSpeed = Math.hypot(inp.feet.tail.vel.x, inp.feet.tail.vel.y);
 
     return {
       phase: this.#phase,
@@ -246,9 +288,13 @@ export class GestureFSM {
       openStep: step,
       expireStep: step + this.airTrickWindowSteps,
       q: pop.q,
+      air: null,
     };
     this.#lastFailReason = null; // a new attempt clears the old failure
     this.#impulseWindow.length = 0; // fresh maneuver, fresh interrupt window
+    this.#airClassifier.reset(); // fresh maneuver, fresh flick/sweep evidence
+    this.#rollAngle = 0;
+    this.#shuvAngle = 0;
     this.#popStep = step;
     this.#phase = 'pop';
     this.telemetry?.log({ type: 'popRecognized', step, label: pop.label, q: pop.q, confidence });
@@ -263,21 +309,52 @@ export class GestureFSM {
     const cos = Math.max(-1, Math.min(1, upY));
     const thetaDeg = (Math.acos(cos) * 180) / Math.PI;
     const land = this.config.land;
-    const label = this.#label?.label ?? null;
+    // Names come from the OUTCOME (measured board-state history), never from the
+    // recognized intent — a flick whose rotation died early lands as what it
+    // physically was (final-input-and-trick-spec §7; no silent success).
+    const label = this.#outcomeLabel();
+    const flipRotations = this.flipRotations;
+    const shuvDegrees = this.shuvDegrees;
 
-    if (thetaDeg <= land.thetaCleanDeg) {
-      events.push({ kind: 'land', cleanliness: 'clean', thetaDeg, label });
-      this.telemetry?.log({ type: 'trickCompleted', step: inp.step, label: label ?? 'unknown', cleanliness: 'clean', thetaDeg });
+    const finish = (cleanliness: 'clean' | 'dirty'): void => {
+      events.push({ kind: 'land', cleanliness, thetaDeg, label, flipRotations, shuvDegrees });
+      this.telemetry?.log({
+        type: 'trickCompleted',
+        step: inp.step,
+        label,
+        cleanliness,
+        thetaDeg,
+        flipRotations,
+        shuvDegrees,
+      });
       this.#label = null;
       this.#phase = 'ground';
-    } else if (thetaDeg <= land.thetaDirtyDeg) {
-      events.push({ kind: 'land', cleanliness: 'dirty', thetaDeg, label });
-      this.telemetry?.log({ type: 'trickCompleted', step: inp.step, label: label ?? 'unknown', cleanliness: 'dirty', thetaDeg });
-      this.#label = null;
-      this.#phase = 'ground';
-    } else {
-      this.#bail(cos < 0 ? 'inverted' : 'over-rotation', inp.step, events);
+    };
+
+    if (thetaDeg <= land.thetaCleanDeg) finish('clean');
+    else if (thetaDeg <= land.thetaDirtyDeg) finish('dirty');
+    else this.#bail(cos < 0 ? 'inverted' : 'over-rotation', inp.step, events);
+  }
+
+  /**
+   * OUTCOME label from the measured rotation history (§7 "names from board state
+   * history"). Prefers the dominant completed rotation over its naming threshold;
+   * falls back to the base pop label (ollie/nollie) when neither flip nor shuv
+   * accrued enough — so a flicked-but-fizzled attempt reads honestly.
+   */
+  #outcomeLabel(): string {
+    const flip = this.config.flip;
+    const rec = this.config.recognition;
+    const base = this.#label?.label ?? 'ollie';
+    const turns = Math.abs(this.#rollAngle) / (2 * Math.PI);
+    const yawDeg = Math.abs((this.#shuvAngle * 180) / Math.PI);
+    const flipOk = turns >= flip.nameMinTurns;
+    const shuvOk = yawDeg >= rec.shuvNameMinDeg;
+    if (flipOk && (!shuvOk || turns / flip.nameMinTurns >= yawDeg / rec.shuvNameMinDeg)) {
+      return labelFor('flip', this.#rollAngle >= 0 ? 1 : -1);
     }
+    if (shuvOk) return labelFor('shuv', this.#shuvAngle >= 0 ? 1 : -1);
+    return base;
   }
 
   /**
@@ -316,13 +393,17 @@ export class GestureFSM {
   }
 
   #bail(reason: FailReason, step: number, events: FsmEvent[]): void {
+    // A bailed maneuver still has a rotation history (§7: every failure has
+    // telemetry; the M9 scorer reads the partial rotation).
+    const flipRotations = this.flipRotations;
+    const shuvDegrees = this.shuvDegrees;
     // Interrupt (§3.3): clear open labels/envelopes; physics continues.
     this.#label = null;
     this.#lastFailReason = reason;
     this.#phase = 'bail';
     this.#bailStepsLeft = Math.max(1, Math.floor(this.config.bail.recoverSteps));
     events.push({ kind: 'bail', reason });
-    this.telemetry?.log({ type: 'bail', step, reason });
+    this.telemetry?.log({ type: 'bail', step, reason, flipRotations, shuvDegrees });
   }
 
   // --- air-phase helpers -----------------------------------------------------
@@ -372,18 +453,60 @@ export class GestureFSM {
   }
 
   /**
-   * M5 extension point: free-foot flicks/sweeps land inside the air-trick
-   * window. In M4 lift edges above flickSpeedMin are ROUTED here and logged
-   * only — no physics. M5 replaces this with flick/sweep classification.
+   * M5 flick/sweep classification (final-input-and-trick-spec §5). Runs only
+   * inside the air-trick recognition window; feeds the free foot's calibrated
+   * pad velocity to the classifier and mirrors the open air gesture onto the
+   * label so ManeuverAssist can drive the per-step envelope. Flick-vs-steer
+   * (§3.1) is resolved by construction: this only runs airborne, never on ground.
    */
-  #logAirGestures(inp: FsmInputs): void {
+  #classifyAir(inp: FsmInputs): void {
     if (!this.#label || inp.step > this.#label.expireStep) return;
-    const min = this.config.recognition.flickSpeedMin;
-    if (this.#prevNosePlanted && !inp.feet.nose.planted && this.#prevNoseSpeed >= min) {
-      this.telemetry?.log({ type: 'airGesture', step: inp.step, foot: 'nose', kind: 'flickCandidate', speed: this.#prevNoseSpeed });
-    }
-    if (this.#prevTailPlanted && !inp.feet.tail.planted && this.#prevTailSpeed >= min) {
-      this.telemetry?.log({ type: 'airGesture', step: inp.step, foot: 'tail', kind: 'flickCandidate', speed: this.#prevTailSpeed });
-    }
+    const g = this.#airClassifier.update({
+      step: inp.step,
+      dt: 1 / this.config.physics.hz,
+      nose: { planted: inp.feet.nose.planted, vel: inp.feet.nose.vel },
+      tail: { planted: inp.feet.tail.planted, vel: inp.feet.tail.vel },
+    });
+    this.#label.air = g;
+  }
+
+  /**
+   * Accumulate the board's roll about its own long axis (+Z) and yaw about its
+   * up axis (+Y) since takeoff, by integrating the pre-step angular velocity
+   * projected onto the CURRENT board axes (deterministic left-Riemann sum). This
+   * is a net-rotation signal: a landed single flip reads ≈ ±1.0 turn by design (a
+   * kickflip IS one 360° roll — the catch freezes it there; uncaught it
+   * over-rotates), and a sub-threshold flick that never completes stays partial.
+   * It is intentionally COARSE in magnitude — fine-grained flick strength lives
+   * in the recognized intensity s (flipRecognized.intensity), while the SIGN
+   * here is the load-bearing part for outcome naming. Per-axis projection (not a
+   * single swing-twist decomposition) is used deliberately: it keeps roll and
+   * yaw independent, so a big kickflip roll never leaks into the shuv-yaw signal
+   * and misname a flip as a shuv. Never writes the body.
+   */
+  #integrateRotation(inp: FsmInputs): void {
+    const dt = 1 / this.config.physics.hz;
+    const q = inp.pose.q;
+    const av = inp.pose.av;
+    // World images of the board local +Z (long) and +Y (up) axes.
+    const zx = 2 * (q.x * q.z + q.w * q.y);
+    const zy = 2 * (q.y * q.z - q.w * q.x);
+    const zz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    const yx = 2 * (q.x * q.y - q.w * q.z);
+    const yy = 1 - 2 * (q.x * q.x + q.z * q.z);
+    const yz = 2 * (q.y * q.z + q.w * q.x);
+    this.#rollAngle += (av.x * zx + av.y * zy + av.z * zz) * dt;
+    this.#shuvAngle += (av.x * yx + av.y * yy + av.z * yz) * dt;
+  }
+
+  /** Build the enriched catch event (carries the outcome rotation for quantize). */
+  #catchEvent(foot: 'nose' | 'tail' | 'both'): Extract<FsmEvent, { kind: 'catch' }> {
+    return {
+      kind: 'catch',
+      foot,
+      gesture: this.#label?.air ? this.#label.air.kind : null,
+      flipRotations: this.flipRotations,
+      shuvDegrees: this.shuvDegrees,
+    };
   }
 }

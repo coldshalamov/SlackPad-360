@@ -22,6 +22,7 @@
  */
 
 import type { SimConfig, Vec3 } from '@slackpad/shared';
+import type { Telemetry } from '../telemetry/Telemetry';
 import type { FsmResult } from './GestureFSM';
 import type { ManeuverCommand } from './ManeuverCommand';
 
@@ -50,6 +51,7 @@ export class ManeuverAssist {
   constructor(
     private readonly config: SimConfig,
     assistLevel: 0 | 1 | 2,
+    private readonly telemetry?: Telemetry,
   ) {
     this.state = {
       phase: 'none',
@@ -83,6 +85,8 @@ export class ManeuverAssist {
     const s = this.state;
     const pop = this.config.pop;
     const cat = this.config.catch;
+    const flip = this.config.flip;
+    const rec = this.config.recognition;
 
     // impulseQueued is a one-step latch: whatever was queued last step has
     // been applied by SimWorld already.
@@ -105,6 +109,12 @@ export class ManeuverAssist {
           const gain = cat.catchGain * cat.assistScale[s.assistLevel];
           s.catchGain = gain;
           cmds.push({ kind: 'catch', angularFactor: 1 - gain });
+          // Quantize (spec §3.4): EXTRA on-axis damping when the completed
+          // rotation at catch sits inside this level's cone of a whole trick
+          // (k·360° flip / k·shuvTargetDeg shuv). Emitted AFTER the base catch
+          // so SimWorld composes them. L0 cone/damp are 0 → L0 never snaps.
+          const quant = this.#quantizeCommand(ev.gesture, ev.flipRotations, ev.shuvDegrees, flip, rec, step);
+          if (quant) cmds.push(quant);
           break;
         }
         case 'land': {
@@ -129,16 +139,57 @@ export class ManeuverAssist {
       }
     }
 
+    // Per-step flip/shuv envelope (spec §3.2). Runs in AIR ONLY (so it expires
+    // before catch — only catch + quantize act on the residual) and within the
+    // recognition window. SimWorld does the PD math + torque clamp.
+    const air = result.label?.air ?? null;
+    if (result.phase === 'air' && air && result.label && step <= result.label.expireStep) {
+      // The shuv yaw axis has ~17× the roll inertia, so it uses its own clamp.
+      const tauMax = air.axis === 'up' ? flip.shuvTauMax[s.assistLevel] : flip.tauMax[s.assistLevel];
+      cmds.push({ kind: 'flipTorque', axis: air.axis, omegaTarget: air.omegaTarget, tauMax });
+      s.omegaTarget =
+        air.axis === 'long' ? { x: 0, y: 0, z: air.omegaTarget } : { x: 0, y: air.omegaTarget, z: 0 };
+    } else {
+      s.omegaTarget = zero();
+    }
+
     // Mirror the FSM into the spec-shaped state. FSM 'ground' maps to the
     // spec's 'none' (AssistState has no ground phase — nothing is assisted).
     s.phase = result.phase === 'ground' ? 'none' : result.phase;
-    s.label = result.label?.label ?? null;
+    s.label = result.label?.air?.label ?? result.label?.label ?? null;
     if (result.label) {
       s.openStep = result.label.openStep;
       s.expireStep = result.label.expireStep;
     }
-    void step;
 
     return cmds;
+  }
+
+  /**
+   * Build the catch-time quantize command, or null when out of cone / L0. The
+   * residual is the angular distance from the completed rotation to the nearest
+   * whole trick (k·360° for a flip, k·shuvTargetDeg for a shuv).
+   */
+  #quantizeCommand(
+    gesture: 'flip' | 'shuv' | null,
+    flipRotations: number,
+    shuvDegrees: number,
+    flip: SimConfig['flip'],
+    rec: SimConfig['recognition'],
+    step: number,
+  ): ManeuverCommand | null {
+    if (!gesture) return null;
+    const L = this.state.assistLevel;
+    const coneDeg = flip.quantizeConeDeg[L];
+    const damp = flip.quantizeExtraDamp[L];
+    if (coneDeg <= 0 || damp <= 0) return null; // L0 never snaps (by construction)
+    const axis = gesture === 'flip' ? 'long' : 'up';
+    const residualDeg =
+      gesture === 'flip'
+        ? Math.abs(flipRotations - Math.round(flipRotations)) * 360
+        : Math.abs(shuvDegrees - Math.round(shuvDegrees / rec.shuvTargetDeg) * rec.shuvTargetDeg);
+    if (residualDeg > coneDeg) return null;
+    this.telemetry?.log({ type: 'quantize', step, axis, damp, residualDeg });
+    return { kind: 'catchQuantize', axis, damp };
   }
 }

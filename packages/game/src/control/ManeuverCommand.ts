@@ -10,7 +10,9 @@
 
 export type ManeuverCommand =
   | PopManeuverCommand
+  | FlipTorqueManeuverCommand
   | CatchManeuverCommand
+  | CatchQuantizeManeuverCommand
   | LandScrubManeuverCommand
   | BailStartManeuverCommand;
 
@@ -29,12 +31,48 @@ export interface PopManeuverCommand {
 }
 
 /**
+ * Per-step flip/shuv envelope (M5; final-physics §3.2). SimWorld resolves the
+ * board-local axis to world (quatRotate), reads the live angular velocity,
+ * projects it onto the axis, and applies the PD torque
+ *   tau = clamp(kp·(omegaTarget − omegaAxis) − kd·omegaAxis, ±tauMax)
+ * as a torque impulse tau·dt about the world axis. kp/kd come from config.flip;
+ * omegaTarget is clamped to ±flip.omegaFlipMax; tauMax is the ALREADY assist-
+ * level-selected clamp (ManeuverAssist picks flip.tauMax[assistLevel]). No pose
+ * or velocity writes — a pure torque, exactly the applyGroundForces pattern.
+ */
+export interface FlipTorqueManeuverCommand {
+  kind: 'flipTorque';
+  /** Board-local axis to spin about: 'long' = +Z (roll), 'up' = +Y (yaw). */
+  axis: 'long' | 'up';
+  /** Signed target angular rate about the axis, rad/s (SimWorld re-clamps). */
+  omegaTarget: number;
+  /** Torque clamp for this assist level, N·m (SimWorld re-clamps to a sane cap). */
+  tauMax: number;
+}
+
+/**
  * Catch damping: the spec's own equation, implemented as an angular-velocity
  * scale. factor = 1 − catchGain·assistScale[assistLevel], clamped to [0, 1].
  */
 export interface CatchManeuverCommand {
   kind: 'catch';
   angularFactor: number;
+}
+
+/**
+ * Catch-time quantize (M5; final-physics §3.4). When the completed rotation at
+ * catch lands inside the assist-level cone of a whole trick (k·360° flip / k·180°
+ * shuv), remove `damp` of the ON-AXIS spin so the residual bleeds off and the
+ * trick settles ON the level. SimWorld removes only the axis-projected component:
+ *   av' = av − damp·(av·axisWorld)·axisWorld
+ * This is EXTRA angular damping about one axis — never a pose write, never a
+ * teleport to a perfect pose. L0 never emits this (cone 0 / damp 0).
+ */
+export interface CatchQuantizeManeuverCommand {
+  kind: 'catchQuantize';
+  axis: 'long' | 'up';
+  /** Fraction of the on-axis angular velocity to remove, clamped to [0, 1]. */
+  damp: number;
 }
 
 /**

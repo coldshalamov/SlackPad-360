@@ -15,6 +15,11 @@
  *    prep is performable — releasing X replants A, which is also the catch).
  *  - S toggle stance · C capture padYawOffset from the current segment ·
  *    F swap feet · 0/1/2 set assist level (via ProfileStore, persisted).
+ *  - M5 air gestures (press AFTER a pop, while airborne): K = kickflip flick,
+ *    H = heelflip flick, J = BS shuv sweep, L = FS shuv sweep. Each scripts a
+ *    plausible free-foot contact path (a fast lateral slide for flicks, a yaw
+ *    arc for shuvs) over ~6 emitted frames through the SAME emitter, so it drives
+ *    the real AirGestureClassifier. On the ground the flick is ignored (§3.1).
  *
  * M4 ollie recipe (regular stance, A on the pad-right = tail, B = nose):
  *   hold LMB right-of-center + SHIFT (cruise) → release SHIFT (nose lift) →
@@ -33,9 +38,23 @@ const PANEL_W = 260;
 const PANEL_H = 180;
 const EMIT_HZ = 120;
 
+/** Scripted air-gesture path (M5 dev keys): frames + per-frame magnitude. */
+const GESTURE_FRAMES = 6;
+/** Lateral pad step per frame for a flick (fast enough to clear flickSpeedMin). */
+const FLICK_STEP = 0.05;
+/** Yaw-arc radius + sweep span for a shuv. */
+const SWEEP_RADIUS = 0.16;
+const SWEEP_SPAN = Math.PI * 0.75;
+
+type GestureKind = 'kickflip' | 'heelflip' | 'bs-shuv' | 'fs-shuv';
+
 interface Vec2 {
   x: number;
   y: number;
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 export class VirtualTrackpad {
@@ -57,6 +76,9 @@ export class VirtualTrackpad {
   private bId = 0;
   private bPos: Vec2 = { x: 0.5, y: 0.5 };
   private primary = false;
+
+  /** Active scripted air gesture (K/H/J/L), driving foot A along a path. */
+  private gesture: { kind: GestureKind; i: number; base: Vec2 } | null = null;
 
   constructor(
     container: HTMLElement,
@@ -182,10 +204,58 @@ export class VirtualTrackpad {
       case '2':
         this.profile.setAssistLevel(2);
         break;
+      // M5 scripted air gestures (perform AFTER a pop, while airborne).
+      case 'k':
+        this.startGesture('kickflip');
+        break;
+      case 'h':
+        this.startGesture('heelflip');
+        break;
+      case 'j':
+        this.startGesture('bs-shuv');
+        break;
+      case 'l':
+        this.startGesture('fs-shuv');
+        break;
       default:
         break;
     }
   };
+
+  /** Begin a scripted flick/sweep from foot A's current position. */
+  private startGesture(kind: GestureKind): void {
+    if (!this.aDown || this.aSuspended) return; // need a live free foot to flick
+    this.gesture = { kind, i: 0, base: { ...this.aPos } };
+  }
+
+  /**
+   * Advance the scripted gesture one emitted frame and return foot A's position,
+   * or null when no gesture is active/finished. A flick is a straight fast
+   * lateral slide (heelside for kickflip / toeside for heelflip in the default
+   * regular frame); a shuv traces a yaw arc so the velocity direction turns.
+   */
+  private tickGesture(): Vec2 | null {
+    const g = this.gesture;
+    if (!g) return null;
+    const i = g.i + 1;
+    let p: Vec2;
+    if (g.kind === 'kickflip' || g.kind === 'heelflip') {
+      // Heelside = pad-down (+y) for a regular rider (see AirGestureClassifier).
+      const dir = g.kind === 'kickflip' ? 1 : -1;
+      p = { x: g.base.x, y: clamp01(g.base.y + dir * FLICK_STEP * i) };
+    } else {
+      const dir = g.kind === 'bs-shuv' ? 1 : -1;
+      const a0 = -Math.PI / 2;
+      const a = a0 + dir * SWEEP_SPAN * (i / GESTURE_FRAMES);
+      p = {
+        x: clamp01(g.base.x + SWEEP_RADIUS * Math.cos(a)),
+        y: clamp01(g.base.y + SWEEP_RADIUS + SWEEP_RADIUS * Math.sin(a)),
+      };
+    }
+    g.i = i;
+    if (g.i >= GESTURE_FRAMES) this.gesture = null;
+    return p;
+  }
 
   private onKeyUp = (e: KeyboardEvent): void => {
     if (e.key === 'Shift') {
@@ -211,6 +281,12 @@ export class VirtualTrackpad {
 
   // --- 120 Hz frame emission ----------------------------------------------
   private emit = (): void => {
+    // A scripted air gesture (K/H/J/L) drives foot A's position this frame.
+    const scripted = this.tickGesture();
+    if (scripted) {
+      this.aPos = scripted;
+      if (this.bId && !this.ctrlHeld) this.bPos = this.mirror(this.aPos);
+    }
     const contacts: ContactFrame['contacts'] = [];
     if (this.aDown && !this.aSuspended)
       contacts.push({ id: this.aId, tip: true, x: this.aPos.x, y: this.aPos.y, confidence: true });
@@ -266,6 +342,8 @@ export class VirtualTrackpad {
     );
     ctx.fillStyle = 'rgba(120,145,170,0.7)';
     ctx.fillText('LMB=A · Shift=B · X=liftA · Ctrl=lockB · Space=click', 8, PANEL_H - 8);
+    ctx.fillStyle = this.gesture ? 'rgba(255,180,90,0.95)' : 'rgba(120,145,170,0.7)';
+    ctx.fillText('after pop: K/H=kick/heelflip · J/L=bs/fs shuv', 8, PANEL_H - 34);
 
     // Segment line between the two feet.
     if (this.aDown && this.bId) {

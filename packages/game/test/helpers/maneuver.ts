@@ -92,6 +92,30 @@ export async function settled(seed: number, levelId = 'flat-dev', harness?: Agen
   return new PadDriver(h);
 }
 
+/**
+ * settled() with an explicit stance/assist profile (M5). A fresh harness reads
+ * the profile at reset(), so stance/assist apply from step 0 (and thus reach
+ * the FootTracker's pad-role binding, the AirGestureClassifier, and the flip
+ * torque clamps).
+ */
+export async function settledProfiled(
+  seed: number,
+  opts: { stance?: 'regular' | 'goofy'; assistLevel?: 0 | 1 | 2; levelId?: string } = {},
+): Promise<PadDriver> {
+  const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
+    stance: opts.stance ?? 'regular',
+    padYawOffset: 0,
+    swapFeet: false,
+    assistLevel: opts.assistLevel ?? 1,
+    bothClickMeans: 'push',
+    tapToClickIsKick: true,
+    accessibility: { reducedMotion: false, highContrastHud: false },
+  }));
+  await h.reset(seed, opts.levelId ?? 'flat-dev');
+  h.step(60);
+  return new PadDriver(h);
+}
+
 /** All telemetry events of one type (typed as loose records for assertions). */
 export function eventsOf(h: AgentHarness, type: string): Array<Record<string, unknown>> {
   return h
@@ -215,5 +239,139 @@ export function flyOut(
     outcome,
     thetaDeg,
     failReason: h.observe().lastFailReason,
+  };
+}
+
+// --- M5 air-gesture (flick/sweep) scripting ---------------------------------
+
+export type GestureScript = 'flip-heel' | 'flip-toe' | 'shuv-bs' | 'shuv-fs';
+
+export interface FlipFlightResult extends FlightResult {
+  /** Signed completed roll (turns) at land, from trickCompleted telemetry. */
+  flipRotations: number;
+  /** Signed completed yaw (deg) at land. */
+  shuvDegrees: number;
+  /** Outcome label ('kickflip'|'heelflip'|'fs-shuv'|'bs-shuv'|'ollie'|'nollie'). */
+  label: string | null;
+  caught: boolean;
+  /** Recognized flick/sweep intensity s (from flip/shuvRecognized), or null. */
+  recIntensity: number | null;
+  /** Provisional recognized label, or null if nothing recognized. */
+  recLabel: string | null;
+}
+
+/**
+ * The free foot's (TAIL) scripted pad position at gesture frame k (1-based).
+ * The tail stays planted throughout the pop, so moving it is a free-foot flick
+ * with NO replant edge — it never false-triggers a catch. A flick is a straight
+ * lateral slide (heelside = +y for the default regular frame); a shuv traces a
+ * yaw arc so the velocity DIRECTION turns past sweepMinAngleRad.
+ */
+export function gesturePos(g: GestureScript, k: number, perFrame: number, frames: number): FootInput {
+  if (g === 'flip-heel') return { x: TAIL_POS.x, y: clampPad(TAIL_POS.y + perFrame * k) };
+  if (g === 'flip-toe') return { x: TAIL_POS.x, y: clampPad(TAIL_POS.y - perFrame * k) };
+  // Shuv arc: velocity tangent rotates by `span` over the sweep.
+  const dir = g === 'shuv-bs' ? 1 : -1;
+  const R = 0.13;
+  const span = Math.PI * 0.8;
+  const a0 = 0;
+  const a = a0 + dir * span * (k / frames);
+  return {
+    x: clampPad(TAIL_POS.x + R * (Math.cos(a) - Math.cos(a0))),
+    y: clampPad(TAIL_POS.y + R * (Math.sin(a) - Math.sin(a0))),
+  };
+}
+
+function clampPad(v: number): number {
+  return v < 0.02 ? 0.02 : v > 0.98 ? 0.98 : v;
+}
+
+export interface GestureOptions {
+  gesture: GestureScript;
+  /** Lateral pad step per sim step for a flick (ignored for shuv arc). */
+  perFrame?: number;
+  frames?: number;
+  /** Steps after air entry before the gesture starts. */
+  startAfterAir?: number;
+  catchAfterApexSteps?: number | null;
+  catchPos?: FootInput;
+  maxSteps?: number;
+}
+
+/**
+ * Fly out a pop while scripting a free-foot air gesture, then optionally catch.
+ * Assumes the caller already ran scriptOllie (tail planted, nose lifted).
+ */
+export function flyWithGesture(d: PadDriver, opts: GestureOptions): FlipFlightResult {
+  const h = d.harness;
+  const perFrame = opts.perFrame ?? 0.1;
+  const frames = opts.frames ?? 6;
+  const startAfterAir = opts.startAfterAir ?? 2;
+  const catchAfter = opts.catchAfterApexSteps ?? null;
+  const catchPos = opts.catchPos ?? NOSE_POS;
+  const maxSteps = opts.maxSteps ?? 240;
+
+  const y0 = h.observe().board.p.y;
+  let maxY = y0;
+  let airSteps = 0;
+  let airStart: number | null = null;
+  let apexStep: number | null = null;
+  let gi = 0;
+  let nosePlanted = false;
+
+  for (let i = 0; i < maxSteps; i++) {
+    const obs = h.observe();
+    if (obs.board.p.y > maxY) maxY = obs.board.p.y;
+    const phase = obs.phase;
+    if (phase === 'air' || phase === 'catch') {
+      airSteps += 1;
+      if (airStart == null) airStart = obs.step;
+      if (apexStep == null && obs.board.lv.y <= 0) apexStep = obs.step;
+    }
+    const done = lastEventOf(h, 'trickCompleted') ?? lastEventOf(h, 'bail');
+    if (done && (phase === 'ground' || phase === 'bail')) break;
+
+    let tail: FootInput = TAIL_POS;
+    if (airStart != null && obs.step >= airStart + startAfterAir) {
+      if (gi < frames) gi += 1;
+      tail = gesturePos(opts.gesture, gi, perFrame, frames); // holds at final after `frames`
+    }
+
+    if (!nosePlanted && catchAfter != null && apexStep != null && obs.step >= apexStep + catchAfter) {
+      nosePlanted = true;
+    }
+    d.drive({ nose: nosePlanted ? catchPos : null, tail });
+  }
+
+  const trick = lastEventOf(h, 'trickCompleted');
+  const bail = lastEventOf(h, 'bail');
+  const trickStep = trick ? (trick.step as number) : -1;
+  const bailStep = bail ? (bail.step as number) : -1;
+  const rec = eventsOf(h, 'flipRecognized').concat(eventsOf(h, 'shuvRecognized'));
+  const recFirst = rec[0];
+
+  let outcome: FlightResult['outcome'] = 'none';
+  let thetaDeg: number | null = null;
+  const bailed = bailStep > trickStep;
+  const outcomeEv = bailed ? bail : trick;
+  if (bailed) {
+    outcome = 'bail';
+  } else if (trick) {
+    outcome = trick.cleanliness as 'clean' | 'dirty';
+    thetaDeg = trick.thetaDeg as number;
+  }
+
+  return {
+    height: maxY - y0,
+    airtimeSec: airSteps / DEFAULT_SIM_CONFIG.physics.hz,
+    outcome,
+    thetaDeg,
+    failReason: h.observe().lastFailReason,
+    flipRotations: outcomeEv ? ((outcomeEv.flipRotations as number) ?? 0) : 0,
+    shuvDegrees: outcomeEv ? ((outcomeEv.shuvDegrees as number) ?? 0) : 0,
+    label: trick ? (trick.label as string) : bailed ? h.observe().lastFailReason : null,
+    caught: lastEventOf(h, 'catch') !== undefined,
+    recIntensity: recFirst ? (recFirst.intensity as number) : null,
+    recLabel: recFirst ? (recFirst.label as string) : null,
   };
 }

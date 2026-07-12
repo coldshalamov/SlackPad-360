@@ -58,6 +58,15 @@ export interface RecognitionConfig {
   sweepMinAngleRad: number;
   /** Nose-lift prep velocity threshold distinguishing ollie prep from noise. */
   prepLiftSpeedMin: number;
+  // --- M5 shuv naming/target (hypothesis) --------------------------------
+  /** Shuv rotation target, degrees (180 first ship; 360 deferred). */
+  shuvTargetDeg: number;
+  /**
+   * Minimum |completed yaw| (degrees) for the OUTCOME namer to call a shuv
+   * 'fs-shuv'/'bs-shuv' rather than fall back to the base pop label. Set safely
+   * above any incidental yaw a plain ollie accrues.
+   */
+  shuvNameMinDeg: number;
 }
 
 export interface FootTrackerConfig {
@@ -138,6 +147,57 @@ export interface FlipConfig {
   kd: number;
   /** Torque clamp per assist level, N·m. */
   tauMax: [number, number, number];
+  // --- M5 flick/sweep classification + envelopes (hypothesis) -----------
+  /**
+   * Axis-dominance ratio for the shuv-vs-flip conflict (final-input-and-trick
+   * §3.1): the free foot's lateral (across-board) speed must exceed its
+   * longitudinal (along-board) speed by this factor for a LATERAL-dominant
+   * flick → flip; otherwise arc/yaw evidence is allowed to win → shuv.
+   */
+  axisDominanceRatio: number;
+  /**
+   * Minimum integrated lateral pad displacement (calibrated units) over the
+   * flick path to confirm a flick (rejects a single noisy fast frame). ~one
+   * board-half of pad travel.
+   */
+  flickPathMinLen: number;
+  /**
+   * Lateral pad speed (calibrated units/s) at which the flick intensity s
+   * saturates to 1. s = clamp((peakLatSpeed − flickSpeedMin)/(flickSpeedForMaxS
+   * − flickSpeedMin), 0, 1); omegaTarget = s·sign·omegaFlipMax.
+   */
+  flickSpeedForMaxS: number;
+  /** Target yaw rate magnitude for a shuv envelope, rad/s (about board up). */
+  shuvOmegaMax: number;
+  /**
+   * Torque clamp per assist level for the SHUV yaw envelope, N·m. Separate from
+   * `tauMax` (which drives flip roll) because the board's yaw inertia about the
+   * up axis is ~17× its roll inertia about the long axis — the same clamp would
+   * barely spin a shuv. Sized so a shuv reaches its 180° target within airtime.
+   */
+  shuvTauMax: [number, number, number];
+  /**
+   * Catch-time quantize cone half-width per assist level, degrees. When the
+   * integrated flip roll (or shuv yaw) at catch lands within this cone of the
+   * nearest k·360° (flip) / k·180° (shuv), extra axis-damping bleeds the
+   * residual spin so the trick settles ON the level (final-physics §3.4). L0 is
+   * 0 → L0 NEVER snaps (quantize off). NEVER a pose write.
+   */
+  quantizeConeDeg: [number, number, number];
+  /**
+   * Fraction of the on-axis spin removed at catch when inside the quantize cone,
+   * per assist level. Applied ON TOP of the base catch damping, only about the
+   * trick axis. L0 is 0 by construction. L2 > L1 (stronger snap).
+   */
+  quantizeExtraDamp: [number, number, number];
+  /**
+   * Minimum |completed rotations| (turns) for the OUTCOME namer to call a flip
+   * 'kickflip'/'heelflip' rather than fall back to the base pop label
+   * (final-input-and-trick §7: names from board-state history — a flick whose
+   * rotation died early is named for what physically happened). Set safely above
+   * any incidental roll a plain/dirty ollie accrues about its long axis.
+   */
+  nameMinTurns: number;
 }
 
 export interface CatchConfig {
@@ -377,6 +437,120 @@ export interface RuntimeConfig {
   };
 }
 
+/**
+ * Camera rig tunables (M7). PRESENTATION ONLY — the camera reads sim state via
+ * the harness and never writes input/sim (spec §6: "camera never changes the
+ * board-local input frame"). All values are cycle-3 hypothesis defaults for a
+ * later feel pass; distances are metres, heights metres, FOV degrees. The rig
+ * frames off `ObserveState.phase`; transitions are a critically damped spring on
+ * position + a rate-clamped slerp on orientation (spec §6).
+ */
+export interface CameraConfig {
+  /** Near/far clip planes, m. */
+  near: number;
+  far: number;
+  /** Base (ground/chase) vertical FOV, deg. */
+  fovBase: number;
+  /** Air pull-back FOV, deg — widened so a full rotation reads (spec §6). */
+  fovAir: number;
+
+  // --- Chase low 3/4 (ground) -------------------------------------------
+  /** Distance the chase cam sits BEHIND the board (along board heading −Z), m. */
+  chaseDistance: number;
+  /** Chase cam height above the board centre, m (feet stay visible). */
+  chaseHeight: number;
+  /** Lateral 3/4 offset of the chase cam, m (the "3/4" in low 3/4). */
+  chaseSide: number;
+  /** Aim point height above the board centre for the look target, m. */
+  aimHeight: number;
+  /** Minimum look-ahead distance in front of the board, m (spec: 2–4 m). */
+  lookAheadMin: number;
+  /** Maximum look-ahead distance, m (reached at `lookAheadSpeedRef`). */
+  lookAheadMax: number;
+  /** Ground speed (m/s) at which look-ahead saturates to `lookAheadMax`. */
+  lookAheadSpeedRef: number;
+
+  // --- Air pull-back / catch --------------------------------------------
+  /** Chase distance while airborne, m (pulled back for readability). */
+  airDistance: number;
+  /** Chase height while airborne, m. */
+  airHeight: number;
+  /**
+   * Catch tightening factor in [0,1]: how far catch frames blend from the air
+   * pose back toward the chase pose (0 = stay air, 1 = full chase).
+   */
+  catchTighten: number;
+
+  // --- Bail wide --------------------------------------------------------
+  /** Bail cam distance, m — wide so the failure is readable (spec §6). */
+  bailDistance: number;
+  /** Bail cam height, m. */
+  bailHeight: number;
+  /** Slow orbit rate while holding the bail wide shot, rad/s. */
+  bailOrbitRate: number;
+
+  // --- Grind overhead blend (STUB until M6 phase arrives) ----------------
+  /** Grind cam height above the board, m (overhead-ish). */
+  grindHeight: number;
+  /** Grind cam lateral offset, m. */
+  grindSide: number;
+  /** Grind look-ahead along the rail, m. */
+  grindLookAhead: number;
+
+  // --- Transitions ------------------------------------------------------
+  /**
+   * Critically damped position smooth time, s (Unity-style SmoothDamp — the
+   * analytic critically damped spring). Smaller = snappier. `reducedMotion`
+   * snaps instantly regardless.
+   */
+  positionSmoothTime: number;
+  /** Max camera angular slew rate, deg/s (orientation slerp clamp, spec §6). */
+  maxAngularRateDeg: number;
+
+  // --- Occlusion spring-arm ---------------------------------------------
+  /** Sphere-cast probe radius for the occlusion spring-arm, m (spec §6). */
+  occlusionRadius: number;
+  /** Never shorten the arm below this distance from the target, m. */
+  occlusionMinDistance: number;
+}
+
+/**
+ * Presentation tunables (M7) for the shoes, wheels, and bail/respawn overlays.
+ * PRESENTATION ONLY — none of these feed the sim. Blend RATES are per-second
+ * exponential smoothing coefficients (`a = 1 − exp(−rate·dt)`), so they are
+ * frame-rate independent and never pop. Cycle-3 hypothesis defaults.
+ */
+export interface PresentationConfig {
+  /** Shoe follow rate on the ground (plant/rest tracking), 1/s. */
+  shoeGroundBlendRate: number;
+  /** Shoe rate while lerping back to sockets on catch, 1/s (spec §5 damp). */
+  shoeCatchBlendRate: number;
+  /** Air lean angle per unit board roll rate, rad per (rad/s) — cosmetic. */
+  shoeAirLeanGain: number;
+  /** Clamp on the procedural air lean, deg. */
+  shoeAirLeanMaxDeg: number;
+  /** Vertical squash of a planted shoe (1 = none), spec §5 "slight squash". */
+  shoeSquashY: number;
+  /** Render-space gravity for a bailed (detached) shoe, m/s². */
+  bailShoeGravity: number;
+  /** Tumble spin of a bailed shoe, rad/s (cosmetic). */
+  bailShoeSpin: number;
+  /** Bailed-shoe fade-out duration, ms. */
+  bailShoeFadeMs: number;
+  /**
+   * Visual wheel-spin multiplier. Wheel angle accumulates
+   * `+= (groundSpeed / wheelRadius) · dt · wheelSpinFactor` — never an absolute
+   * angle derived from instantaneous speed (that stutters).
+   */
+  wheelSpinFactor: number;
+  /** Fallback wheel radius, m, if the GLB wheel bbox can't be measured. */
+  wheelRadiusFallback: number;
+  /** Red bail vignette hold duration, ms (CSS overlay; skipped if reducedMotion). */
+  bailVignetteMs: number;
+  /** Respawn fade-through-black duration, ms (instant if reducedMotion). */
+  respawnFadeMs: number;
+}
+
 export interface SimConfig {
   recognition: RecognitionConfig;
   footTracker: FootTrackerConfig;
@@ -390,6 +564,8 @@ export interface SimConfig {
   physics: PhysicsConfig;
   locomotion: LocomotionConfig;
   runtime: RuntimeConfig;
+  camera: CameraConfig;
+  presentation: PresentationConfig;
 }
 
 // Deep-frozen at definition: the shared defaults are a contract, not a
@@ -407,6 +583,8 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     plantSpeedEps: 0.35,
     sweepMinAngleRad: 0.9,
     prepLiftSpeedMin: 0.8,
+    shuvTargetDeg: 180,
+    shuvNameMinDeg: 90,
   },
   footTracker: {
     recenterHoldMs: 300,
@@ -433,6 +611,14 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     kp: 8,
     kd: 0.6,
     tauMax: [1.2, 2.0, 3.0],
+    axisDominanceRatio: 1.3,
+    flickPathMinLen: 0.06,
+    flickSpeedForMaxS: 5.0,
+    shuvOmegaMax: 9.0,
+    shuvTauMax: [5, 7, 10],
+    quantizeConeDeg: [0, 45, 80],
+    quantizeExtraDamp: [0, 0.5, 0.85],
+    nameMinTurns: 0.4,
   },
   catch: {
     volumeRadius: 0.15,
@@ -511,6 +697,46 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     loop: { maxFrameMs: 250, maxStepsPerFrame: 5 },
     telemetry: { ringCapacity: 10000 },
     replay: { checkpointEverySteps: 30 },
+  },
+  camera: {
+    near: 0.05,
+    far: 400,
+    fovBase: 55,
+    fovAir: 66,
+    chaseDistance: 2.8,
+    chaseHeight: 1.05,
+    chaseSide: 0.7,
+    aimHeight: 0.45,
+    lookAheadMin: 2.0,
+    lookAheadMax: 4.0,
+    lookAheadSpeedRef: 6.0,
+    airDistance: 5.0,
+    airHeight: 2.2,
+    catchTighten: 0.55,
+    bailDistance: 7.0,
+    bailHeight: 3.0,
+    bailOrbitRate: 0.25,
+    grindHeight: 4.0,
+    grindSide: 2.5,
+    grindLookAhead: 2.5,
+    positionSmoothTime: 0.32,
+    maxAngularRateDeg: 150,
+    occlusionRadius: 0.25,
+    occlusionMinDistance: 0.8,
+  },
+  presentation: {
+    shoeGroundBlendRate: 18,
+    shoeCatchBlendRate: 9,
+    shoeAirLeanGain: 0.06,
+    shoeAirLeanMaxDeg: 18,
+    shoeSquashY: 0.9,
+    bailShoeGravity: -9.0,
+    bailShoeSpin: 3.0,
+    bailShoeFadeMs: 650,
+    wheelSpinFactor: 1.0,
+    wheelRadiusFallback: 0.026,
+    bailVignetteMs: 900,
+    respawnFadeMs: 250,
   },
 } as SimConfig);
 

@@ -134,7 +134,7 @@ export class AgentHarness {
     this.#boardController = this.#makeBoardController();
     this.#kickArbiter = this.#makeKickArbiter();
     this.#fsm = this.#makeGestureFsm();
-    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel);
+    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel, this.#telemetry);
   }
 
   /** Deep-frozen private copy of the current profile — trackers only read it. */
@@ -166,7 +166,7 @@ export class AgentHarness {
   }
 
   #makeGestureFsm(): GestureFSM {
-    return new GestureFSM(this.#config, this.#assistLevel, this.#telemetry);
+    return new GestureFSM(this.#config, this.#assistLevel, this.#profile.stance, this.#telemetry);
   }
 
   /** One-time engine init (idempotent). reset() also awaits this. */
@@ -194,7 +194,7 @@ export class AgentHarness {
     this.#boardController = this.#makeBoardController();
     this.#kickArbiter = this.#makeKickArbiter();
     this.#fsm = this.#makeGestureFsm();
-    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel);
+    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel, this.#telemetry);
     this.#feetState = null;
     this.#telemetry.log({ type: 'reset', step: 0, seed, levelId });
   }
