@@ -46,10 +46,18 @@ export interface ObserveState {
     nose: FootObservation;
     tail: FootObservation;
   };
+  /**
+   * Grind state (M6). Null when there is neither a live grind candidate nor an
+   * active grind. `candidate` is the visible-snap signal (research §6.2/§9): the
+   * board is in a grind-candidate volume with a plausible approach — surfaced
+   * BEFORE any latch so magnetism is never invisible. `active` is the latched
+   * grind; `balance` is the meter (0 = centred, |balance| → balanceLimit slips).
+   */
   grind: {
     active: boolean;
     family: GrindFamily;
     balance: number;
+    candidate: boolean;
   } | null;
   score: number;
   lastFailReason: string | null;

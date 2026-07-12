@@ -153,6 +153,31 @@ export class ManeuverAssist {
       s.omegaTarget = zero();
     }
 
+    // Per-step grind latch (M6; spec §4). Flush the GrindSystem's clamped
+    // soft-snap command while grinding (and the one-shot lateral kick a balance
+    // slip carries), and mirror the rail frame into AssistState.grindAxis/
+    // grindAnchor. SimWorld does the force math + clamps — no pose write here.
+    const grind = result.grind;
+    if (grind && grind.axis && grind.perp) {
+      cmds.push({
+        kind: 'grindLatch',
+        family: grind.family ?? 'fifty-fifty',
+        approachOnly: grind.approachOnly,
+        axis: { ...grind.axis },
+        perp: { ...grind.perp },
+        lateralOffset: grind.lateralOffset,
+        springGain: grind.springGain,
+        balanceLateral: grind.balanceLateral,
+      });
+    }
+    if (grind && grind.active && grind.axis && grind.anchor) {
+      s.grindAxis = { ...grind.axis };
+      s.grindAnchor = { ...grind.anchor };
+    } else {
+      s.grindAxis = null;
+      s.grindAnchor = null;
+    }
+
     // Mirror the FSM into the spec-shaped state. FSM 'ground' maps to the
     // spec's 'none' (AssistState has no ground phase — nothing is assisted).
     s.phase = result.phase === 'ground' ? 'none' : result.phase;

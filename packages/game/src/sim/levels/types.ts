@@ -4,6 +4,7 @@
 
 import type { RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
 import type { SimConfig } from '@slackpad/shared';
+import type { RailDescriptor } from '../rails';
 
 /** Seeded PRNG: returns a float in [0, 1). */
 export type Rng = () => number;
@@ -21,6 +22,13 @@ export interface LevelHandle {
    * here — it is level data, never an agent-reachable API.
    */
   spawn: { x: number; y: number; z: number };
+  /**
+   * Grindable rail descriptors (M6): plain-data centre-lines the grind system
+   * queries via SimWorld.railProximity(). The physical rail COLLIDERS are built
+   * into the world by the level; these descriptors are just the geometry the
+   * control layer reads. Absent/empty on levels with no rails.
+   */
+  rails?: RailDescriptor[];
 }
 
 export type LevelBuilder = (

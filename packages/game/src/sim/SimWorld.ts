@@ -19,6 +19,9 @@ import { getLevelBuilder } from './levels/index';
 import type { Rng } from './levels/types';
 import type { GroundCommand } from '../control/GroundCommand';
 import type { ManeuverCommand } from '../control/ManeuverCommand';
+import { nearestRail } from './rails';
+import type { RailDescriptor, RailProximity } from './rails';
+import { grindLatchImpulse } from './grindForces';
 
 /** Full rigid-body observation (position, orientation, linear/angular velocity). */
 export interface BoardPose {
@@ -91,6 +94,8 @@ export class SimWorld {
   // --- M4 maneuver/bail state (all #private: game rules, not agent API) ----
   /** Level spawn marker captured at build time (deterministic per seed). */
   #spawn: Vec3 = zero();
+  /** Grindable rail descriptors from the level (plain data; queried, never leaked). */
+  #rails: RailDescriptor[] = [];
   /** Bail-respawn countdown; null when not bailing (the respawn game rule). */
   #bailStepsLeft: number | null = null;
   /** Max board contact impulse (N·s) observed during the LAST step(). */
@@ -126,6 +131,7 @@ export class SimWorld {
     this.#board = handle.board;
     this.#eventQueue = new RAPIER.EventQueue(true);
     this.#spawn = { ...handle.spawn };
+    this.#rails = handle.rails ? handle.rails.map((r) => ({ ...r })) : [];
     this.#bailStepsLeft = null;
     this.#lastContactImpulse = 0;
     this.stepCount = 0;
@@ -224,6 +230,22 @@ export class SimWorld {
     const restHeight = phys.truckDropY + phys.truckHalfExtents.y;
     const y = body.translation().y;
     return Number.isFinite(y) && y <= restHeight + phys.groundedTolerance;
+  }
+
+  /**
+   * Nearest grindable rail to the board centre (M6), or null when the level has
+   * no rails or the board is far from all of them. A narrow observational query
+   * exactly like isGrounded(): it returns fresh PLAIN DATA (rail tangent, anchor,
+   * lateral offset) computed from the rail descriptors + the board position, and
+   * never exposes a body or collider. GrindSystem consults this to decide the
+   * candidate/latch/exit; it cannot reach the physics world through it.
+   */
+  railProximity(): RailProximity | null {
+    if (this.#rails.length === 0) return null;
+    const body = this.requireBoard();
+    const p = body.translation();
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) return null;
+    return nearestRail(this.#rails, p.x, p.z);
   }
 
   /**
@@ -415,6 +437,34 @@ export class SimWorld {
         body.setLinearDamping(this.config.bail.dampingFactor);
         body.setAngularDamping(this.config.bail.dampingFactor);
         this.#bailStepsLeft = Math.max(1, Math.floor(this.config.bail.recoverSteps));
+        break;
+      }
+      case 'grindLatch': {
+        // Soft-snap latch (spec §4): clamped HORIZONTAL forces + a yaw-align
+        // torque only. Vertical support is the rail collider's contact — this
+        // never writes the pose. The force maths lives in the pure, unit-tested
+        // grindLatchImpulse() (single source of truth for the latch physics).
+        const { lin, yaw } = grindLatchImpulse(
+          { q, lv, av },
+          {
+            family: cmd.family,
+            approachOnly: cmd.approachOnly,
+            axis: cmd.axis,
+            perp: cmd.perp,
+            lateralOffset: cmd.lateralOffset,
+            springGain: cmd.springGain,
+            balanceLateral: cmd.balanceLateral,
+          },
+          this.config.grind,
+          phys.boardMass,
+          phys.hz,
+        );
+        if (Number.isFinite(lin.x) && Number.isFinite(lin.z) && (lin.x !== 0 || lin.z !== 0)) {
+          body.applyImpulse({ x: lin.x, y: 0, z: lin.z }, true);
+        }
+        if (Number.isFinite(yaw) && yaw !== 0) {
+          body.applyTorqueImpulse({ x: 0, y: yaw, z: 0 }, true);
+        }
         break;
       }
     }

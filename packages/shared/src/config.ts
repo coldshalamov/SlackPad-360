@@ -290,6 +290,100 @@ export interface GrindConfig {
   balanceGain: number;
   /** Hard off-axis impulse (N·s) that clears the latch. */
   interruptImpulse: number;
+
+  // --- M6 grind detection / candidate signalling (hypothesis) ------------
+  /**
+   * Horizontal distance (m) from the board centre to the rail centre-line
+   * within which a grind CANDIDATE is signalled (ObserveState.grind.candidate +
+   * `grindCandidate` telemetry). MUST exceed `rSnap[2]` so the candidate always
+   * appears BEFORE the latch — the visible-snap fairness mandate (research
+   * §6.2/§9: "show icon when in snap volume so player trusts system"). Pure
+   * feedback; never itself latches.
+   */
+  candidateVolumeRadius: number;
+  /**
+   * Steps after a pop during which a grind is still "recently popped" and thus a
+   * candidate even if momentarily grounded (research §6.1: "candidate when
+   * airborne OR recent pop"). Latch itself still only opens from the air phase.
+   */
+  recentPopSteps: number;
+  /**
+   * Board-centre ride height ABOVE the rail top surface, m, for each family. A
+   * 50-50 straddles with the trucks on the rail (mirrors physics.truckDropY +
+   * truckHalfExtents.y ≈ 0.085); a boardslide lies deck-flat (mirrors
+   * deckThickness/2 ≈ 0.025). Used per-family for the tight vertical geometric-
+   * contact test — NO loose vertical capture band (a generous band would be
+   * vertical magnetism; the ~0.06 m family difference fits inside rSnap[1]).
+   */
+  rideHeightFiftyFifty: number;
+  rideHeightBoardslide: number;
+
+  // --- M6 soft-snap latch forces (hypothesis) ---------------------------
+  /**
+   * Lateral corrective spring gain per assist level, N per m of offset from the
+   * rail centre-line (final-physics §4 latch: "lateral spring toward rail
+   * centreline on entry"). L0 = 0 → pure physics, NO snap (a thin rail is then
+   * genuinely hard); L1 default soft; L2 stronger. Never a pose write — applied
+   * as a clamped horizontal force so the board is guided, not teleported.
+   */
+  latchLateralSpring: [number, number, number];
+  /** Damping on the board's rail-perpendicular velocity, N per (m/s). Cancels sideways drift so the board tracks the rail. */
+  latchLateralDamp: number;
+  /** Hard clamp on the lateral corrective force magnitude, N (anti-explosion). */
+  latchLateralForceMax: number;
+  /**
+   * Along-rail speed-proportional drag while grinding, 1/s. Bleeds grind speed so
+   * a grind naturally ends (speed-end dismount) rather than riding forever —
+   * force-based, never a velocity write.
+   */
+  tangentDrag: number;
+  /** Along-rail speed (m/s) below which the grind speed-ends to a ground dismount. Below entry `vMin` for hysteresis (no instant exit at entry). */
+  speedEndSpeed: number;
+
+  // --- M6 balance meter (hypothesis; forgiving, no death loops) ----------
+  /** Disturbance weight from the board's signed lateral offset from the centre-line. */
+  balanceOffsetWeight: number;
+  /** Disturbance weight from the board's signed roll relative to rail-up. */
+  balanceRollWeight: number;
+  /** Player counter-lean authority: balance correction per unit foot lateral bias. */
+  balanceInputGain: number;
+  /**
+   * Self-centring decay of the balance meter, 1/s. Neutral play (no lean input)
+   * eases balance back toward 0 so staying on is forgiving and a slip is always
+   * recoverable — the anti-death-loop guarantee (research §5 "no inescapable
+   * death loops").
+   */
+  balanceSelfCenter: number;
+  /** Hard clamp on |balance| so the meter is always finite. */
+  balanceClampMax: number;
+  /** |balance| below this rides CLEAN (scores); between this and balanceLimit rides but dirty. */
+  cleanBalanceBand: number;
+
+  // --- M6 exits / interrupt (hypothesis) --------------------------------
+  /** Vertical impulse (N·s) of an ollie-out hop off the rail, applied via the reused pop path. */
+  exitHopImpulse: number;
+  /**
+   * Lateral impulse (N·s) kicking the board OFF the rail on a balance-fail slip,
+   * plus `relatchCooldownSteps` of latch suppression, so a slip cannot instantly
+   * re-latch within rSnap (the anti-oscillation guard — the specific death-loop
+   * the mandate forbids).
+   */
+  slipLateralImpulse: number;
+  /** Steps after ANY grind exit during which a new latch is suppressed (anti-oscillation). */
+  relatchCooldownSteps: number;
+
+  // --- M6 yaw alignment (hypothesis) — the orientation analog of the lateral
+  // spring. A 50-50 is self-stabilising (momentum aligned with the board) but a
+  // boardslide sits yawed ~90° across a thin line-contact that barely resists
+  // yaw, so without this the board would pivot off. Aligns board heading to the
+  // family target (parallel for 50-50, perpendicular for boardslide) with a
+  // clamped torque — never a pose write. Near-zero for an already-aligned board.
+  /** Yaw-align torque per rad of heading error, N·m/rad. */
+  latchYawAlignGain: number;
+  /** Yaw-rate damping while grinding, N·m per (rad/s). */
+  latchYawDamp: number;
+  /** Hard clamp on the yaw-align torque magnitude, N·m. */
+  latchYawTorqueMax: number;
 }
 
 export interface PhysicsConfig {
@@ -663,11 +757,32 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     vMin: 0.8,
     vMax: 9.0,
     fiftyFiftyEnvelopeDeg: 25,
-    boardslideEnvelopeDeg: 30,
+    boardslideEnvelopeDeg: 40,
     rSnap: [0.02, 0.08, 0.14],
     balanceLimit: 1.0,
     balanceGain: 1.6,
     interruptImpulse: 6.0,
+    candidateVolumeRadius: 0.6,
+    recentPopSteps: 24,
+    rideHeightFiftyFifty: 0.085,
+    rideHeightBoardslide: 0.025,
+    latchLateralSpring: [0, 55, 90],
+    latchLateralDamp: 14,
+    latchLateralForceMax: 60,
+    tangentDrag: 0.9,
+    speedEndSpeed: 0.5,
+    balanceOffsetWeight: 3.2,
+    balanceRollWeight: 0.7,
+    balanceInputGain: 2.4,
+    balanceSelfCenter: 2.2,
+    balanceClampMax: 3.0,
+    cleanBalanceBand: 0.45,
+    exitHopImpulse: 6.4,
+    slipLateralImpulse: 1.2,
+    relatchCooldownSteps: 20,
+    latchYawAlignGain: 6.0,
+    latchYawDamp: 1.4,
+    latchYawTorqueMax: 6.0,
   },
   physics: {
     hz: 60,

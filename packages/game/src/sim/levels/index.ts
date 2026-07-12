@@ -4,10 +4,12 @@
 import type { LevelBuilder } from './types';
 import { flatDev } from './flat-dev';
 import { testObstacle } from './test-obstacle';
+import { grindLab } from './grind-lab';
 
 export const LEVELS: Readonly<Record<string, LevelBuilder>> = {
   'flat-dev': flatDev,
   'test-obstacle': testObstacle,
+  'grind-lab': grindLab,
 };
 
 export const DEFAULT_LEVEL_ID = 'flat-dev';

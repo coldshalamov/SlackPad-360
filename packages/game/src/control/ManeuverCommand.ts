@@ -8,13 +8,16 @@
  * `omega *= (1 - catchGain * assistScale)`).
  */
 
+import type { Vec3 } from '@slackpad/shared';
+
 export type ManeuverCommand =
   | PopManeuverCommand
   | FlipTorqueManeuverCommand
   | CatchManeuverCommand
   | CatchQuantizeManeuverCommand
   | LandScrubManeuverCommand
-  | BailStartManeuverCommand;
+  | BailStartManeuverCommand
+  | GrindLatchManeuverCommand;
 
 /**
  * One-shot pop: vertical impulse J = (0, jY, 0) plus a pitch torque impulse
@@ -93,4 +96,40 @@ export interface LandScrubManeuverCommand {
  */
 export interface BailStartManeuverCommand {
   kind: 'bailStart';
+}
+
+/**
+ * Per-step grind latch (M6; final-physics §4 latch). A SOFT constraint applied
+ * as clamped HORIZONTAL forces — never a pose write, never a teleport:
+ *   - project velocity along the rail tangent (drag off the along-rail speed so
+ *     the grind eventually speed-ends);
+ *   - a lateral corrective spring toward the rail centre-line (the "lateral
+ *     spring toward rail centreline on entry" soft snap — assist-scaled, L0 = 0)
+ *     plus perpendicular-velocity damping so the board tracks the rail;
+ *   - a lateral balance nudge so an imbalanced grind visibly drifts.
+ * Vertical support comes from the real rail collider (contact), NOT this command.
+ * SimWorld re-clamps every component; the total lateral force is capped.
+ */
+export interface GrindLatchManeuverCommand {
+  kind: 'grindLatch';
+  /** Grind family — selects the yaw-align target (parallel vs perpendicular). */
+  family: 'fifty-fifty' | 'boardslide';
+  /**
+   * Approach-only orientation snap (M6): true while a grind is a CANDIDATE in the
+   * air but not yet latched. SimWorld then applies ONLY the yaw-alignment torque
+   * (assist the player's rotation into the family orientation "on entry",
+   * final-physics §4) and NO lateral spring / tangent drag / balance — so there
+   * is orientation help but zero POSITIONAL magnetism before the latch commits.
+   */
+  approachOnly: boolean;
+  /** Rail tangent, unit world horizontal (velocity projected along this). */
+  axis: Vec3;
+  /** Rail-perpendicular, unit world horizontal (spring + balance act along this). */
+  perp: Vec3;
+  /** Signed lateral offset of the board centre from the centre-line, m. */
+  lateralOffset: number;
+  /** Lateral spring gain for this assist level, N/m (SimWorld re-clamps ≥ 0). */
+  springGain: number;
+  /** Signed balance lateral force, N (SimWorld folds into the capped lateral force). */
+  balanceLateral: number;
 }

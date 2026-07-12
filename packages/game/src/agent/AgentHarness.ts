@@ -238,7 +238,7 @@ export class AgentHarness {
         nose: this.#footObservation('nose'),
         tail: this.#footObservation('tail'),
       },
-      grind: null,
+      grind: this.#fsm.grindObservation(),
       score: 0, // M9 owns scoring; trickCompleted telemetry feeds it later
       lastFailReason: this.#fsm.lastFailReason,
       inputSource: this.#lastInputSource,
@@ -481,6 +481,7 @@ export class AgentHarness {
     const grounded = this.#world.isGrounded();
     const pose = this.#world.boardPose();
     const contactImpulse = this.#world.lastContactImpulseMagnitude();
+    const railProximity = this.#world.railProximity();
     // Impact observability (deterministic — derived from sim state only).
     // Normal rolling stays well under 0.5 N·s per step; landings + wall hits
     // show up here, which is what interrupt tuning reads.
@@ -489,8 +490,12 @@ export class AgentHarness {
     }
 
     // Arbitrate kicks against the PREVIOUS step's phase (the FSM gate): pop
-    // paths open only from riding-on-ground recognition.
-    const arb = this.#kickArbiter.update(feet, kicks, this.#fsm.phase === 'ground', step);
+    // paths open from riding-on-ground recognition OR mid-grind (the ollie-out
+    // hop the KickArbiter explicitly reserves — "mid-maneuver kicks ... e.g.
+    // grind hop"). buttonSide attribution routes a mid-grind click straight to a
+    // pop with no locomotion leak.
+    const popAllowed = this.#fsm.phase === 'ground' || this.#fsm.phase === 'grind';
+    const arb = this.#kickArbiter.update(feet, kicks, popAllowed, step);
 
     const fsmResult = this.#fsm.update({
       feet,
@@ -498,6 +503,7 @@ export class AgentHarness {
       grounded,
       pose,
       contactImpulse,
+      railProximity,
       step,
     });
 

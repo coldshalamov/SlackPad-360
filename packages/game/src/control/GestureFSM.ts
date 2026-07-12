@@ -2,15 +2,23 @@
  * GestureFSM — the maneuver phase state machine (M4; research/control-grammar
  * §7, final-input-and-trick-spec §3/§5/§7, final-physics §3.3).
  *
- * Phases: 'none' (not riding) | 'ground' | 'pop' | 'air' | 'catch' | 'bail'.
- * Legal edges (the property test pins this exact table):
+ * Phases: 'none' (not riding) | 'ground' | 'pop' | 'air' | 'catch' | 'grind' |
+ * 'bail'. Legal edges (the property test pins this exact table):
  *
  *   none   → ground                         (board settles onto the ground)
  *   ground → pop | none                     (pop recognition / lost the ground)
  *   pop    → air | ground | bail            (liftoff / fizzle / interrupt)
- *   air    → catch | ground | bail          (catch / land check / interrupt)
+ *   air    → catch | ground | grind | bail  (catch / land / GRIND LATCH / interrupt)
  *   catch  → ground | bail                  (land check / interrupt)
+ *   grind  → pop | air | ground | bail      (hop-out / slip / low dismount / hard fail)
  *   bail   → none                           (respawn — SimWorld game rule)
+ *
+ * Grind (M6): air→grind on a soft-snap latch (GrindSystem, geometric contact
+ * required — no teleport). Exits: hop reuses the pop path (grind→pop→air);
+ * balance slip / foot lift / off-end drop to grind→air (land check resolves);
+ * a low speed-end dismounts grind→ground; a hard collision grind→bail. While a
+ * grind CANDIDATE is live in the air, air-shuv/flip + catch are suppressed
+ * (phase exclusive; final-input-and-trick §3.1).
  *
  * The FSM consumes PLAIN DATA only (FeetState, arbitrated PopRecognitions,
  * BoardPose reads, the last-step contact impulse). It never touches the body:
@@ -41,11 +49,14 @@ import type { SimConfig, Stance } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { FeetState } from '../input/FootTracker';
 import type { BoardPose } from '../sim/SimWorld';
+import type { RailProximity } from '../sim/rails';
 import type { PopRecognition } from './KickArbiter';
 import { AirGestureClassifier, labelFor } from './AirGestureClassifier';
 import type { AirGesture, AirGestureKind } from './AirGestureClassifier';
+import { GrindSystem } from './GrindSystem';
+import type { GrindExitReason, GrindInputs, GrindSnapshot, GrindStepResult } from './GrindSystem';
 
-export type GesturePhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'bail';
+export type GesturePhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
 
 export type FailReason = 'over-rotation' | 'hard-impact' | 'inverted' | 'timeout';
 
@@ -96,6 +107,8 @@ export interface FsmInputs {
   pose: BoardPose;
   /** Max board contact impulse (N·s) observed during the previous step. */
   contactImpulse: number;
+  /** Nearest grindable rail readout (SimWorld.railProximity), or null (M6). */
+  railProximity: RailProximity | null;
   step: number;
 }
 
@@ -104,6 +117,11 @@ export interface FsmResult {
   label: RecognitionLabelState | null;
   lastFailReason: FailReason | null;
   events: FsmEvent[];
+  /**
+   * Per-step grind result (M6): candidate/latch state + the grindLatch command
+   * data ManeuverAssist flushes. Null outside the air/grind phases.
+   */
+  grind: GrindStepResult | null;
 }
 
 function msToSteps(ms: number, hz: number): number {
@@ -137,6 +155,11 @@ export class GestureFSM {
   /** Signed accumulated yaw about board up (+Y) since takeoff, rad. */
   #shuvAngle = 0;
 
+  // --- M6 grind subsystem (owned like #airClassifier) ----------------------
+  #grind: GrindSystem;
+  /** Grind result of the LAST update (air/grind only), for observe + assist. */
+  #lastGrind: GrindStepResult | null = null;
+
   private readonly airTrickWindowSteps: number;
   private readonly catchWindowSteps: number;
 
@@ -150,6 +173,7 @@ export class GestureFSM {
     this.airTrickWindowSteps = msToSteps(config.recognition.airTrickWindowMs, hz);
     this.catchWindowSteps = msToSteps(config.catch.windowMs, hz);
     this.#airClassifier = new AirGestureClassifier(config, stance, telemetry);
+    this.#grind = new GrindSystem(config, assistLevel, telemetry);
   }
 
   /** Current phase (read by the KickArbiter gate and the checkpoint hash). */
@@ -176,9 +200,28 @@ export class GestureFSM {
     return this.#lastFailReason;
   }
 
+  /**
+   * Grind observation for ObserveState.grind (M6): {active, family, balance,
+   * candidate}, or null when there is neither a live candidate nor an active
+   * grind. Derived from the last update's grind result so it is null outside the
+   * air/grind phases.
+   */
+  grindObservation(): GrindSnapshot | null {
+    const g = this.#lastGrind;
+    if (!g || (!g.active && !g.candidate)) return null;
+    return {
+      active: g.active,
+      family: g.family ?? 'fifty-fifty',
+      balance: g.balance,
+      candidate: g.candidate,
+    };
+  }
+
   update(inp: FsmInputs): FsmResult {
     const events: FsmEvent[] = [];
     const from = this.#phase;
+    // Grind result is recomputed each step by the air/grind cases; null elsewhere.
+    this.#lastGrind = null;
 
     switch (this.#phase) {
       case 'none':
@@ -224,13 +267,25 @@ export class GestureFSM {
         if (this.#airTimeout(inp, events)) break;
         this.#integrateRotation(inp);
         this.#trackApex(inp);
-        this.#classifyAir(inp);
-        const hit = this.#catchAttempt(inp);
-        if (hit) {
-          this.#caught = true;
-          this.#phase = 'catch';
-          events.push(this.#catchEvent(hit));
-          this.telemetry?.log({ type: 'catch', step: inp.step, foot: hit, factor: this.#catchFactor() });
+        // Grind evaluation (airborne here): a soft-snap latch opens grind; a live
+        // candidate suppresses air-shuv/flip + catch so a boardslide approach is
+        // never misread as a shuv (phase exclusive, §3.1). Rails sit above the
+        // grounded band, so the latch never races the land check.
+        const gr = this.#grind.update(this.#grindInputs(inp, /*canLatch*/ true));
+        this.#lastGrind = gr;
+        if (gr.latchedThisStep) {
+          this.#phase = 'grind';
+          break;
+        }
+        if (!gr.candidate) {
+          this.#classifyAir(inp);
+          const hit = this.#catchAttempt(inp);
+          if (hit) {
+            this.#caught = true;
+            this.#phase = 'catch';
+            events.push(this.#catchEvent(hit));
+            this.telemetry?.log({ type: 'catch', step: inp.step, foot: hit, factor: this.#catchFactor() });
+          }
         }
         break;
       }
@@ -243,6 +298,13 @@ export class GestureFSM {
         if (this.#collisionInterrupt(inp, events)) break;
         this.#integrateRotation(inp);
         this.#airTimeout(inp, events);
+        break;
+      }
+
+      case 'grind': {
+        const gr = this.#grind.update(this.#grindInputs(inp, /*canLatch*/ false));
+        this.#lastGrind = gr;
+        if (gr.exit) this.#exitGrind(gr.exit, inp, events);
         break;
       }
 
@@ -271,7 +333,74 @@ export class GestureFSM {
       label: this.label,
       lastFailReason: this.#lastFailReason,
       events,
+      grind: this.#lastGrind,
     };
+  }
+
+  // --- grind helpers (M6) --------------------------------------------------
+
+  /** Assemble the plain-data GrindInputs from the FSM step inputs. */
+  #grindInputs(inp: FsmInputs, canLatch: boolean): GrindInputs {
+    return {
+      rail: inp.railProximity,
+      pose: inp.pose,
+      feet: inp.feet,
+      canLatch,
+      recentPop: inp.step - this.#popStep <= this.config.grind.recentPopSteps,
+      // A recognised pop while grinding is an ollie-out hop.
+      hopRequested: inp.pops.length > 0,
+      contactImpulse: inp.contactImpulse,
+      step: inp.step,
+    };
+  }
+
+  /** Resolve a grind exit into the right phase transition (GrindSystem cleared its latch). */
+  #exitGrind(reason: GrindExitReason, inp: FsmInputs, events: FsmEvent[]): void {
+    switch (reason) {
+      case 'hop': {
+        // Ollie-out: reuse the pop path (grind→pop→air) so the impulse + air
+        // bookkeeping are exactly the ground ollie's. Hop strength is a fixed
+        // config impulse mapped back to a prep quality.
+        const pop = this.#hopPop(inp.pops[0]);
+        this.#openPop(pop, inp.step);
+        events.push({ kind: 'pop', label: pop.label, q: pop.q });
+        break;
+      }
+      case 'speed-end':
+        // Low dismount rolls back onto the ground; an elevated speed-end drops to
+        // the air and the land check resolves it.
+        this.#phase = inp.grounded ? 'ground' : 'air';
+        if (!inp.grounded) this.#enterAir(inp.step);
+        break;
+      case 'foot-lift':
+      case 'balance-fail':
+        // Slip / step-off into the air — recoverable; the land check (or bail by
+        // cone) resolves it. Never an inescapable state (research §5).
+        this.#enterAir(inp.step);
+        break;
+      case 'collision':
+        this.#bail('hard-impact', inp.step, events);
+        break;
+    }
+  }
+
+  /** A synthetic pop for an ollie-out hop: fixed exit-hop impulse → prep quality q. */
+  #hopPop(recognized: PopRecognition | undefined): PopRecognition {
+    const pop = this.config.pop;
+    const span = pop.jMax - pop.jMin;
+    const q = span > 1e-6 ? Math.max(0, Math.min(1, (this.config.grind.exitHopImpulse - pop.jMin) / span)) : 0;
+    return { step: 0, label: recognized?.label ?? 'ollie', q };
+  }
+
+  /** Enter the air phase fresh (used by grind slip/drop exits). */
+  #enterAir(step: number): void {
+    this.#phase = 'air';
+    this.#airStartStep = step;
+    this.#apexSeen = false;
+    this.#caught = false;
+    this.#rollAngle = 0;
+    this.#shuvAngle = 0;
+    this.#impulseWindow.length = 0;
   }
 
   // --- transitions ---------------------------------------------------------
@@ -293,6 +422,7 @@ export class GestureFSM {
     this.#lastFailReason = null; // a new attempt clears the old failure
     this.#impulseWindow.length = 0; // fresh maneuver, fresh interrupt window
     this.#airClassifier.reset(); // fresh maneuver, fresh flick/sweep evidence
+    this.#grind.reset(); // fresh maneuver, fresh grind candidate/latch (keeps cooldown)
     this.#rollAngle = 0;
     this.#shuvAngle = 0;
     this.#popStep = step;
@@ -399,6 +529,7 @@ export class GestureFSM {
     const shuvDegrees = this.shuvDegrees;
     // Interrupt (§3.3): clear open labels/envelopes; physics continues.
     this.#label = null;
+    this.#grind.reset(); // a bail clears any grind candidate/latch too
     this.#lastFailReason = reason;
     this.#phase = 'bail';
     this.#bailStepsLeft = Math.max(1, Math.floor(this.config.bail.recoverSteps));

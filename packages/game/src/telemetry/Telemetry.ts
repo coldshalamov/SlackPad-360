@@ -60,6 +60,35 @@ export type TelemetryEvent =
   | { type: 'quantize'; step: number; axis: 'long' | 'up'; damp: number; residualDeg: number }
   // Legacy M4 routing event (superseded by flip/shuvRecognized; kept for shape).
   | { type: 'airGesture'; step: number; foot: 'nose' | 'tail'; kind: string; speed: number }
+  // --- M6 grind (candidate / latch / balance / exit) -----------------------
+  | {
+      type: 'grindCandidate';
+      step: number;
+      family: 'fifty-fifty' | 'boardslide';
+      railId: string;
+      // Approach diagnostics (also feed the M9 HUD candidate pip).
+      acuteDeg: number;
+      relSpeed: number;
+      lateralDist: number;
+      heightDelta: number;
+    }
+  | { type: 'grindLatched'; step: number; family: 'fifty-fifty' | 'boardslide'; railId: string }
+  | { type: 'grindRejected'; step: number; reason: 'too-slow' | 'too-fast' | 'bad-angle'; railId: string }
+  | {
+      type: 'grindExit';
+      step: number;
+      reason: 'hop' | 'speed-end' | 'foot-lift' | 'balance-fail' | 'collision';
+      family: 'fifty-fifty' | 'boardslide';
+      durationSteps: number;
+    }
+  | {
+      type: 'grindCompleted';
+      step: number;
+      family: 'fifty-fifty' | 'boardslide';
+      durationSteps: number;
+      /** Fraction of the grind spent inside the clean balance band (score input). */
+      cleanFraction: number;
+    }
   // Escape hatch for ad-hoc diagnostic events (never used for gameplay logic).
   | { type: string; [key: string]: unknown };
 
