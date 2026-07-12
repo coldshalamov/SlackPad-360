@@ -46,6 +46,30 @@ mark provenance `procedural-authored`.
 Reopen: if the shot rubric fails on procedural output, fall back to the
 Blender contract (pause packet) or commissioned assets per cycle-2 option B/C.
 
+## IMPL-006 — Flip intensity: grade from label+cleanliness+intensity, not rotation magnitude (M5 finding → M9/G2)
+
+M5 empirically established that `trickCompleted.flipRotations` is a **signed
+turn-count whose sign is load-bearing** (drives kickflip/heelflip and fs/bs-shuv
+naming, verified across stances) but whose **magnitude is coarse**: any
+recognized flick completes a full ~360° flip under the assist envelope, so a
+caught flick at flick-intensity s=0.4 and s=1.0 both land a clean single flip.
+The cycle-3 hypothesis "s=0.4 → partial <300°" is therefore **superseded** by
+the emergent "a recognized flick completes a full flip" — an expected G2 tuning
+outcome, not an unmet requirement.
+
+Consequences:
+- **M9 scoring MUST grade from `{label, cleanliness, flipRecognized.intensity s}`
+  — not from `flipRotations` magnitude.** The signed rotation is for naming and
+  direction only.
+- **G2 feel flag:** intensity currently expresses through *uncaught
+  over-rotation* and *catch-window margin*, not the caught result. If the feel
+  pass wants flick strength to read in successful tricks (e.g. bigger flick →
+  double kickflip), that is a deliberate assist/omega retune owned by G2, with
+  the multi-rotation naming (`nameMinTurns`) already wired.
+- A swing-twist roll measure was tested and rejected (it saturated AND
+  cross-contaminated roll into yaw, misnaming a kickflip as a shuv); the
+  land-cone upright check is the authoritative "did the flip complete cleanly".
+
 ## IMPL-005 — Browser dev mode with virtual trackpad (synthetic source)
 
 The plan rejects the browser as the human dual-foot *product* path; it also
