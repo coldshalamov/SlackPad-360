@@ -49,6 +49,7 @@ async function boot(): Promise<void> {
   const renderer = await GameRenderer.create(app, config, {
     stance: bootProfile.stance,
     reducedMotion: bootProfile.accessibility.reducedMotion,
+    levelId: LEVEL_ID,
   });
   harness.setScreenshotProvider(renderer.captureScreenshot);
 

@@ -42,6 +42,9 @@ export class DebugHud {
   readonly #stats: HTMLDivElement;
   readonly #trickChip: HTMLDivElement;
   readonly #failChip: HTMLDivElement;
+  readonly #grindChip: HTMLDivElement;
+  readonly #grindLabel: HTMLSpanElement;
+  readonly #grindNeedle: HTMLDivElement;
   readonly #bailBanner: HTMLDivElement;
   readonly #vignette: HTMLDivElement;
   readonly #fade: HTMLDivElement;
@@ -121,11 +124,54 @@ export class DebugHud {
     failChip.textContent = 'fail —';
     this.#failChip = failChip;
 
+    // --- Grind trust loop (M6 fairness mandate: VISIBLE snap + balance) ----
+    // Hidden unless near/on a rail. Candidate = hollow pip ("in the snap
+    // zone"); latched = family label + a balance meter with the clean (±0.45)
+    // and slip (±1.0) bands marked.
+    const grindChip = chip();
+    Object.assign(grindChip.style, { display: 'none', alignItems: 'center', gap: '8px' });
+    const grindLabel = document.createElement('span');
+    grindLabel.textContent = '◇ RAIL';
+    const meterOuter = document.createElement('div');
+    Object.assign(meterOuter.style, {
+      position: 'relative',
+      width: '96px',
+      height: '8px',
+      borderRadius: '4px',
+      background: 'rgba(255,255,255,0.14)',
+      overflow: 'hidden',
+    });
+    // Clean band (inner ±0.45 of ±1.0 range shown).
+    const cleanBand = document.createElement('div');
+    Object.assign(cleanBand.style, {
+      position: 'absolute',
+      left: `${50 - 45 / 2}%`,
+      width: '45%',
+      top: '0',
+      bottom: '0',
+      background: 'rgba(120,230,220,0.25)',
+    });
+    const needle = document.createElement('div');
+    Object.assign(needle.style, {
+      position: 'absolute',
+      left: '50%',
+      width: '3px',
+      top: '0',
+      bottom: '0',
+      background: 'rgba(255,255,255,0.95)',
+      transform: 'translateX(-50%)',
+    });
+    meterOuter.append(cleanBand, needle);
+    grindChip.append(grindLabel, meterOuter);
+    this.#grindChip = grindChip;
+    this.#grindLabel = grindLabel;
+    this.#grindNeedle = needle;
+
     const fine = chip();
     Object.assign(fine.style, { opacity: '0.72', fontSize: '10px' });
     fine.textContent = 'STAGED ART (pending promotion)';
 
-    root.append(phaseChip, stats, trickChip, failChip, fine);
+    root.append(phaseChip, stats, trickChip, failChip, grindChip, fine);
 
     // --- Bail banner (top edge band — never board centre) ------------------
     const bailBanner = document.createElement('div');
@@ -206,6 +252,25 @@ export class DebugHud {
       `src ${obs.inputSource ?? 'none'}   L${obs.assistLevel}`;
     this.#trickChip.textContent = `trick ${this.#lastTrick}`;
     this.#failChip.textContent = `fail ${obs.lastFailReason ?? '—'}`;
+
+    // Grind trust loop: candidate pip before latch, balance meter while riding.
+    const grind = obs.grind;
+    if (grind && (grind.active || grind.candidate)) {
+      this.#grindChip.style.display = 'flex';
+      if (grind.active) {
+        const fam = grind.family === 'fifty-fifty' ? '50-50' : 'BOARDSLIDE';
+        this.#grindLabel.textContent = `✦ ${fam}`;
+        this.#grindLabel.style.color = 'rgba(120,230,220,0.98)';
+      } else {
+        this.#grindLabel.textContent = '◇ RAIL ZONE';
+        this.#grindLabel.style.color = 'rgba(235,235,235,0.85)';
+      }
+      // Needle across ±1.0 (the slip band); clean band is drawn at ±0.45.
+      const b = Math.max(-1, Math.min(1, grind.balance));
+      this.#grindNeedle.style.left = `${50 + b * 50}%`;
+    } else {
+      this.#grindChip.style.display = 'none';
+    }
 
     // Bail banner tracks the live phase (transient, top-edge).
     if (obs.phase === 'bail') {

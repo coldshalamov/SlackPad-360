@@ -23,6 +23,7 @@ import type { RenderPose } from '../sim/SimWorld';
 import { AssetLoader, type WheelHandle } from './AssetLoader';
 import { CameraRig } from './CameraRig';
 import { ShoeAnimator } from './ShoeAnimator';
+import { buildLevelStatics } from './LevelStatics';
 
 const HDRI_URL = '/env/kloppenheim_05_puresky_1k.hdr';
 const CONCRETE_BASE = '/textures/concrete/';
@@ -39,6 +40,8 @@ const GROUND_TILE_M = 2.0;
 export interface GameRendererOptions {
   stance: Stance;
   reducedMotion: boolean;
+  /** Level whose static obstacles (rails/ledges) should be drawn. */
+  levelId?: string;
 }
 
 export class GameRenderer {
@@ -111,12 +114,13 @@ export class GameRenderer {
     opts: GameRendererOptions,
   ): Promise<GameRenderer> {
     const r = new GameRenderer(container, config, opts);
-    await r.#init(opts.stance);
+    await r.#init(opts.stance, opts.levelId);
     return r;
   }
 
-  async #init(stance: Stance): Promise<void> {
+  async #init(stance: Stance, levelId?: string): Promise<void> {
     this.#buildGround();
+    if (levelId) this.#scene.add(buildLevelStatics(levelId));
     await Promise.all([this.#loadEnv(), this.#loadHero(stance)]);
     this.#installResize();
     this.#ready = true;
