@@ -47,7 +47,7 @@ try {
   // dotnet missing entirely
 }
 if (hasNet10) {
-  run('host build (net10.0-windows)', 'dotnet build host/SlackPad.sln -c Release --nologo -v minimal');
+  run('host build + tests (net10.0-windows)', 'dotnet test host/SlackPad.sln -c Release --nologo -v minimal');
 } else {
   process.stdout.write('\n(skip) host build — .NET 10 SDK not installed (G-DOTNET10-SDK)\n');
 }
