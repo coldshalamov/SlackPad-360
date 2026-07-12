@@ -31,6 +31,7 @@ async function runFlick(
     swapFeet: false,
     assistLevel,
     bothClickMeans: 'push',
+    kickAttribution: 'plantMask',
     tapToClickIsKick: true,
     accessibility: { reducedMotion: false, highContrastHud: false },
   }));

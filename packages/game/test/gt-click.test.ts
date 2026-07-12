@@ -17,11 +17,14 @@
  * here rather than silently faked.
  */
 import { describe, expect, it } from 'vitest';
-import { eventsOf, NOSE_POS, settled, TAIL_POS } from './helpers/maneuver';
+import { eventsOf, NOSE_POS, settledProfiled, TAIL_POS } from './helpers/maneuver';
 import type { PadDriver } from './helpers/maneuver';
 
+// This suite is the PLANT-MASK truth table (M4 legacy mode, pinned explicitly
+// since IMPL-007 made 'buttonSide' the ship default). The buttonSide table
+// lives in gt-click-buttonside.test.ts.
 async function riding(seed: number): Promise<PadDriver> {
-  const d = await settled(seed);
+  const d = await settledProfiled(seed, { kickAttribution: 'plantMask' });
   d.cruise(90); // both planted: rest captured, phase 'ground'
   return d;
 }

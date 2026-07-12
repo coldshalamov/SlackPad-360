@@ -12,13 +12,18 @@
  * stay landings.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import { OBSTACLE_WALL_Z } from '../src/sim/levels/test-obstacle';
 import { eventsOf, NOSE_POS, scriptOllie, settled, TAIL_POS } from './helpers/maneuver';
 
+// Speed-building here uses plant-mask push kicks (both-planted click → push),
+// so the legacy attribution is pinned (ship default is 'buttonSide', IMPL-007).
+const PLANT_MASK_PROFILE = () => ({ ...DEFAULT_INPUT_PROFILE, kickAttribution: 'plantMask' as const });
+
 describe('GT-interrupt: mid-air hard collision', () => {
   it('fast wall hit mid-air → bail(hard-impact), open label + assists cleared', async () => {
-    const h = new AgentHarness();
+    const h = new AgentHarness(DEFAULT_SIM_CONFIG, PLANT_MASK_PROFILE);
     const d = await settled(0x0b57, 'test-obstacle', h);
 
     // Build speed: cruise + four push kicks (both-planted click, arbitrated to

@@ -6,7 +6,7 @@
  * partial ω and bails, never a silent success (§7).
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
+import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import { OBSTACLE_WALL_Z } from '../src/sim/levels/test-obstacle';
 import {
@@ -66,6 +66,7 @@ describe('shuv-180: sweep → 180° yaw', () => {
         swapFeet: false,
         assistLevel: 1,
         bothClickMeans: 'push',
+        kickAttribution: 'plantMask' as const,
         tapToClickIsKick: true,
         accessibility: { reducedMotion: false, highContrastHud: false },
       }));
@@ -90,7 +91,12 @@ describe('shuv-180: sweep → 180° yaw', () => {
   });
 
   it('interrupted shuv (mid-air wall hit) bails with a partial yaw, never silent', async () => {
-    const h = new AgentHarness();
+    // Speed-building uses plant-mask push kicks — pin the legacy attribution
+    // (ship default is 'buttonSide', IMPL-007).
+    const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
+      ...DEFAULT_INPUT_PROFILE,
+      kickAttribution: 'plantMask' as const,
+    }));
     await h.reset(0x5b04, 'test-obstacle');
     h.step(60);
     const d = new PadDriver(h);

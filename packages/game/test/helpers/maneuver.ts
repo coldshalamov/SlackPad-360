@@ -28,6 +28,8 @@ export interface DriveOptions {
   /** Tail contact position, or null/undefined for lifted. */
   tail?: FootInput | null;
   primary?: boolean;
+  /** RMB — front-foot kick under 'buttonSide' attribution (IMPL-007). */
+  secondary?: boolean;
 }
 
 /**
@@ -67,7 +69,7 @@ export class PadDriver {
       frameId: this.frameId++,
       tPerfMs: this.step * DT_MS,
       contacts,
-      buttons: { primary: opts.primary ?? false, secondary: false, auxiliary: false },
+      buttons: { primary: opts.primary ?? false, secondary: opts.secondary ?? false, auxiliary: false },
     };
     this.harness.injectContactFrame(frame);
     this.harness.step(1);
@@ -100,7 +102,12 @@ export async function settled(seed: number, levelId = 'flat-dev', harness?: Agen
  */
 export async function settledProfiled(
   seed: number,
-  opts: { stance?: 'regular' | 'goofy'; assistLevel?: 0 | 1 | 2; levelId?: string } = {},
+  opts: {
+    stance?: 'regular' | 'goofy';
+    assistLevel?: 0 | 1 | 2;
+    levelId?: string;
+    kickAttribution?: 'buttonSide' | 'plantMask';
+  } = {},
 ): Promise<PadDriver> {
   const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
     stance: opts.stance ?? 'regular',
@@ -108,6 +115,7 @@ export async function settledProfiled(
     swapFeet: false,
     assistLevel: opts.assistLevel ?? 1,
     bothClickMeans: 'push',
+    kickAttribution: opts.kickAttribution ?? 'buttonSide',
     tapToClickIsKick: true,
     accessibility: { reducedMotion: false, highContrastHud: false },
   }));

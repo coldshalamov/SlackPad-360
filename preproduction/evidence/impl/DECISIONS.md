@@ -46,6 +46,29 @@ mark provenance `procedural-authored`.
 Reopen: if the shot rubric fails on procedural output, fall back to the
 Blender contract (pause packet) or commissioned assets per cycle-2 option B/C.
 
+## IMPL-007 — Kick attribution: 'buttonSide' is the ship default (product-owner directive)
+
+After the owner's first playtest, a direct design directive: "rmb or lmb
+determines which side of the board is kicked and correspondingly which side is
+popped up." This supersedes the cycle-2 device-matrix rule "Windows left/right
+click zones: ignored for feet." Implemented as `InputProfile.kickAttribution`:
+
+- **'buttonSide' (default)** — both fingers stay planted like a real ollie
+  stance; the button picks the kicking end: LMB/primary = back-foot kick →
+  ollie, RMB/secondary = front-foot kick → nollie, resolved the same step (no
+  lookahead latency). Single-foot-planted clicks follow the planted foot
+  regardless of button (a foot not on the board cannot kick). Clicks never mean
+  push — the continuous cruise drive owns push, which removes the M4
+  push-vs-ollie disambiguation delay entirely.
+- **'plantMask' (legacy)** — the M4 behavior, kept for profiles/tests; existing
+  goldens pin it explicitly and remain byte-identical.
+
+Plumbing: ContactFrame.buttons.secondary now flows end-to-end (host mouse-state
+merge → FootTracker secondary edges → KickEvent.button → KickArbiter mapping →
+VirtualTrackpad RMB/N-key). Prep-lift remains a quality bonus (q), not a gate.
+Reopen: G2 formative feedback on the L/R mapping direction (some players may
+want RMB=ollie; expose as a profile swap if requested).
+
 ## IMPL-006 — Flip intensity: grade from label+cleanliness+intensity, not rotation magnitude (M5 finding → M9/G2)
 
 M5 empirically established that `trickCompleted.flipRotations` is a **signed

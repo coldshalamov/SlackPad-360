@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import type { ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
-import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
+import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { rotateAboutCenter } from '../src/input/FootTracker';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'baselines.json');
@@ -84,9 +84,14 @@ async function recordSession(harness: AgentHarness, seed: number): Promise<Sessi
 
 const joinHashes = (cps: ReplayCheckpoint[]): string => cps.map((c) => `${c.step}:${c.hash}`).join('|');
 
+// This golden's scripted session uses plant-mask push semantics (both-planted
+// clicks are pushes). The ship default is now 'buttonSide' (IMPL-007), so the
+// legacy mode is pinned explicitly — the committed baseline stays byte-valid.
+const PLANT_MASK_PROFILE = () => ({ ...DEFAULT_INPUT_PROFILE, kickAttribution: 'plantMask' as const });
+
 describe('ground-locomotion golden (M3)', () => {
   it('replay of a scripted push+steer session reproduces pinned checkpoints', async () => {
-    const harness = new AgentHarness();
+    const harness = new AgentHarness(DEFAULT_SIM_CONFIG, PLANT_MASK_PROFILE);
     const trace = await recordSession(harness, 0x6704d);
     expect(trace.checkpoints.length).toBeGreaterThan(0);
 
@@ -96,7 +101,7 @@ describe('ground-locomotion golden (M3)', () => {
   });
 
   it('the scripted session actually moves the board (not a constant-pose hash)', async () => {
-    const harness = new AgentHarness();
+    const harness = new AgentHarness(DEFAULT_SIM_CONFIG, PLANT_MASK_PROFILE);
     await harness.reset(0x6704d, 'flat-dev');
     for (let i = 0; i < SESSION_STEPS; i++) {
       const f = scriptFrame(i, i);

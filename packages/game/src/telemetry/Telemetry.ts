@@ -22,7 +22,7 @@ export type TelemetryEvent =
   | { type: 'recordingStopped'; step: number; frames: number; checkpoints: number }
   // --- M3 recognizer/controller events -----------------------------------
   | { type: 'footRebind'; reason: string; role?: 'nose' | 'tail'; step?: number; dropped?: number }
-  | { type: 'kick'; step: number; mask: 'nose' | 'tail' | 'both' | 'none' }
+  | { type: 'kick'; step: number; mask: 'nose' | 'tail' | 'both' | 'none'; button: 'primary' | 'secondary' }
   | { type: 'push'; step: number; mask: string }
   | { type: 'recenter'; reason: string }
   | { type: 'groundControl'; step: number; drive: number; yaw: number; bothPlanted: boolean }

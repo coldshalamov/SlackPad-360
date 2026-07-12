@@ -8,7 +8,7 @@
  *   (e) mutated steering-sign regression guard (BoardController command sign)
  */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
+import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import type { Contact, InputProfile } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
@@ -40,8 +40,13 @@ function hSpeed(h: AgentHarness): number {
   return Math.hypot(lv.x, lv.z);
 }
 
+// These suites exercise the M3/M4 plant-mask push semantics (both-planted
+// click → push after the lookahead). The ship default is now 'buttonSide'
+// (IMPL-007: clicks always pop), so pin the legacy mode explicitly.
+const PLANT_MASK_PROFILE = () => ({ ...DEFAULT_INPUT_PROFILE, kickAttribution: 'plantMask' as const });
+
 async function grounded(seed = 0x10c0): Promise<AgentHarness> {
-  const h = new AgentHarness();
+  const h = new AgentHarness(DEFAULT_SIM_CONFIG, PLANT_MASK_PROFILE);
   await h.reset(seed, 'flat-dev');
   h.step(60); // drop from spawnHeight and settle onto the ground
   return h;
@@ -150,7 +155,7 @@ describe('ground locomotion (c) steering sign', () => {
 
 describe('ground locomotion (d) airborne', () => {
   it('applies no ground drive while the board is still falling', async () => {
-    const h = new AgentHarness();
+    const h = new AgentHarness(DEFAULT_SIM_CONFIG, PLANT_MASK_PROFILE);
     await h.reset(0xa15, 'flat-dev');
     // First steps: board is high above the ground (airborne). Cruise+kick input
     // must be ignored (isGrounded false → idle command).
@@ -171,6 +176,7 @@ const DEFAULT_SIM_CONFIG_PROFILE: InputProfile = {
   swapFeet: false,
   assistLevel: 1,
   bothClickMeans: 'push',
+  kickAttribution: 'plantMask',
   tapToClickIsKick: true,
   accessibility: { reducedMotion: false, highContrastHud: false },
 };

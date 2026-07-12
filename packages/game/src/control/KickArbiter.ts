@@ -2,7 +2,17 @@
  * KickArbiter — click-centered pop recognition + the push-vs-ollie conflict
  * table, in ONE place (M4; final-input-and-trick-spec §3.1 / §4.1).
  *
- * On a kick (primary rising edge) the plant mask decides the path:
+ * TWO ATTRIBUTION MODES (profile.kickAttribution, IMPL-007):
+ *
+ * 'buttonSide' (default — the product owner's Tech Deck model): both feet stay
+ * planted like a real ollie stance and the BUTTON picks the kicking end —
+ * LMB/primary = back-foot kick → ollie, RMB/secondary = front-foot kick →
+ * nollie, resolved INSTANTLY (no lookahead latency). Single-foot-planted
+ * clicks follow the planted foot regardless of button (a foot that is not on
+ * the board cannot kick). Clicks never mean push (cruise drive covers push).
+ *
+ * 'plantMask' (M4 legacy): on a kick (primary rising edge) the plant mask
+ * decides the path:
  *
  *   | Plant mask | Decision                                                |
  *   | ---------- | ------------------------------------------------------- |
@@ -93,7 +103,7 @@ export class KickArbiter {
 
   constructor(
     config: SimConfig,
-    private readonly profile: Pick<InputProfile, 'bothClickMeans'>,
+    private readonly profile: Pick<InputProfile, 'bothClickMeans' | 'kickAttribution'>,
     private readonly telemetry?: Telemetry,
   ) {
     this.rec = config.recognition;
@@ -148,8 +158,9 @@ export class KickArbiter {
           this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'nollie-lookahead', mask: 'both' });
           this.pending = null;
         } else if (step > this.pending.expiresStep) {
-          // No lift within the lookahead: it was a push all along.
-          out.locomotion.push({ step: this.pending.kickStep, mask: 'both' });
+          // No lift within the lookahead: it was a push all along. (The
+          // pending path only ever holds primary clicks — plantMask mode.)
+          out.locomotion.push({ step: this.pending.kickStep, mask: 'both', button: 'primary' });
           this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'push', mask: 'both' });
           this.pending = null;
         }
@@ -164,6 +175,36 @@ export class KickArbiter {
         this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-phase', mask: kick.mask });
         continue;
       }
+
+      // --- 'buttonSide' attribution (IMPL-007, the Tech Deck model) ---------
+      // Both feet stay planted like a real ollie stance; the BUTTON picks the
+      // kicking end: LMB/primary = back foot (ollie), RMB/secondary = front
+      // foot (nollie) — instantly, no lookahead. With only one foot planted
+      // the planted foot wins regardless of button (a foot that is not on the
+      // board cannot kick). Clicks never mean push here — cruise drive covers
+      // push, so the plantMask pending machinery is bypassed entirely.
+      if (this.profile.kickAttribution === 'buttonSide') {
+        if (kick.mask === 'none') {
+          this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-none', mask: kick.mask });
+          continue;
+        }
+        let label: 'ollie' | 'nollie';
+        if (kick.mask === 'tail') label = 'ollie';
+        else if (kick.mask === 'nose') label = 'nollie';
+        else label = kick.button === 'secondary' ? 'nollie' : 'ollie';
+        const prepFoot = label === 'ollie' ? 'nose' : 'tail';
+        out.pops.push({ step, label, q: this.lookbackQuality(prepFoot, step) });
+        this.telemetry?.log({
+          type: 'kickArbitrated',
+          step,
+          decision: `${label}-${kick.button === 'secondary' ? 'rmb' : 'lmb'}`,
+          mask: kick.mask,
+        });
+        if (out.pops.length > 0) break;
+        continue;
+      }
+
+      // --- 'plantMask' attribution (M4 legacy behavior, unchanged) ----------
       switch (kick.mask) {
         case 'tail':
           out.pops.push({ step, label: 'ollie', q: this.lookbackQuality('nose', step) });

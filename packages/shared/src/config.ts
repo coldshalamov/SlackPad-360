@@ -9,6 +9,23 @@
 export type Stance = 'regular' | 'goofy';
 export type AssistLevel = 0 | 1 | 2;
 export type BothClickMeans = 'push' | 'ollie';
+/**
+ * How a click chooses which end of the board kicks (product-owner directive,
+ * IMPL-007):
+ *
+ * - 'buttonSide' (DEFAULT — the Tech Deck model): with BOTH feet planted the
+ *   BUTTON decides — LMB/primary = back-foot kick (ollie family), RMB/secondary
+ *   = front-foot kick (nollie family) — instantly, both fingers staying on the
+ *   board like a real ollie stance. With only ONE foot planted the planted
+ *   foot wins regardless of button (a foot that isn't on the board cannot
+ *   kick), preserving the M4 single-foot semantics. Push never comes from
+ *   clicks in this mode (continuous cruise drive covers it), which removes the
+ *   push-vs-ollie lookahead latency entirely.
+ * - 'plantMask' (legacy/fallback): the M4 behavior — plant mask attributes the
+ *   kick; a both-planted click is held for popLookaheadMs and falls back to a
+ *   push (bothClickMeans) if no prep lift follows.
+ */
+export type KickAttribution = 'buttonSide' | 'plantMask';
 
 export interface InputProfile {
   stance: Stance;
@@ -17,6 +34,8 @@ export interface InputProfile {
   swapFeet: boolean;
   assistLevel: AssistLevel;
   bothClickMeans: BothClickMeans;
+  /** Click→kick-side policy (see KickAttribution). */
+  kickAttribution: KickAttribution;
   /** Treat OS tap-to-click primary edges as kicks. */
   tapToClickIsKick: boolean;
   accessibility: {
@@ -31,6 +50,7 @@ export const DEFAULT_INPUT_PROFILE: InputProfile = deepFreezeConfig({
   swapFeet: false,
   assistLevel: 1,
   bothClickMeans: 'push',
+  kickAttribution: 'buttonSide',
   tapToClickIsKick: true,
   accessibility: {
     reducedMotion: false,

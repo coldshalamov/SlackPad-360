@@ -76,6 +76,8 @@ export class VirtualTrackpad {
   private bId = 0;
   private bPos: Vec2 = { x: 0.5, y: 0.5 };
   private primary = false;
+  /** RMB / N key — front-foot kick (nollie) under 'buttonSide' attribution. */
+  private secondary = false;
 
   /** Active scripted air gesture (K/H/J/L), driving foot A along a path. */
   private gesture: { kind: GestureKind; i: number; base: Vec2 } | null = null;
@@ -108,6 +110,7 @@ export class VirtualTrackpad {
     this.ctx = ctx;
 
     canvas.addEventListener('mousedown', this.onMouseDown);
+    canvas.addEventListener('contextmenu', this.onContextMenu);
     window.addEventListener('mousemove', this.onMouseMove);
     window.addEventListener('mouseup', this.onMouseUp);
     window.addEventListener('keydown', this.onKeyDown);
@@ -120,6 +123,7 @@ export class VirtualTrackpad {
   dispose(): void {
     clearInterval(this.emitTimer);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
+    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('keydown', this.onKeyDown);
@@ -140,12 +144,22 @@ export class VirtualTrackpad {
   }
 
   private onMouseDown = (e: MouseEvent): void => {
+    if (e.button === 2) {
+      // RMB on the pad = secondary click (front-foot kick under 'buttonSide').
+      e.preventDefault();
+      this.secondary = true;
+      return;
+    }
     if (e.button !== 0) return;
     e.preventDefault();
     this.aDown = true;
     this.aId = this.nextContactId++;
     this.aPos = this.toPad(e.clientX, e.clientY);
     if (this.shiftHeld) this.plantB();
+  };
+
+  private onContextMenu = (e: MouseEvent): void => {
+    e.preventDefault(); // RMB is a game input on the pad, not a context menu
   };
 
   private onMouseMove = (e: MouseEvent): void => {
@@ -155,6 +169,10 @@ export class VirtualTrackpad {
   };
 
   private onMouseUp = (e: MouseEvent): void => {
+    if (e.button === 2) {
+      this.secondary = false;
+      return;
+    }
     if (e.button !== 0) return;
     this.aDown = false;
     this.aId = 0;
@@ -183,6 +201,9 @@ export class VirtualTrackpad {
       return;
     }
     switch (e.key.toLowerCase()) {
+      case 'n':
+        this.secondary = true; // keyboard alternative to RMB (nollie kick)
+        break;
       case 'x':
         this.aSuspended = true; // lift foot A while held (nollie prep)
         break;
@@ -265,6 +286,8 @@ export class VirtualTrackpad {
       this.ctrlHeld = false;
     } else if (e.code === 'Space') {
       this.primary = false;
+    } else if (e.key.toLowerCase() === 'n') {
+      this.secondary = false;
     } else if (e.key.toLowerCase() === 'x') {
       this.aSuspended = false;
       // Re-plant is a fresh hardware contact: new id (real pads never reuse).
@@ -297,7 +320,7 @@ export class VirtualTrackpad {
       tPerfMs: performance.now(),
       source: 'synthetic',
       contacts,
-      buttons: { primary: this.primary, secondary: false, auxiliary: false },
+      buttons: { primary: this.primary, secondary: this.secondary, auxiliary: false },
     };
     this.inputHub.push(frame);
     this.draw();

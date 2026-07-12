@@ -69,10 +69,16 @@ export interface FeetState {
   plantCount: number;
 }
 
-/** Click attribution result on a primary rising edge. */
+/** Click attribution result on a primary/secondary button rising edge. */
 export interface KickEvent {
   step: number;
   mask: PlantMask;
+  /**
+   * Which physical button edge produced this kick. Primary = LMB (back-foot
+   * kick under 'buttonSide' attribution), secondary = RMB (front-foot kick).
+   * The KickArbiter owns the mapping; the tracker only reports truthfully.
+   */
+  button: 'primary' | 'secondary';
 }
 
 interface RestPose {
@@ -173,6 +179,7 @@ export class FootTracker {
   // Frame/edge bookkeeping.
   private lastFrameTPerfMs: number | null = null;
   private prevPrimary = false;
+  private prevSecondary = false;
   private prevBoth = false;
 
   // Dual-lift ballistic hold.
@@ -291,14 +298,21 @@ export class FootTracker {
     // Snapshot the last good (both-planted) state for the hold window.
     if (both) this.lastGoodState = this.buildLiveState();
 
-    // 7. Click attribution on primary rising edge.
+    // 7. Click attribution on primary/secondary rising edges. Both may rise in
+    // one frame (rare, host-batched) — emit both; the arbiter takes one pop.
     if (!this.prevPrimary && frame.buttons.primary) {
       const mask = this.plantMask();
-      this.pendingKicks.push({ step, mask });
-      this.telemetry?.log({ type: 'kick', step, mask });
+      this.pendingKicks.push({ step, mask, button: 'primary' });
+      this.telemetry?.log({ type: 'kick', step, mask, button: 'primary' });
+    }
+    if (!this.prevSecondary && frame.buttons.secondary) {
+      const mask = this.plantMask();
+      this.pendingKicks.push({ step, mask, button: 'secondary' });
+      this.telemetry?.log({ type: 'kick', step, mask, button: 'secondary' });
     }
 
     this.prevPrimary = frame.buttons.primary;
+    this.prevSecondary = frame.buttons.secondary;
     this.prevBoth = both;
     this.lastFrameTPerfMs = t;
   }
