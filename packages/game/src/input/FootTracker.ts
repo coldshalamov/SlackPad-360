@@ -16,12 +16,12 @@
  * guarded everywhere so a stale/duplicate timestamp can never inject NaN.
  */
 
-import type { ContactFrame } from '@slackpad/shared';
-import type { FootTrackerConfig, InputProfile } from '@slackpad/shared';
-import type { Telemetry } from '../telemetry/Telemetry';
+import type { ContactFrame } from "@slackpad/shared";
+import type { FootTrackerConfig, InputProfile } from "@slackpad/shared";
+import type { Telemetry } from "../telemetry/Telemetry";
 
-export type FootRole = 'nose' | 'tail';
-export type PlantMask = 'nose' | 'tail' | 'both' | 'none';
+export type FootRole = "nose" | "tail";
+export type PlantMask = "nose" | "tail" | "both" | "none";
 
 export interface Vec2 {
   x: number;
@@ -67,6 +67,8 @@ export interface FeetState {
   segment: SegmentState;
   bothPlanted: boolean;
   plantCount: number;
+  /** Deterministic explicit propulsion action (native Ctrl / DEV Ctrl). */
+  accelerating?: boolean;
 }
 
 /** Click attribution result on a primary/secondary button rising edge. */
@@ -78,7 +80,7 @@ export interface KickEvent {
    * kick under 'buttonSide' attribution), secondary = RMB (front-foot kick).
    * The KickArbiter owns the mapping; the tracker only reports truthfully.
    */
-  button: 'primary' | 'secondary';
+  button: "primary" | "secondary";
 }
 
 interface RestPose {
@@ -157,13 +159,13 @@ interface CalPoint {
 export class FootTracker {
   private readonly cfg: FootTrackerConfig;
   private readonly plantSpeedEps: number;
-  private stance: InputProfile['stance'];
+  private stance: InputProfile["stance"];
   private padYawOffset: number;
   private swapFeet: boolean;
 
   private readonly roles: Record<FootRole, RoleSlot> = {
-    nose: this.freshSlot('nose'),
-    tail: this.freshSlot('tail'),
+    nose: this.freshSlot("nose"),
+    tail: this.freshSlot("tail"),
   };
 
   private rest: RestPose | null = null;
@@ -181,10 +183,11 @@ export class FootTracker {
   private prevPrimary = false;
   private prevSecondary = false;
   private prevBoth = false;
+  private accelerating = false;
 
-  // Dual-lift ballistic hold.
+  // Dual-lift identity memory. This never lies about live plant state: it only
+  // keeps recent positions internally so fresh hardware ids can rebind.
   private dualLiftMs: number | null = null;
-  private lastGoodState: FeetState | null = null;
 
   // Soft recenter.
   private recenterStillMs = 0;
@@ -196,7 +199,7 @@ export class FootTracker {
   constructor(
     cfg: FootTrackerConfig,
     plantSpeedEps: number,
-    profile: Pick<InputProfile, 'stance' | 'padYawOffset' | 'swapFeet'>,
+    profile: Pick<InputProfile, "stance" | "padYawOffset" | "swapFeet">,
     private readonly telemetry?: Telemetry,
   ) {
     this.cfg = cfg;
@@ -261,13 +264,16 @@ export class FootTracker {
     const assign = this.assignRoles(pts, step);
 
     // 4. Update role slots (position, velocity, plant/lift).
-    for (const role of ['nose', 'tail'] as const) {
+    for (const role of ["nose", "tail"] as const) {
       const R = this.roles[role];
       const pt = assign.get(role);
       if (pt) {
         if (R.planted && R.lastTPerfMs != null && dt > EPS_DT) {
           const inst = { x: (pt.x - R.pos.x) / dt, y: (pt.y - R.pos.y) / dt };
-          R.vel = { x: ema(R.vel.x, inst.x, this.cfg.velEmaAlpha), y: ema(R.vel.y, inst.y, this.cfg.velEmaAlpha) };
+          R.vel = {
+            x: ema(R.vel.x, inst.x, this.cfg.velEmaAlpha),
+            y: ema(R.vel.y, inst.y, this.cfg.velEmaAlpha),
+          };
         } else {
           R.vel = { x: 0, y: 0 };
         }
@@ -295,24 +301,22 @@ export class FootTracker {
     // 6. Dual-lift ballistic hold / clear.
     this.updateDualLift(both, dtMs);
 
-    // Snapshot the last good (both-planted) state for the hold window.
-    if (both) this.lastGoodState = this.buildLiveState();
-
     // 7. Click attribution on primary/secondary rising edges. Both may rise in
     // one frame (rare, host-batched) — emit both; the arbiter takes one pop.
     if (!this.prevPrimary && frame.buttons.primary) {
       const mask = this.plantMask();
-      this.pendingKicks.push({ step, mask, button: 'primary' });
-      this.telemetry?.log({ type: 'kick', step, mask, button: 'primary' });
+      this.pendingKicks.push({ step, mask, button: "primary" });
+      this.telemetry?.log({ type: "kick", step, mask, button: "primary" });
     }
     if (!this.prevSecondary && frame.buttons.secondary) {
       const mask = this.plantMask();
-      this.pendingKicks.push({ step, mask, button: 'secondary' });
-      this.telemetry?.log({ type: 'kick', step, mask, button: 'secondary' });
+      this.pendingKicks.push({ step, mask, button: "secondary" });
+      this.telemetry?.log({ type: "kick", step, mask, button: "secondary" });
     }
 
     this.prevPrimary = frame.buttons.primary;
     this.prevSecondary = frame.buttons.secondary;
+    this.accelerating = frame.buttons.auxiliary;
     this.prevBoth = both;
     this.lastFrameTPerfMs = t;
   }
@@ -327,14 +331,23 @@ export class FootTracker {
 
     if (this.rest == null) {
       // Fresh dual plant → capture rest and zero the derivatives (no spurious ω).
-      this.rest = { nose: { ...nose }, tail: { ...tail }, angle, length: length || 1e-6, midpoint: { ...midpoint } };
+      this.rest = {
+        nose: { ...nose },
+        tail: { ...tail },
+        angle,
+        length: length || 1e-6,
+        midpoint: { ...midpoint },
+      };
       this.angVelEma = 0;
       this.midVelEma = { x: 0, y: 0 };
-      this.telemetry?.log({ type: 'recenter', reason: 'rest-capture' });
+      this.telemetry?.log({ type: "recenter", reason: "rest-capture" });
     } else if (this.prevBoth && this.segLastTPerfMs != null && dt > EPS_DT) {
       const aInst = wrapPi(angle - this.segPrevAngle) / dt;
       this.angVelEma = ema(this.angVelEma, aInst, this.cfg.velEmaAlpha);
-      const mInst = { x: (midpoint.x - this.segPrevMid.x) / dt, y: (midpoint.y - this.segPrevMid.y) / dt };
+      const mInst = {
+        x: (midpoint.x - this.segPrevMid.x) / dt,
+        y: (midpoint.y - this.segPrevMid.y) / dt,
+      };
       this.midVelEma = {
         x: ema(this.midVelEma.x, mInst.x, this.cfg.velEmaAlpha),
         y: ema(this.midVelEma.y, mInst.y, this.cfg.velEmaAlpha),
@@ -356,7 +369,10 @@ export class FootTracker {
       angleFromRest: wrapPi(angle - rest.angle),
       angVel: this.angVelEma,
       midpoint,
-      midpointOffsetFromRest: { x: midpoint.x - rest.midpoint.x, y: midpoint.y - rest.midpoint.y },
+      midpointOffsetFromRest: {
+        x: midpoint.x - rest.midpoint.x,
+        y: midpoint.y - rest.midpoint.y,
+      },
       midpointVel: this.midVelEma,
       lengthRatio: length / rest.length,
     };
@@ -367,9 +383,23 @@ export class FootTracker {
   /** Soft recenter: ease rest toward current while both planted and nearly still. */
   private updateRecenter(dt: number): void {
     if (this.rest == null) return;
+    // A held common-mode offset is an analog steering command, not sensor
+    // drift. Only absorb tiny near-neutral offsets; otherwise a steady carve
+    // fades after recenterHoldMs and feels like a broken analog stick.
+    const commonOffset = Math.hypot(
+      this.curSegment.midpointOffsetFromRest.x,
+      this.curSegment.midpointOffsetFromRest.y,
+    );
+    if (commonOffset > 0.025) {
+      this.recenterStillMs = 0;
+      this.recenterActive = false;
+      return;
+    }
     const still =
-      Math.hypot(this.roles.nose.vel.x, this.roles.nose.vel.y) < this.plantSpeedEps &&
-      Math.hypot(this.roles.tail.vel.x, this.roles.tail.vel.y) < this.plantSpeedEps;
+      Math.hypot(this.roles.nose.vel.x, this.roles.nose.vel.y) <
+        this.plantSpeedEps &&
+      Math.hypot(this.roles.tail.vel.x, this.roles.tail.vel.y) <
+        this.plantSpeedEps;
     if (!still) {
       this.recenterStillMs = 0;
       this.recenterActive = false;
@@ -380,18 +410,27 @@ export class FootTracker {
 
     if (!this.recenterActive) {
       this.recenterActive = true;
-      this.telemetry?.log({ type: 'recenter', reason: 'soft-drift' });
+      this.telemetry?.log({ type: "recenter", reason: "soft-drift" });
     }
     const k = Math.max(0, Math.min(1, this.cfg.recenterRateHz * dt));
-    const drift = (from: Vec2, to: Vec2): Vec2 => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k });
+    const drift = (from: Vec2, to: Vec2): Vec2 => ({
+      x: from.x + (to.x - from.x) * k,
+      y: from.y + (to.y - from.y) * k,
+    });
     const nose = this.roles.nose.pos;
     const tail = this.roles.tail.pos;
     this.rest.nose = drift(this.rest.nose, nose);
     this.rest.tail = drift(this.rest.tail, tail);
-    const seg = { x: this.rest.nose.x - this.rest.tail.x, y: this.rest.nose.y - this.rest.tail.y };
+    const seg = {
+      x: this.rest.nose.x - this.rest.tail.x,
+      y: this.rest.nose.y - this.rest.tail.y,
+    };
     this.rest.angle = Math.atan2(seg.y, seg.x);
     this.rest.length = Math.hypot(seg.x, seg.y) || 1e-6;
-    this.rest.midpoint = { x: (this.rest.nose.x + this.rest.tail.x) / 2, y: (this.rest.nose.y + this.rest.tail.y) / 2 };
+    this.rest.midpoint = {
+      x: (this.rest.nose.x + this.rest.tail.x) / 2,
+      y: (this.rest.nose.y + this.rest.tail.y) / 2,
+    };
   }
 
   private resetRecenter(): void {
@@ -400,7 +439,8 @@ export class FootTracker {
   }
 
   private updateDualLift(both: boolean, dtMs: number): void {
-    const plantedCount = (this.roles.nose.planted ? 1 : 0) + (this.roles.tail.planted ? 1 : 0);
+    const plantedCount =
+      (this.roles.nose.planted ? 1 : 0) + (this.roles.tail.planted ? 1 : 0);
     if (plantedCount > 0) {
       this.dualLiftMs = null;
       return;
@@ -415,9 +455,8 @@ export class FootTracker {
       // longer clear window, after which the ids are considered fresh.
       if (this.rest != null) {
         this.rest = null;
-        this.telemetry?.log({ type: 'footRebind', reason: 'dual-lift-clear' });
+        this.telemetry?.log({ type: "footRebind", reason: "dual-lift-clear" });
       }
-      this.lastGoodState = null;
       if (this.dualLiftMs >= this.cfg.dualLiftClearMs) {
         this.roles.nose.hasMemory = false;
         this.roles.tail.hasMemory = false;
@@ -429,10 +468,10 @@ export class FootTracker {
   private plantMask(): PlantMask {
     const n = this.roles.nose.planted;
     const t = this.roles.tail.planted;
-    if (n && t) return 'both';
-    if (n) return 'nose';
-    if (t) return 'tail';
-    return 'none';
+    if (n && t) return "both";
+    if (n) return "nose";
+    if (t) return "tail";
+    return "none";
   }
 
   // --- assignment ---------------------------------------------------------
@@ -441,7 +480,7 @@ export class FootTracker {
     const used = new Set<number>();
 
     // (a) Sticky: a contact whose id equals a role's bound id keeps that role.
-    for (const role of ['nose', 'tail'] as const) {
+    for (const role of ["nose", "tail"] as const) {
       const R = this.roles[role];
       if (R.boundId == null || !R.planted) continue;
       const pt = pts.find((p) => p.id === R.boundId);
@@ -451,7 +490,7 @@ export class FootTracker {
       }
     }
 
-    const freeRoles = (['nose', 'tail'] as const).filter((r) => !out.has(r));
+    const freeRoles = (["nose", "tail"] as const).filter((r) => !out.has(r));
     const freePts = pts.filter((p) => !used.has(p.id));
     if (freePts.length === 0 || freeRoles.length === 0) return out;
 
@@ -462,9 +501,9 @@ export class FootTracker {
       if (!anyMemory) {
         const [a, b] = freePts as [CalPoint, CalPoint];
         const roleOf = this.padRolesFor(a, b);
-        out.set('nose', roleOf.nose);
-        out.set('tail', roleOf.tail);
-        this.telemetry?.log({ type: 'footRebind', reason: 'fresh-dual', step });
+        out.set("nose", roleOf.nose);
+        out.set("tail", roleOf.tail);
+        this.telemetry?.log({ type: "footRebind", reason: "fresh-dual", step });
         return out;
       }
       // Both free but with memory → proximity pairing (rebind after dual lift).
@@ -482,14 +521,28 @@ export class FootTracker {
       const radius2 = this.cfg.rebindRadius * this.cfg.rebindRadius;
       if (mem && mem.d <= radius2) {
         out.set(mem.r, pt);
-        this.telemetry?.log({ type: 'footRebind', reason: 'proximity', role: mem.r, step });
+        this.telemetry?.log({
+          type: "footRebind",
+          reason: "proximity",
+          role: mem.r,
+          step,
+        });
       } else if (freeRoles.length === 1) {
         const r = freeRoles[0] as FootRole;
         out.set(r, pt);
-        this.telemetry?.log({ type: 'footRebind', reason: 'fresh-single', role: r, step });
+        this.telemetry?.log({
+          type: "footRebind",
+          reason: "fresh-single",
+          role: r,
+          step,
+        });
       } else {
-        out.set('tail', pt); // provisional per input spec (1-contact mode)
-        this.telemetry?.log({ type: 'footRebind', reason: 'provisional-tail', step });
+        out.set("tail", pt); // provisional per input spec (1-contact mode)
+        this.telemetry?.log({
+          type: "footRebind",
+          reason: "provisional-tail",
+          step,
+        });
       }
       return out;
     }
@@ -511,7 +564,10 @@ export class FootTracker {
       let best: { ri: number; pi: number; d: number } | null = null;
       for (let ri = 0; ri < roles.length; ri++) {
         for (let pi = 0; pi < pts.length; pi++) {
-          const d = dist2(pts[pi] as CalPoint, this.roles[roles[ri] as FootRole].pos);
+          const d = dist2(
+            pts[pi] as CalPoint,
+            this.roles[roles[ri] as FootRole].pos,
+          );
           if (!best || d < best.d) best = { ri, pi, d };
         }
       }
@@ -519,7 +575,12 @@ export class FootTracker {
       const role = roles[best.ri] as FootRole;
       const pt = pts[best.pi] as CalPoint;
       out.set(role, pt);
-      this.telemetry?.log({ type: 'footRebind', reason: 'proximity', role, step });
+      this.telemetry?.log({
+        type: "footRebind",
+        reason: "proximity",
+        role,
+        step,
+      });
       roles.splice(best.ri, 1);
       pts.splice(best.pi, 1);
     }
@@ -527,7 +588,10 @@ export class FootTracker {
   }
 
   /** Apply pad-left rule + stance + swapFeet to map two contacts to roles. */
-  private padRolesFor(a: CalPoint, b: CalPoint): { nose: CalPoint; tail: CalPoint } {
+  private padRolesFor(
+    a: CalPoint,
+    b: CalPoint,
+  ): { nose: CalPoint; tail: CalPoint } {
     let padLeft: CalPoint;
     let padRight: CalPoint;
     if (a.x <= b.x) {
@@ -542,24 +606,32 @@ export class FootTracker {
       padLeft = padRight;
       padRight = tmp;
     }
-    // regular ⇒ padLeft = nose; goofy inverts.
-    return this.stance === 'regular'
-      ? { nose: padLeft, tail: padRight }
-      : { nose: padRight, tail: padLeft };
+    // Right-hand regular stance: index/pad-left is the back foot on the tail;
+    // middle/pad-right is the front foot on the nose. Goofy mirrors it.
+    return this.stance === "regular"
+      ? { nose: padRight, tail: padLeft }
+      : { nose: padLeft, tail: padRight };
   }
 
   /** Keep the two best contacts when >2 are present; log the drop. */
   private selectTwo(pts: CalPoint[], step: number): CalPoint[] {
     const boundIds = new Set(
-      (['nose', 'tail'] as const).map((r) => this.roles[r].boundId).filter((id): id is number => id != null),
+      (["nose", "tail"] as const)
+        .map((r) => this.roles[r].boundId)
+        .filter((id): id is number => id != null),
     );
     const scored = pts.map((p) => {
       let rank = 2; // fresh contact
-      if (boundIds.has(p.id)) rank = 0; // already a gameplay foot → keep
+      if (boundIds.has(p.id))
+        rank = 0; // already a gameplay foot → keep
       else {
         // Prefer contacts near an existing role position (history).
-        for (const r of ['nose', 'tail'] as const) {
-          if (this.roles[r].hasMemory && dist2(p, this.roles[r].pos) <= this.cfg.rebindRadius * this.cfg.rebindRadius) {
+        for (const r of ["nose", "tail"] as const) {
+          if (
+            this.roles[r].hasMemory &&
+            dist2(p, this.roles[r].pos) <=
+              this.cfg.rebindRadius * this.cfg.rebindRadius
+          ) {
             rank = 1;
             break;
           }
@@ -567,10 +639,17 @@ export class FootTracker {
       }
       return { p, rank };
     });
-    scored.sort((x, y) => (x.rank !== y.rank ? x.rank - y.rank : x.p.id - y.p.id));
+    scored.sort((x, y) =>
+      x.rank !== y.rank ? x.rank - y.rank : x.p.id - y.p.id,
+    );
     const kept = scored.slice(0, 2).map((s) => s.p);
     const droppedCount = pts.length - kept.length;
-    this.telemetry?.log({ type: 'footRebind', reason: 'overflow-drop', dropped: droppedCount, step });
+    this.telemetry?.log({
+      type: "footRebind",
+      reason: "overflow-drop",
+      dropped: droppedCount,
+      step,
+    });
     return kept;
   }
 
@@ -589,8 +668,8 @@ export class FootTracker {
   }
 
   private buildLiveState(): FeetState {
-    const nose = this.footStateFor('nose');
-    const tail = this.footStateFor('tail');
+    const nose = this.footStateFor("nose");
+    const tail = this.footStateFor("tail");
     const plantCount = (nose.planted ? 1 : 0) + (tail.planted ? 1 : 0);
     return {
       nose,
@@ -598,21 +677,14 @@ export class FootTracker {
       segment: { ...this.curSegment },
       bothPlanted: nose.planted && tail.planted,
       plantCount,
+      accelerating: this.accelerating,
     };
   }
 
   private buildOutputState(): FeetState {
-    const plantedCount = (this.roles.nose.planted ? 1 : 0) + (this.roles.tail.planted ? 1 : 0);
-    // Ballistic hold: within the prediction window after a dual lift, report the
-    // last both-planted state so a momentary lift does not drop control.
-    if (
-      plantedCount === 0 &&
-      this.dualLiftMs != null &&
-      this.dualLiftMs < this.cfg.ballisticPredictMs &&
-      this.lastGoodState
-    ) {
-      return this.lastGoodState;
-    }
+    // Output is always the current hardware truth. The prediction window above
+    // exists only for ID reassignment; returning a cached planted state made
+    // lifted fingers remain visibly glued to the board for up to 200 ms.
     return this.buildLiveState();
   }
 }

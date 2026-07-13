@@ -92,22 +92,25 @@ describe('shuv-180: sweep → 180° yaw', () => {
 
   it('interrupted shuv (mid-air wall hit) bails with a partial yaw, never silent', async () => {
     // Speed-building uses plant-mask push kicks — pin the legacy attribution
-    // (ship default is 'buttonSide', IMPL-007).
+    // (the optional buttonSide profile is covered separately).
     const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
       ...DEFAULT_INPUT_PROFILE,
       kickAttribution: 'plantMask' as const,
+      bothClickMeans: 'push' as const,
     }));
     await h.reset(0x5b04, 'test-obstacle');
     h.step(60);
     const d = new PadDriver(h);
 
-    // Build lots of speed toward the wall.
-    d.cruise(30);
-    for (let p = 0; p < 6; p++) {
-      d.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
-      d.cruise(12);
-    }
-    expect(Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z)).toBeGreaterThan(6);
+    // Hold Ctrl until fast, while preserving enough clear run-up to pop before
+    // the wall rather than colliding during the acceleration fixture itself.
+    let speedGuard = 0;
+    while (
+      Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z) <= 5 &&
+      h.observe().board.p.z < OBSTACLE_WALL_Z - 4 &&
+      speedGuard++ < 300
+    ) d.cruise(1);
+    expect(Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z)).toBeGreaterThan(5);
 
     // Approach CLOSE, pop with a SMALL gap (so the pop fires before the board
     // reaches the wall, not a ground ram), then start a shuv sweep — the board

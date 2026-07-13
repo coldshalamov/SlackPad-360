@@ -18,7 +18,6 @@ import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import type { ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
 import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
-import { rotateAboutCenter } from '../src/input/FootTracker';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'baselines.json');
 const UPDATE_GOLDENS = process.env.UPDATE_GOLDENS === '1';
@@ -50,20 +49,17 @@ function scriptFrame(step: number, frameId: number): InjectableFrame | null {
     { id: 1, x: 0.4, y: 0.5, tip: true, confidence: true },
     { id: 2, x: 0.6, y: 0.5, tip: true, confidence: true },
   ];
-  // Carve: rotate the segment during the back third of the session.
+  // Carve: hold a common-mode two-finger lateral offset like an analog stick.
   if (step >= 200) {
-    const deg = (step - 200) * 1.5;
-    contacts = contacts.map((c) => {
-      const r = rotateAboutCenter(c.x, c.y, deg);
-      return { ...c, x: r.x, y: r.y };
-    });
+    const lateral = Math.min(0.1, (step - 199) * 0.01);
+    contacts = contacts.map((c) => ({ ...c, x: c.x + lateral }));
   }
   return {
     schemaVersion: 1,
     frameId,
     tPerfMs: step * DT_MS,
     contacts,
-    buttons: { primary, secondary: false, auxiliary: false },
+    buttons: { primary, secondary: false, auxiliary: true },
   };
 }
 
@@ -85,7 +81,7 @@ async function recordSession(harness: AgentHarness, seed: number): Promise<Sessi
 const joinHashes = (cps: ReplayCheckpoint[]): string => cps.map((c) => `${c.step}:${c.hash}`).join('|');
 
 // This golden's scripted session uses plant-mask push semantics (both-planted
-// clicks are pushes). The ship default is now 'buttonSide' (IMPL-007), so the
+// clicks are pushes). This fixture explicitly exercises the legacy gesture model, so the
 // legacy mode is pinned explicitly — the committed baseline stays byte-valid.
 const PLANT_MASK_PROFILE = () => ({ ...DEFAULT_INPUT_PROFILE, kickAttribution: 'plantMask' as const });
 

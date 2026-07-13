@@ -11,6 +11,7 @@
 
 import type { LevelBuilder } from './types';
 import { buildBoard } from './board';
+import { ORDINARY_WORLD_COLLISION_GROUPS } from '../collisionGroups';
 
 /** Wall placement (level geometry, not a physics tunable). */
 export const OBSTACLE_WALL_Z = 12;
@@ -24,7 +25,8 @@ export const testObstacle: LevelBuilder = (rapier, world, config, rng) => {
   world.createCollider(
     rapier.ColliderDesc.cuboid(g.x, g.y, g.z)
       .setTranslation(0, -g.y, 0)
-      .setFriction(phys.ground.friction),
+      .setFriction(phys.ground.friction)
+      .setCollisionGroups(ORDINARY_WORLD_COLLISION_GROUPS),
   );
 
   // --- Static wall across the +Z run line ---------------------------------
@@ -32,7 +34,8 @@ export const testObstacle: LevelBuilder = (rapier, world, config, rng) => {
   world.createCollider(
     rapier.ColliderDesc.cuboid(w.x, w.y, w.z)
       .setTranslation(0, w.y, OBSTACLE_WALL_Z)
-      .setFriction(phys.ground.friction),
+      .setFriction(phys.ground.friction)
+      .setCollisionGroups(ORDINARY_WORLD_COLLISION_GROUPS),
   );
 
   return buildBoard(rapier, world, config, rng);

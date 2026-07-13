@@ -33,6 +33,9 @@
  * plus a telemetry event — never undefined, never silent.
  *
  * Catch generosity notes (M4, documented hypotheses):
+ *  - Shipping assists L1/L2 automatically catch a stable two-contact riding
+ *    stance after apex. The player's swipe chooses the trick; they do not have
+ *    to lift and re-place a virtual foot in 3D to stop the board.
  *  - Catch volumes are board-local spheres of catch.volumeRadius around each
  *    shoe socket; a replant hits when padToBoardScale·|offsetFromRest| is
  *    inside the radius. When the rest pose was cleared by a long dual lift,
@@ -58,7 +61,13 @@ import type { GrindExitReason, GrindInputs, GrindSnapshot, GrindStepResult } fro
 
 export type GesturePhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
 
-export type FailReason = 'over-rotation' | 'hard-impact' | 'inverted' | 'timeout';
+export type FailReason =
+  | 'over-rotation'
+  | 'hard-impact'
+  | 'inverted'
+  | 'timeout'
+  | 'out-of-bounds'
+  | 'unrideable';
 
 /** Recognition label per policy §3: occurrence + confidence + window. */
 export interface RecognitionLabelState {
@@ -107,6 +116,8 @@ export interface FsmInputs {
   pose: BoardPose;
   /** Max board contact impulse (N·s) observed during the previous step. */
   contactImpulse: number;
+  /** Vertical-dominant contact impulse (floor/rail support, excludes walls). */
+  supportContactImpulse?: number;
   /** Nearest grindable rail readout (SimWorld.railProximity), or null (M6). */
   railProximity: RailProximity | null;
   step: number;
@@ -201,6 +212,30 @@ export class GestureFSM {
   }
 
   /**
+   * A finite level boundary is a simulation failure, not a user-commanded
+   * teleport. SimWorld has already returned the board to its spawn when this
+   * runs; keep the visible FSM, telemetry, and HUD in sync with that recovery.
+   */
+  recoverFromWorld(reason: FailReason, step: number): void {
+    const from = this.#phase;
+    const flipRotations = this.flipRotations;
+    const shuvDegrees = this.shuvDegrees;
+    this.#label = null;
+    this.#grind.reset();
+    this.#lastGrind = null;
+    this.#lastFailReason = reason;
+    this.#phase = 'none';
+    this.#bailStepsLeft = 0;
+    this.#impulseWindow.length = 0;
+    this.#airClassifier.reset();
+    this.telemetry?.log({ type: 'bail', step, reason, flipRotations, shuvDegrees });
+    this.telemetry?.log({ type: 'respawn', step });
+    if (from !== this.#phase) {
+      this.telemetry?.log({ type: 'phaseChanged', step, from, to: this.#phase });
+    }
+  }
+
+  /**
    * Grind observation for ObserveState.grind (M6): {active, family, balance,
    * candidate}, or null when there is neither a live candidate nor an active
    * grind. Derived from the last update's grind result so it is null outside the
@@ -259,12 +294,6 @@ export class GestureFSM {
       }
 
       case 'air': {
-        if (inp.grounded) {
-          this.#landCheck(inp, events);
-          break;
-        }
-        if (this.#collisionInterrupt(inp, events)) break;
-        if (this.#airTimeout(inp, events)) break;
         this.#integrateRotation(inp);
         this.#trackApex(inp);
         // Grind evaluation (airborne here): a soft-snap latch opens grind; a live
@@ -277,6 +306,21 @@ export class GestureFSM {
           this.#phase = 'grind';
           break;
         }
+        // Height alone detects a landing too late on a pitched deck: the nose
+        // or tail can hit, bounce, and self-level before the centre reaches the
+        // old grounded band. A reported contact-force event near the floor is
+        // the first physical landing and must be judged at that pose. Grind gets
+        // first refusal above so real rail contacts still latch.
+        const groundContact =
+          (inp.supportContactImpulse ?? 0) > 0 &&
+          inp.pose.p.y <= this.config.physics.boardLength * 0.62 &&
+          inp.pose.lv.y < -0.25;
+        if (inp.grounded || groundContact) {
+          this.#landCheck(inp, events);
+          break;
+        }
+        if (this.#collisionInterrupt(inp, events)) break;
+        if (this.#airTimeout(inp, events)) break;
         if (!gr.candidate) {
           this.#classifyAir(inp);
           const hit = this.#catchAttempt(inp);
@@ -291,7 +335,19 @@ export class GestureFSM {
       }
 
       case 'catch': {
-        if (inp.grounded) {
+        // Catch assistance must not steal a rail approach. A held stance may
+        // auto-catch at apex while actual rail contact happens later on
+        // descent, so keep the physical grind candidate/latch path live.
+        const gr = this.#grind.update(this.#grindInputs(inp, /*canLatch*/ true));
+        this.#lastGrind = gr;
+        if (gr.latchedThisStep) {
+          this.#phase = 'grind';
+          break;
+        }
+        const groundContact =
+          (inp.supportContactImpulse ?? 0) > 0 &&
+          inp.pose.p.y <= this.config.physics.boardLength * 0.62;
+        if (inp.grounded || groundContact) {
           this.#landCheck(inp, events);
           break;
         }
@@ -572,6 +628,19 @@ export class GestureFSM {
     if (noseHit && tailHit) return 'both';
     if (noseHit) return 'nose';
     if (tailHit) return 'tail';
+    // Default/strong assists interpret a held two-finger stance as "stay over
+    // the board" and catch automatically on descent. L0 preserves the manual
+    // replant path for players who explicitly choose it.
+    if (this.assistLevel > 0 && this.#apexSeen && inp.feet.bothPlanted) {
+      const gesture = this.#label?.air;
+      if (!gesture) return 'both';
+      // Never freeze a flip while the grip tape faces the floor. Wait for the
+      // assisted envelope to carry it near a complete turn, then catch/damp.
+      if (gesture.kind === 'flip' && Math.abs(this.flipRotations) >= 0.94) return 'both';
+      if (gesture.kind === 'shuv' && Math.abs(this.shuvDegrees) >= this.config.recognition.shuvTargetDeg * 0.85) {
+        return 'both';
+      }
+    }
     return null;
   }
 

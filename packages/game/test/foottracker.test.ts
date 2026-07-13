@@ -40,36 +40,36 @@ function frame(tPerfMs: number, contacts: Contact[], primary = false): ContactFr
 }
 
 describe('FootTracker binding + stance', () => {
-  it('dual plant assigns padLeft=nose for regular (smaller x = padLeft)', () => {
+  it('regular right-hand stance maps pad-left index to tail and pad-right middle to nose', () => {
     const t = tracker({ stance: 'regular' });
     const s = t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0);
     expect(s.bothPlanted).toBe(true);
-    expect(s.nose.contactId).toBe(1); // x=0.4 = padLeft = nose (regular)
-    expect(s.tail.contactId).toBe(2);
+    expect(s.tail.contactId).toBe(1); // x=0.4 = index/back foot/tail
+    expect(s.nose.contactId).toBe(2); // x=0.6 = middle/front foot/nose
   });
 
   it('goofy inverts nose/tail binding', () => {
     const t = tracker({ stance: 'goofy' });
     const s = t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0);
-    expect(s.nose.contactId).toBe(2); // padLeft(0.4)=tail for goofy → nose is 0.6
-    expect(s.tail.contactId).toBe(1);
+    expect(s.nose.contactId).toBe(1);
+    expect(s.tail.contactId).toBe(2);
   });
 
   it('swapFeet inverts which contact is padLeft', () => {
     const t = tracker({ stance: 'regular', swapFeet: true });
     const s = t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0);
-    expect(s.nose.contactId).toBe(2); // swap → padLeft becomes x=0.6 → nose (regular)
-    expect(s.tail.contactId).toBe(1);
+    expect(s.nose.contactId).toBe(1);
+    expect(s.tail.contactId).toBe(2);
   });
 
   it('sticky ids: bindings survive contacts crossing in x', () => {
     const t = tracker();
-    t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0); // nose=1, tail=2
+    t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0); // tail=1, nose=2
     // Swap positions: id1 now larger x than id2. Sticky → roles unchanged.
     const s = t.update([frame(8, [c(1, 0.7, 0.5), c(2, 0.3, 0.5)])], 1);
-    expect(s.nose.contactId).toBe(1);
-    expect(s.tail.contactId).toBe(2);
-    expect(s.nose.pos.x).toBeCloseTo(0.7, 6);
+    expect(s.tail.contactId).toBe(1);
+    expect(s.nose.contactId).toBe(2);
+    expect(s.tail.pos.x).toBeCloseTo(0.7, 6);
   });
 });
 
@@ -77,38 +77,38 @@ describe('FootTracker rebind + lift', () => {
   it('re-plant after dual lift rebinds by proximity, not provisional', () => {
     const tel = new Telemetry();
     const t = tracker({}, tel);
-    t.update([frame(0, [c(1, 0.3, 0.5), c(2, 0.7, 0.5)])], 0); // nose=1@0.3, tail=2@0.7
+    t.update([frame(0, [c(1, 0.3, 0.5), c(2, 0.7, 0.5)])], 0); // tail=1@0.3, nose=2@0.7
     t.update([frame(8, [])], 1); // dual lift → held, memory retained
-    // A single NEW id near the OLD NOSE position must bind to NOSE (proximity),
-    // not the provisional 'tail' a fresh single contact would get.
+    // A single NEW id near the OLD TAIL position must bind to TAIL by proximity.
     const s = t.update([frame(16, [c(3, 0.32, 0.5)])], 2);
-    expect(s.nose.planted).toBe(true);
-    expect(s.nose.contactId).toBe(3);
-    expect(s.tail.planted).toBe(false);
+    expect(s.tail.planted).toBe(true);
+    expect(s.tail.contactId).toBe(3);
+    expect(s.nose.planted).toBe(false);
     expect(tel.count('footRebind')).toBeGreaterThan(0);
   });
 
   it('single-foot lift frees only that role; other stays sticky', () => {
     const t = tracker();
     t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0);
-    const s = t.update([frame(8, [c(1, 0.4, 0.5)])], 1); // id2 (tail) lifted
-    expect(s.nose.planted).toBe(true);
-    expect(s.nose.contactId).toBe(1);
-    expect(s.tail.planted).toBe(false);
+    const s = t.update([frame(8, [c(1, 0.4, 0.5)])], 1); // id2 (nose) lifted
+    expect(s.tail.planted).toBe(true);
+    expect(s.tail.contactId).toBe(1);
+    expect(s.nose.planted).toBe(false);
     expect(s.plantCount).toBe(1);
   });
 
-  it('dual lift holds last state then clears after the predict window', () => {
+  it('dual lift reports immediately while retaining identity memory internally', () => {
     const t = tracker();
     t.update([frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)])], 0);
-    // Shortly after dual lift: still holding both-planted state.
+    // Visual/control state must match the hardware frame immediately.
     t.update([frame(8, [])], 1);
-    const held = t.update([frame(16, [])], 2);
-    expect(held.bothPlanted).toBe(true); // ballistic hold
+    const lifted = t.update([frame(16, [])], 2);
+    expect(lifted.bothPlanted).toBe(false);
+    expect(lifted.plantCount).toBe(0);
 
     // Feed empty frames past ballisticPredictMs (200 ms) → cleared.
     let tp = 16;
-    let s = held;
+    let s = lifted;
     for (let i = 0; i < 40; i++) {
       tp += 8;
       s = t.update([frame(tp, [])], 3 + i);

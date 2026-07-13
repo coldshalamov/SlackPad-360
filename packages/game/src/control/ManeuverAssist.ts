@@ -25,6 +25,7 @@ import type { SimConfig, Vec3 } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { FsmResult } from './GestureFSM';
 import type { ManeuverCommand } from './ManeuverCommand';
+import type { FeetState } from '../input/FootTracker';
 
 /** Spec §3.1 AssistState — exact fields. */
 export interface AssistState {
@@ -80,7 +81,7 @@ export class ManeuverAssist {
   }
 
   /** Translate one FSM step result into SimWorld commands + AssistState. */
-  update(result: FsmResult, step: number): ManeuverCommand[] {
+  update(result: FsmResult, step: number, feet?: FeetState): ManeuverCommand[] {
     const cmds: ManeuverCommand[] = [];
     const s = this.state;
     const pop = this.config.pop;
@@ -153,6 +154,25 @@ export class ManeuverAssist {
       s.omegaTarget = zero();
     }
 
+    // A basic ollie is a snap-and-level sequence, not a vertical translation.
+    // Hold a readable pitch briefly, then physically torque the deck back to
+    // level before landing. Flip/shuv torque remains orthogonal and can compose.
+    const baseLabel = result.label?.label;
+    const guidePlanted = baseLabel === 'nollie' ? feet?.tail.planted : feet?.nose.planted;
+    if (
+      result.phase === 'air' &&
+      (baseLabel === 'ollie' || baseLabel === 'nollie') &&
+      guidePlanted
+    ) {
+      const age = Math.max(0, step - result.label!.openStep);
+      const hold = Math.max(0, pop.snapHoldSteps);
+      const end = Math.max(hold + 1, pop.levelEndSteps);
+      const levelT = age <= hold ? 0 : Math.min(1, (age - hold) / (end - hold));
+      const sign = baseLabel === 'ollie' ? 1 : -1;
+      const targetPitch = sign * (pop.noseUpTargetDeg * Math.PI / 180) * (1 - levelT);
+      cmds.push({ kind: 'ollieLevel', targetPitch });
+    }
+
     // Per-step grind latch (M6; spec §4). Flush the GrindSystem's clamped
     // soft-snap command while grinding (and the one-shot lateral kick a balance
     // slip carries), and mirror the rail frame into AssistState.grindAxis/
@@ -168,6 +188,7 @@ export class ManeuverAssist {
         lateralOffset: grind.lateralOffset,
         springGain: grind.springGain,
         balanceLateral: grind.balanceLateral,
+        dismountLiftImpulse: grind.dismountLiftImpulse,
       });
     }
     if (grind && grind.active && grind.axis && grind.anchor) {

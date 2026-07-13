@@ -20,6 +20,7 @@ const HARNESS_ALLOWLIST = [
   'init',
   'reset',
   'injectContactFrame',
+  'releaseInputs',
   'step',
   'observe',
   'startRecording',

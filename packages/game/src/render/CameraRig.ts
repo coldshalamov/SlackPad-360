@@ -6,8 +6,8 @@
  * frame however reads best.
  *
  * Shot modes are keyed off `ObserveState.phase`:
- *   ground/none/pop → chase low 3/4 (behind + above along the board heading,
- *                     feet visible, look-ahead 2–4 m scaled by speed)
+ *   ground/none/pop → low broadside 3/4 (mostly beside the board, with a small
+ *                     trailing bias so both feet and deck motion stay legible)
  *   air             → pull-back (more distance + wider FOV so a full rotation
  *                     reads; the heading is FROZEN at take-off so flips don't
  *                     swing the camera)
@@ -25,12 +25,13 @@
  * `reducedMotion` collapses every spring/slerp to an instant cut.
  */
 
-import * as THREE from 'three';
-import type { CameraConfig, ObserveState } from '@slackpad/shared';
-import type { RenderPose } from '../sim/SimWorld';
+import * as THREE from "three";
+import type { CameraConfig, ObserveState } from "@slackpad/shared";
+import type { RenderPose } from "../sim/SimWorld";
 
 /** Camera shot modes (spec §6). Replay/tutorial are enum placeholders. */
-export type ShotMode = 'chase' | 'air' | 'catch' | 'bail' | 'grind' | 'tutorial' | 'replay';
+export type ShotMode =
+  "chase" | "air" | "catch" | "bail" | "grind" | "tutorial" | "replay";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
@@ -47,16 +48,18 @@ function smoothDampVec3(
   const omega = 2 / st;
   const x = omega * dt;
   const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-  const damp = (cur: number, tgt: number, v: number): [number, number] => {
-    const change = cur - tgt;
-    const temp = (v + omega * change) * dt;
-    const newVel = (v - omega * temp) * exp;
-    const output = tgt + (change + temp) * exp;
-    return [output, newVel];
-  };
-  const [ox, vx] = damp(current.x, target.x, vel.x);
-  const [oy, vy] = damp(current.y, target.y, vel.y);
-  const [oz, vz] = damp(current.z, target.z, vel.z);
+  const changeX = current.x - target.x;
+  const tempX = (vel.x + omega * changeX) * dt;
+  const vx = (vel.x - omega * tempX) * exp;
+  const ox = target.x + (changeX + tempX) * exp;
+  const changeY = current.y - target.y;
+  const tempY = (vel.y + omega * changeY) * dt;
+  const vy = (vel.y - omega * tempY) * exp;
+  const oy = target.y + (changeY + tempY) * exp;
+  const changeZ = current.z - target.z;
+  const tempZ = (vel.z + omega * changeZ) * dt;
+  const vz = (vel.z - omega * tempZ) * exp;
+  const oz = target.z + (changeZ + tempZ) * exp;
   vel.set(vx, vy, vz);
   out.set(ox, oy, oz);
 }
@@ -85,10 +88,11 @@ export class CameraRig {
   // camera) + working temporaries reused each frame (no per-frame allocation).
   readonly #heading = new THREE.Vector3(0, 0, 1);
   #bailOrbit = 0;
-  #lastMode: ShotMode = 'chase';
+  #lastMode: ShotMode = "chase";
 
   #occluders: THREE.Object3D[] = [];
   readonly #ray = new THREE.Raycaster();
+  readonly #occlusionHits: THREE.Intersection[] = [];
 
   // Scratch.
   readonly #boardPos = new THREE.Vector3();
@@ -109,7 +113,12 @@ export class CameraRig {
     this.#cfg = config;
     this.#reducedMotion = reducedMotion;
     this.#fov = config.fovBase;
-    this.camera = new THREE.PerspectiveCamera(config.fovBase, aspect, config.near, config.far);
+    this.camera = new THREE.PerspectiveCamera(
+      config.fovBase,
+      aspect,
+      config.near,
+      config.far,
+    );
   }
 
   setAspect(aspect: number): void {
@@ -127,18 +136,18 @@ export class CameraRig {
   }
 
   /** Map a maneuver phase to a shot mode. */
-  #modeForPhase(phase: ObserveState['phase']): ShotMode {
+  #modeForPhase(phase: ObserveState["phase"]): ShotMode {
     switch (phase) {
-      case 'air':
-        return 'air';
-      case 'catch':
-        return 'catch';
-      case 'bail':
-        return 'bail';
-      case 'grind':
-        return 'grind';
+      case "air":
+        return "air";
+      case "catch":
+        return "catch";
+      case "bail":
+        return "bail";
+      case "grind":
+        return "grind";
       default:
-        return 'chase'; // none | ground | pop
+        return "chase"; // none | ground | pop
     }
   }
 
@@ -153,14 +162,19 @@ export class CameraRig {
     const mode = this.#modeForPhase(obs.phase);
 
     // Heading is refreshed only while grounded; airborne flips keep the frame.
-    const grounded = obs.phase === 'ground' || obs.phase === 'none' || obs.phase === 'pop';
+    const grounded =
+      obs.phase === "ground" || obs.phase === "none" || obs.phase === "pop";
     if (grounded) flatHeading(this.#boardQuat, this.#heading);
     const heading = this.#heading;
     this.#right.copy(WORLD_UP).cross(heading).normalize(); // right = up × heading
 
     const speed = Math.hypot(obs.board.lv.x, obs.board.lv.z);
-    const laT = Math.min(1, Math.max(0, speed / Math.max(1e-3, cfg.lookAheadSpeedRef)));
-    const lookAhead = cfg.lookAheadMin + (cfg.lookAheadMax - cfg.lookAheadMin) * laT;
+    const laT = Math.min(
+      1,
+      Math.max(0, speed / Math.max(1e-3, cfg.lookAheadSpeedRef)),
+    );
+    const lookAhead =
+      cfg.lookAheadMin + (cfg.lookAheadMax - cfg.lookAheadMin) * laT;
 
     // --- Chase low 3/4 (reused as the catch tighten target) ----------------
     this.#chasePos
@@ -178,24 +192,30 @@ export class CameraRig {
       .copy(this.#boardPos)
       .addScaledVector(heading, -cfg.airDistance)
       .addScaledVector(WORLD_UP, cfg.airHeight)
-      .addScaledVector(this.#right, cfg.chaseSide * 0.5);
-    this.#airLook.copy(this.#boardPos).addScaledVector(WORLD_UP, cfg.aimHeight * 0.5);
+      .addScaledVector(this.#right, cfg.chaseSide * 1.15);
+    this.#airLook
+      .copy(this.#boardPos)
+      .addScaledVector(WORLD_UP, cfg.aimHeight * 0.5);
 
     let desiredFov = cfg.fovBase;
-    if (mode === 'chase') {
+    if (mode === "chase") {
       this.#desiredPos.copy(this.#chasePos);
       this.#lookTarget.copy(this.#chaseLook);
       desiredFov = cfg.fovBase;
-    } else if (mode === 'air') {
+    } else if (mode === "air") {
       this.#desiredPos.copy(this.#airPos);
       this.#lookTarget.copy(this.#airLook);
       desiredFov = cfg.fovAir;
-    } else if (mode === 'catch') {
+    } else if (mode === "catch") {
       // Tighten from the air pose back toward chase.
-      this.#desiredPos.copy(this.#airPos).lerp(this.#chasePos, cfg.catchTighten);
-      this.#lookTarget.copy(this.#airLook).lerp(this.#chaseLook, cfg.catchTighten);
+      this.#desiredPos
+        .copy(this.#airPos)
+        .lerp(this.#chasePos, cfg.catchTighten);
+      this.#lookTarget
+        .copy(this.#airLook)
+        .lerp(this.#chaseLook, cfg.catchTighten);
       desiredFov = cfg.fovAir + (cfg.fovBase - cfg.fovAir) * cfg.catchTighten;
-    } else if (mode === 'bail') {
+    } else if (mode === "bail") {
       // Wide slow orbit; failure readable.
       this.#bailOrbit += cfg.bailOrbitRate * dt;
       this.#armDir.copy(heading).applyAxisAngle(WORLD_UP, this.#bailOrbit);
@@ -203,7 +223,9 @@ export class CameraRig {
         .copy(this.#boardPos)
         .addScaledVector(this.#armDir, -cfg.bailDistance)
         .addScaledVector(WORLD_UP, cfg.bailHeight);
-      this.#lookTarget.copy(this.#boardPos).addScaledVector(WORLD_UP, cfg.aimHeight);
+      this.#lookTarget
+        .copy(this.#boardPos)
+        .addScaledVector(WORLD_UP, cfg.aimHeight);
       desiredFov = cfg.fovBase;
     } else {
       // grind (overhead) + tutorial/replay placeholders → overhead-ish framing.
@@ -212,19 +234,32 @@ export class CameraRig {
         .addScaledVector(WORLD_UP, cfg.grindHeight)
         .addScaledVector(this.#right, cfg.grindSide)
         .addScaledVector(heading, -cfg.grindLookAhead * 0.5);
-      this.#lookTarget.copy(this.#boardPos).addScaledVector(heading, cfg.grindLookAhead);
+      this.#lookTarget
+        .copy(this.#boardPos)
+        .addScaledVector(heading, cfg.grindLookAhead);
       desiredFov = cfg.fovBase;
     }
-    if (mode !== 'bail') this.#bailOrbit = 0;
+    if (mode !== "bail") this.#bailOrbit = 0;
     this.#lastMode = mode;
 
     // --- Position: critically damped spring (or instant cut) ---------------
-    if (!this.#initialized || this.#reducedMotion) {
+    // The first pose must be a complete cut: easing orientation from the
+    // PerspectiveCamera's identity rotation while position has already cut to
+    // its target leaves the board behind the camera on the opening frame.
+    const cutToTarget = !this.#initialized || this.#reducedMotion;
+    if (cutToTarget) {
       this.#smoothed.copy(this.#desiredPos);
       this.#posVel.set(0, 0, 0);
       this.#initialized = true;
     } else {
-      smoothDampVec3(this.camera.position, this.#desiredPos, this.#posVel, cfg.positionSmoothTime, dt, this.#smoothed);
+      smoothDampVec3(
+        this.camera.position,
+        this.#desiredPos,
+        this.#posVel,
+        cfg.positionSmoothTime,
+        dt,
+        this.#smoothed,
+      );
     }
 
     // --- Occlusion spring-arm (sphere-cast shorten) ------------------------
@@ -234,7 +269,7 @@ export class CameraRig {
     // --- Orientation: rate-clamped slerp toward the look-at --------------
     this.#lookMat.lookAt(this.camera.position, this.#lookTarget, WORLD_UP);
     this.#lookQuat.setFromRotationMatrix(this.#lookMat);
-    if (this.#reducedMotion) {
+    if (cutToTarget) {
       this.camera.quaternion.copy(this.#lookQuat);
     } else {
       const maxStep = THREE.MathUtils.degToRad(cfg.maxAngularRateDeg) * dt;
@@ -268,11 +303,17 @@ export class CameraRig {
     this.#armDir.divideScalar(dist);
     this.#ray.set(this.#lookTarget, this.#armDir);
     this.#ray.far = dist;
-    const hits = this.#ray.intersectObjects(this.#occluders, true);
-    if (hits.length > 0) {
-      const hit = hits[0]!;
-      const shortened = Math.max(this.#cfg.occlusionMinDistance, hit.distance - this.#cfg.occlusionRadius);
-      pos.copy(this.#lookTarget).addScaledVector(this.#armDir, Math.min(dist, shortened));
+    this.#occlusionHits.length = 0;
+    this.#ray.intersectObjects(this.#occluders, true, this.#occlusionHits);
+    if (this.#occlusionHits.length > 0) {
+      const hit = this.#occlusionHits[0]!;
+      const shortened = Math.max(
+        this.#cfg.occlusionMinDistance,
+        hit.distance - this.#cfg.occlusionRadius,
+      );
+      pos
+        .copy(this.#lookTarget)
+        .addScaledVector(this.#armDir, Math.min(dist, shortened));
     }
   }
 
@@ -280,7 +321,12 @@ export class CameraRig {
    * Run the rig to convergence for a still capture (screenshots): steps the
    * spring at a fixed dt until it settles. Presentation-only; does not touch sim.
    */
-  settle(pose: RenderPose, obs: ObserveState, iterations = 48, dt = 1 / 60): void {
+  settle(
+    pose: RenderPose,
+    obs: ObserveState,
+    iterations = 48,
+    dt = 1 / 60,
+  ): void {
     for (let i = 0; i < iterations; i++) this.update(pose, obs, dt);
   }
 

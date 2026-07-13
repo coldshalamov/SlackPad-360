@@ -17,11 +17,11 @@
  * here rather than silently faked.
  */
 import { describe, expect, it } from 'vitest';
-import { eventsOf, NOSE_POS, settledProfiled, TAIL_POS } from './helpers/maneuver';
+import { eventsOf, NOSE_POS, settled, settledProfiled, TAIL_POS } from './helpers/maneuver';
 import type { PadDriver } from './helpers/maneuver';
 
 // This suite is the PLANT-MASK truth table (M4 legacy mode, pinned explicitly
-// since IMPL-007 made 'buttonSide' the ship default). The buttonSide table
+// while the optional buttonSide profile has its own table). The buttonSide table
 // lives in gt-click-buttonside.test.ts.
 async function riding(seed: number): Promise<PadDriver> {
   const d = await settledProfiled(seed, { kickAttribution: 'plantMask' });
@@ -30,6 +30,17 @@ async function riding(seed: number): Promise<PadDriver> {
 }
 
 describe('GT-click: kick classification truth table', () => {
+  it('ship default: a stable both-planted LMB opens an immediate ollie', async () => {
+    const d = await settled(0xc1100);
+    d.cruise(30);
+    const kickStep = d.step;
+    d.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
+    const pops = eventsOf(d.harness, 'popRecognized');
+    expect(pops).toHaveLength(1);
+    expect(pops[0]!.label).toBe('ollie');
+    expect(d.step).toBeGreaterThan(kickStep);
+    expect(eventsOf(d.harness, 'push')).toHaveLength(0);
+  });
   it('tail plant + nose lift + click → ollie (kick claimed, no push)', async () => {
     const d = await riding(0xc11c1);
     d.drive({ tail: TAIL_POS }); // nose lift

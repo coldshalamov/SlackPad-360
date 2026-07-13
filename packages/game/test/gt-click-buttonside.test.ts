@@ -1,25 +1,23 @@
 /**
- * GT-click 'buttonSide' (IMPL-007, the ship DEFAULT) — the product owner's
+ * GT-click 'buttonSide' (optional browser/dev mapping) — the alternate
  * Tech Deck model: both fingers stay planted like a real ollie stance and the
  * BUTTON picks the kicking end, instantly.
  *
  *   both planted + LMB            → ollie, SAME step (no lookahead latency)
  *   both planted + RMB            → nollie, same step
- *   tail-only + LMB               → ollie   (single-foot rule: planted foot wins)
- *   tail-only + RMB               → ollie   (a foot not on the board cannot kick)
- *   nose-only + LMB               → nollie  (mirrored)
+ *   one contact + either button   → ignored (initial slap / unstable stance)
  *   none + either button          → ignored (no pop, no push)
  *   clicks never produce a push   (cruise drive owns push in this mode)
  *
  * The legacy 'plantMask' table lives in gt-click.test.ts (pinned explicitly).
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { eventsOf, NOSE_POS, settledProfiled, TAIL_POS } from './helpers/maneuver';
 import type { PadDriver } from './helpers/maneuver';
 
 async function riding(seed: number): Promise<PadDriver> {
-  // Default profile IS buttonSide; pass it explicitly so this suite still
-  // pins the behavior if the default ever changes.
+  // Pass the shipping mode explicitly so this truth table stays self-contained.
   const d = await settledProfiled(seed, { kickAttribution: 'buttonSide' });
   d.cruise(90);
   return d;
@@ -47,22 +45,20 @@ describe("GT-click 'buttonSide': the Tech Deck kick table", () => {
     expect(eventsOf(d.harness, 'push').length).toBe(0);
   });
 
-  it('tail-only + RMB → still ollie (a lifted foot cannot kick)', async () => {
+  it('tail-only + RMB is ignored because the riding stance is no longer stable', async () => {
     const d = await riding(0xb5003);
     d.drive({ tail: TAIL_POS }); // nose lifted
     d.drive({ tail: TAIL_POS, secondary: true });
     const pops = eventsOf(d.harness, 'popRecognized');
-    expect(pops.length).toBe(1);
-    expect(pops[0]!.label).toBe('ollie');
+    expect(pops.length).toBe(0);
   });
 
-  it('nose-only + LMB → nollie (planted foot wins over button)', async () => {
+  it('nose-only + LMB is ignored rather than turning a lift into a trick command', async () => {
     const d = await riding(0xb5004);
     d.drive({ nose: NOSE_POS }); // tail lifted
     d.drive({ nose: NOSE_POS, primary: true });
     const pops = eventsOf(d.harness, 'popRecognized');
-    expect(pops.length).toBe(1);
-    expect(pops[0]!.label).toBe('nollie');
+    expect(pops.length).toBe(0);
   });
 
   it('no feet + either button → ignored (no pop, no push)', async () => {
@@ -76,20 +72,11 @@ describe("GT-click 'buttonSide': the Tech Deck kick table", () => {
     expect(eventsOf(d.harness, 'push').length).toBe(0);
   });
 
-  it('nose-lift prep before an LMB pop still raises quality q (prep is a bonus, not a gate)', async () => {
-    // No prep: q floor.
+  it('binary LMB/RMB clicks use the configured consistent pop quality', async () => {
     const flat = await riding(0xb5006);
     flat.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
     const qFlat = eventsOf(flat.harness, 'popRecognized')[0]!.q as number;
-
-    // Crisp nose-lift prep just before the click (the M4 skill move).
-    const prepped = await riding(0xb5006);
-    prepped.drive({ nose: { x: NOSE_POS.x, y: NOSE_POS.y - 0.06 }, tail: TAIL_POS });
-    prepped.drive({ tail: TAIL_POS }); // nose lifts with speed
-    prepped.drive({ tail: TAIL_POS, primary: true });
-    const qPrepped = eventsOf(prepped.harness, 'popRecognized')[0]!.q as number;
-
-    expect(qPrepped).toBeGreaterThan(qFlat);
+    expect(qFlat).toBe(DEFAULT_SIM_CONFIG.pop.clickQuality);
   });
 
   it('replay determinism: a buttonSide session with RMB nollies reproduces its checkpoints', async () => {

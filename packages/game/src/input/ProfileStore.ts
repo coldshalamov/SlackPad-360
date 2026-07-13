@@ -12,7 +12,9 @@ import { DEFAULT_INPUT_PROFILE } from '@slackpad/shared';
 import type { AssistLevel, InputProfile, Stance } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 
-const STORAGE_KEY = 'slackpad.profile.v1';
+// v4 installs the direct Skate-like click contract for existing local builds:
+// LMB pops the tail, RMB pops the nose, with both riding contacts planted.
+export const PROFILE_STORAGE_KEY = 'slackpad.profile.v4';
 
 type Listener = (profile: InputProfile) => void;
 
@@ -43,7 +45,13 @@ export class ProfileStore {
   }
 
   update(patch: Partial<InputProfile>): void {
-    this.profile = { ...this.profile, ...patch, accessibility: { ...this.profile.accessibility } };
+    this.profile = {
+      ...this.profile,
+      ...patch,
+      kickAttribution: 'buttonSide',
+      bothClickMeans: 'ollie',
+      accessibility: { ...this.profile.accessibility },
+    };
     this.persist();
     this.telemetry?.log({ type: 'profileChanged', patch: { ...patch } });
     for (const l of this.listeners) l(this.get());
@@ -73,10 +81,18 @@ export class ProfileStore {
     const base = structuredClone(DEFAULT_INPUT_PROFILE);
     if (!hasLocalStorage()) return base;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
       if (!raw) return base;
       const saved = JSON.parse(raw) as Partial<InputProfile>;
-      return { ...base, ...saved, accessibility: { ...base.accessibility, ...saved.accessibility } };
+      return {
+        ...base,
+        ...saved,
+        // The lift-first mapping was the source of unreliable "click does
+        // nothing" behavior. It is no longer a shipping profile choice.
+        kickAttribution: 'buttonSide',
+        bothClickMeans: 'ollie',
+        accessibility: { ...base.accessibility, ...saved.accessibility },
+      };
     } catch {
       return base;
     }
@@ -85,7 +101,7 @@ export class ProfileStore {
   private persist(): void {
     if (!hasLocalStorage()) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.profile));
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(this.profile));
     } catch {
       /* dev-only best effort */
     }

@@ -15,7 +15,7 @@ import { NOSE_POS, TAIL_POS, settledProfiled, scriptOllie, eventsOf } from './he
 async function enterGrind() {
   const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
   const h = d.harness;
-  d.cruise(100);
+  d.cruise(70);
   scriptOllie(d, {});
   for (let i = 0; i < 60; i++) {
     d.drive({ nose: NOSE_POS, tail: TAIL_POS });
@@ -60,7 +60,7 @@ describe('grind phase-exclusive (§3.1)', () => {
     // and no shuv/flip should be recognised once the candidate is live.
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
-    d.cruise(100);
+    d.cruise(70);
     scriptOllie(d, {});
     let latched = false;
     for (let i = 0; i < 60; i++) {

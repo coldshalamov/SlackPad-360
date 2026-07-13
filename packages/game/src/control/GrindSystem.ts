@@ -86,6 +86,8 @@ export interface GrindStepResult {
   lateralOffset: number;
   springGain: number;
   balanceLateral: number;
+  /** One-shot upward impulse for a physical rail-clearing dismount. */
+  dismountLiftImpulse: number;
 }
 
 function inactiveResult(candidate: boolean, family: GrindFamily | null, rejected: GrindRejectReason | null): GrindStepResult {
@@ -105,6 +107,7 @@ function inactiveResult(candidate: boolean, family: GrindFamily | null, rejected
     lateralOffset: 0,
     springGain: 0,
     balanceLateral: 0,
+    dismountLiftImpulse: 0,
   };
 }
 
@@ -334,6 +337,7 @@ export class GrindSystem {
       res.springGain = 0;
       res.lateralOffset = 0;
       res.balanceLateral = side * (g.slipLateralImpulse / dt);
+      res.dismountLiftImpulse = g.dismountLiftImpulse;
     }
     return res;
   }
@@ -360,6 +364,7 @@ export class GrindSystem {
       lateralOffset: approach.lateralOffset,
       springGain,
       balanceLateral,
+      dismountLiftImpulse: 0,
     };
   }
 

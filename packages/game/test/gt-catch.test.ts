@@ -1,18 +1,11 @@
 /**
- * GT-catch (M4) — catch volumes + window (final-physics §3.2, trick-spec §5):
- *  - replant inside a socket volume during the post-apex window → catch:
- *    angular velocity is scaled by exactly (1 − catchGain·assistScale[L]) and
- *    the landing is measurably cleaner than the no-catch control run;
- *  - replant OUTSIDE the volumes → no catch (missed catch, harder landing);
- *  - replant BEFORE the apex (catch.apexOnly default) → window closed, no
- *    catch;
- *  - forgiveness sweep: replant offsets across the volume radius, reported as
- *    numbers (volumeRadius 0.15 m, padToBoardScale 0.6 → pad offsets < 0.25
- *    catch, beyond miss).
+ * GT-catch (M4) — the shipping assists treat a held stable two-contact stance
+ * as staying over the board: L1/L2 auto-catch on descent. L0 retains the
+ * explicit post-apex replant/volume path for players who choose manual catch.
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
-import { eventsOf, lastEventOf, NOSE_POS, scriptOllie, settled, TAIL_POS } from './helpers/maneuver';
+import { eventsOf, lastEventOf, NOSE_POS, scriptOllie, settledProfiled, TAIL_POS } from './helpers/maneuver';
 import type { FootInput } from './helpers/maneuver';
 
 interface CatchRun {
@@ -26,17 +19,19 @@ interface CatchRun {
 }
 
 /**
- * Scripted q=1 ollie; optionally replant the nose at `replantApexOffset` steps
- * relative to the apex (negative = before apex) at NOSE_POS + `offset`.
+ * Script a binary click pop, then either hold both contacts or exercise L0's
+ * manual replant path at `replantApexOffset` relative to the apex.
  */
-async function ollieWithReplant(
+async function runCatch(
   seed: number,
-  replantApexOffset: number | null,
+  assistLevel: 0 | 1 | 2,
+  mode: 'hold' | 'lift' | 'manual',
+  replantApexOffset: number | null = null,
   offset: FootInput = { x: 0, y: 0 },
 ): Promise<CatchRun> {
-  const d = await settled(seed);
+  const d = await settledProfiled(seed, { assistLevel, kickAttribution: 'buttonSide' });
   d.cruise(90);
-  scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
+  scriptOllie(d);
 
   const h = d.harness;
   let apexStep: number | null = null;
@@ -51,7 +46,8 @@ async function ollieWithReplant(
     if ((phase === 'air' || phase === 'catch') && airStart == null) airStart = obs.step;
     if (airStart != null && apexStep == null && obs.board.lv.y <= 0) apexStep = obs.step;
 
-    // Pre-apex replant: schedule from air start (apex is unknowable then).
+    // Pre-apex manual replant: schedule shortly after liftoff, while a
+    // non-negative offset is measured from the detected apex.
     const target =
       replantApexOffset == null
         ? null
@@ -63,13 +59,18 @@ async function ollieWithReplant(
             ? airStart + 3 // "before apex": shortly after liftoff
             : null;
 
-    const plantNow = !replanted && target != null && obs.step >= target;
+    const plantNow = mode === 'manual' && !replanted && target != null && obs.step >= target;
     if (plantNow) {
       avBefore = Math.hypot(obs.board.av.x, obs.board.av.y, obs.board.av.z);
       replanted = true;
     }
     d.drive({
-      nose: replanted ? { x: NOSE_POS.x + offset.x, y: NOSE_POS.y + offset.y } : null,
+      nose:
+        mode === 'hold'
+          ? NOSE_POS
+          : mode === 'manual' && replanted
+            ? { x: NOSE_POS.x + offset.x, y: NOSE_POS.y + offset.y }
+            : null,
       tail: TAIL_POS,
     });
     if (plantNow) {
@@ -92,50 +93,64 @@ async function ollieWithReplant(
   };
 }
 
-describe('GT-catch: catch volumes and window', () => {
-  it('replant at the socket inside the window → catch, ω scaled by the spec factor', async () => {
-    const run = await ollieWithReplant(0xca7c1, 2);
-    expect(run.caught).toBe(true);
-    // Default assist level 1: factor = 1 − 1.0·0.55 = 0.45.
-    const expected = 1 - DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[1];
-    expect(run.catchFactor).toBeCloseTo(expected, 6);
-    // Direct ω measurement across the catch step: |av| drops to ~factor.
-    expect(run.avBeforeReplant).not.toBeNull();
-    expect(run.avAfterReplant).not.toBeNull();
-    const ratio = run.avAfterReplant! / run.avBeforeReplant!;
-    expect(ratio).toBeLessThan(expected + 0.12); // damping factor plus slack
-    expect(ratio).toBeGreaterThan(expected - 0.12);
-    expect(run.outcome).toBe('clean');
-  });
-
-  it('no replant (control) → no catch, harder landing than the caught run', async () => {
-    const caught = await ollieWithReplant(0xca7c1, 2);
-    const control = await ollieWithReplant(0xca7c1, null);
-    expect(control.caught).toBe(false);
-    // Missed catch: no damping → the control lands dirtier (bigger θ) or bails.
-    expect(control.outcome === 'dirty' || control.outcome === 'bail').toBe(true);
-    if (control.thetaDeg != null && caught.thetaDeg != null) {
-      expect(control.thetaDeg).toBeGreaterThan(caught.thetaDeg);
+describe('GT-catch: assisted hold and optional L0 manual catch', () => {
+  it('L1 and L2 auto-catch a held stable stance on descent and land clean', async () => {
+    for (const level of [1, 2] as const) {
+      const run = await runCatch(0xca7c0 + level, level, 'hold');
+      expect(run.caught).toBe(true);
+      const expected = 1 - DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[level];
+      expect(run.catchFactor).toBeCloseTo(expected, 6);
+      expect(run.outcome).toBe('clean');
     }
   });
 
-  it('replant OUTSIDE the catch volumes → no catch', async () => {
-    // 0.5 pad units × padToBoardScale 0.6 = 0.30 m from the socket ≫ 0.15 m.
-    const run = await ollieWithReplant(0xca7c2, 2, { x: -0.25, y: 0.43 });
-    expect(run.caught).toBe(false);
+  it('assisted auto-catch applies the configured angular damping factor', async () => {
+    const d = await settledProfiled(0xca7c8, { assistLevel: 1, kickAttribution: 'buttonSide' });
+    d.cruise(90);
+    scriptOllie(d);
+    let before: number | null = null;
+    let after: number | null = null;
+    for (let i = 0; i < 160 && after == null; i++) {
+      const obs = d.harness.observe();
+      const count = eventsOf(d.harness, 'catch').length;
+      before = Math.hypot(obs.board.av.x, obs.board.av.y, obs.board.av.z);
+      d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+      if (eventsOf(d.harness, 'catch').length > count) {
+        const av = d.harness.observe().board.av;
+        after = Math.hypot(av.x, av.y, av.z);
+      }
+    }
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    const expected = 1 - DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[1];
+    expect(after! / before!).toBeGreaterThan(expected - 0.12);
+    expect(after! / before!).toBeLessThan(expected + 0.12);
   });
 
-  it('replant BEFORE the apex → window closed (catch.apexOnly), no catch', async () => {
-    const run = await ollieWithReplant(0xca7c3, -1);
-    expect(run.caught).toBe(false);
+  it('L0 does not auto-catch a held stance, but a post-apex socket replant catches', async () => {
+    const held = await runCatch(0xca7d0, 0, 'hold');
+    const manual = await runCatch(0xca7d1, 0, 'manual', 2);
+    expect(held.caught).toBe(false);
+    expect(manual.caught).toBe(true);
+    expect(manual.catchFactor).toBeCloseTo(
+      1 - DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[0],
+      6,
+    );
   });
 
-  it('forgiveness sweep: catch volume admits generous replant error (reported)', async () => {
+  it('L0 manual catch still respects apex timing and the socket volume', async () => {
+    const early = await runCatch(0xca7d2, 0, 'manual', -1);
+    const outside = await runCatch(0xca7d3, 0, 'manual', 2, { x: 0.3, y: 0 });
+    expect(early.caught).toBe(false);
+    expect(outside.caught).toBe(false);
+  });
+
+  it('L0 forgiveness sweep keeps the documented manual catch radius', async () => {
     const cfg = DEFAULT_SIM_CONFIG;
     const rows: Array<{ padOffset: number; meters: number; caught: boolean }> = [];
     // Pad-unit offsets map to board-local meters via padToBoardScale (0.6).
     for (const [i, padOffset] of [0, 0.1, 0.2, 0.3].entries()) {
-      const run = await ollieWithReplant(0xca7d0 + i, 2, { x: padOffset, y: 0 });
+      const run = await runCatch(0xca7e0 + i, 0, 'manual', 2, { x: padOffset, y: 0 });
       rows.push({
         padOffset,
         meters: +(padOffset * cfg.locomotion.padToBoardScale).toFixed(3),

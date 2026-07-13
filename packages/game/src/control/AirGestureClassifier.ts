@@ -24,19 +24,19 @@
  * FootTracker pad-left rule puts the NOSE at pad-left for a regular rider (goofy
  * mirrors). So the board long axis (nose direction) on the pad is:
  *
- *        regular:  nose = −x        goofy:  nose = +x
+ *        regular:  nose = +x        goofy:  nose = −x
  *
  * The rider's heel edge is one long side of the deck, the toe edge the other.
  * We fix the convention: for a REGULAR rider the heel edge is pad-DOWN (+y).
  *
  *      pad-top (y=0)
- *        ┌─────────────┐         longAxis (nose):  regular −x , goofy +x
- *   nose │  ·A    ·B   │ tail    latAxis (heel +):  regular +y , goofy −y
+ *        ┌─────────────┐         longAxis (nose):  regular +x , goofy −x
+ *   tail │  ·A    ·B   │ nose    latAxis (heel +):  regular +y , goofy −y
  *  (−x)  │   (regular) │ (+x)
  *        └─────────────┘         flick with vLat>0  = HEELSIDE = kickflip (+roll)
  *      pad-bottom (y=1)          flick with vLat<0  = TOESIDE  = heelflip (−roll)
  *
- *   vLong = v·longAxis = regular? −v.x : +v.x   (along board, nose positive)
+ *   vLong = v·longAxis = regular? +v.x : −v.x   (along board, nose positive)
  *   vLat  = v·latAxis  = regular? +v.y : −v.y   (across board, heelside positive)
  *
  * Because latAxis is mirrored by stance, the SAME physical pad flick yields
@@ -124,6 +124,7 @@ export class AirGestureClassifier {
   #yawArc = 0;
   #prevDir: number | null = null;
   #activeFoot: 'nose' | 'tail' | null = null;
+  #movingSamples = 0;
 
   private readonly regular: boolean;
 
@@ -145,6 +146,7 @@ export class AirGestureClassifier {
     this.#yawArc = 0;
     this.#prevDir = null;
     this.#activeFoot = null;
+    this.#movingSamples = 0;
   }
 
   get open(): AirGesture | null {
@@ -159,8 +161,8 @@ export class AirGestureClassifier {
   /** Board-local (vLong along nose, vLat across-board heelside+) of a pad vel. */
   private decompose(v: Vec2): { vLong: number; vLat: number } {
     return this.regular
-      ? { vLong: -v.x, vLat: v.y }
-      : { vLong: v.x, vLat: -v.y };
+      ? { vLong: v.x, vLat: v.y }
+      : { vLong: -v.x, vLat: -v.y };
   }
 
   /**
@@ -192,6 +194,7 @@ export class AirGestureClassifier {
     // when actually moving, so a near-still foot's noisy direction is ignored.
     const rec = this.config.recognition;
     if (active.speed > rec.flickSpeedMin * 0.25) {
+      this.#movingSamples += 1;
       const dir = Math.atan2(active.vel.y, active.vel.x);
       if (this.#prevDir !== null) this.#yawArc += wrapPi(dir - this.#prevDir);
       this.#prevDir = dir;
@@ -208,6 +211,7 @@ export class AirGestureClassifier {
     const flip = this.config.flip;
 
     const flickGate =
+      this.#movingSamples >= 3 &&
       this.#peakLat >= rec.flickSpeedMin &&
       this.#peakLat >= flip.axisDominanceRatio * this.#peakLong &&
       Math.abs(this.#latDisp) >= flip.flickPathMinLen;
@@ -217,13 +221,21 @@ export class AirGestureClassifier {
     // Dominant-axis resolution (spec §3.1): compare threshold-normalized scores.
     const flickN = this.#peakLat / rec.flickSpeedMin;
     const arcN = Math.abs(this.#yawArc) / rec.sweepMinAngleRad;
-    const chooseFlip = flickGate && (!sweepGate || flickN >= arcN);
+    // A clearly developed arc owns shuv even when one leg of that arc was also
+    // a fast lateral motion. This keeps forgiving thresholds from opening a
+    // flip on the first sample and then refusing the player's smooth sweep.
+    const clearSweep = sweepGate && arcN >= 1.25;
+    const chooseFlip = flickGate && (!clearSweep && (!sweepGate || flickN >= arcN));
 
     if (chooseFlip) {
-      const s = clamp01(
+      const raw = clamp01(
         (this.#peakLat - rec.flickSpeedMin) /
           Math.max(1e-6, flip.flickSpeedForMaxS - rec.flickSpeedMin),
       );
+      // Crossing the forgiving gesture gate should complete a readable game
+      // trick. Fine motor precision varies the upper third; it does not decide
+      // whether the board responds at all.
+      const s = 0.72 + 0.28 * raw;
       const sign = this.#latDisp >= 0 ? 1 : -1;
       return {
         kind: 'flip',
@@ -231,7 +243,7 @@ export class AirGestureClassifier {
         axis: 'long',
         omegaTarget: s * sign * flip.omegaFlipMax,
         intensity: s,
-        confidence: rec.cEnter + (1 - rec.cEnter) * s,
+        confidence: rec.cEnter + (1 - rec.cEnter) * raw,
         sign,
         openStep: step,
       };

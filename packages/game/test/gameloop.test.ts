@@ -13,18 +13,21 @@ const MAX_FRAME = DEFAULT_SIM_CONFIG.runtime.loop.maxFrameMs;
 interface Recorded {
   steps: number;
   alphas: number[];
+  frameDts: number[];
   saturatedMs: number[];
 }
 
 function makeLoop(): { loop: GameLoop; rec: Recorded } {
-  const rec: Recorded = { steps: 0, alphas: [], saturatedMs: [] };
+  const rec: Recorded = { steps: 0, alphas: [], frameDts: [], saturatedMs: [] };
   const loop = new GameLoop(
     {
       onStep: () => {
         rec.steps += 1;
       },
-      onRender: (alpha) => {
+      onRender: (...args: number[]) => {
+        const alpha = args[0]!;
         rec.alphas.push(alpha);
+        rec.frameDts.push(args[1] ?? Number.NaN);
       },
       onSaturated: (dropped) => {
         rec.saturatedMs.push(dropped);
@@ -36,6 +39,7 @@ function makeLoop(): { loop: GameLoop; rec: Recorded } {
   loop.tick(0);
   rec.steps = 0;
   rec.alphas.length = 0;
+  rec.frameDts.length = 0;
   return { loop, rec };
 }
 
@@ -78,6 +82,14 @@ describe('GameLoop', () => {
     loop.tick(60_000); // a minute-long stall
     // Intake capped at maxFrameMs → at most cap steps + saturation drop.
     expect(rec.steps).toBeLessThanOrEqual(Math.min(CAP, Math.floor(MAX_FRAME / DT)));
+  });
+
+  it('supplies one rAF-derived presentation delta capped at two sim steps', () => {
+    const { loop, rec } = makeLoop();
+    loop.tick(DT);
+    loop.tick(5000); // background/throttled interval
+    expect(rec.frameDts.every(Number.isFinite)).toBe(true);
+    expect(Math.max(...rec.frameDts)).toBeLessThanOrEqual((DT * 2) / 1000 + 1e-9);
   });
 
   it('folds negative elapsed (clock adjustment) to zero instead of corrupting state', () => {

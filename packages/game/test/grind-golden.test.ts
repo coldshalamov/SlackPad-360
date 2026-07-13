@@ -20,6 +20,7 @@ import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import type { Contact, ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
 import { DT_MS, NOSE_POS, TAIL_POS, eventsOf } from './helpers/maneuver';
+import { rotateAboutCenter } from '../src/input/FootTracker';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'grind-baselines.json');
 const UPDATE_GOLDENS = process.env.UPDATE_GOLDENS === '1';
@@ -40,7 +41,8 @@ function checkBaseline(key: string, actual: string): void {
 
 const SEED = 12345;
 const SESSION_STEPS = 300;
-const POP_STEP = 166;
+const FIFTY_POP_STEP = 130;
+const BOARDSLIDE_POP_STEP = 135;
 
 function c(id: number, x: number, y: number): Contact {
   return { id, tip: true, x, y, confidence: true };
@@ -53,36 +55,47 @@ function scriptFifty(step: number, frameId: number): InjectableFrame | null {
 
   let contacts: Contact[];
   let primary = false;
-  if (step < POP_STEP) {
+  if (step < FIFTY_POP_STEP) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // cruise up to speed
-  } else if (step === POP_STEP) {
-    contacts = [c(2, TAIL_POS.x, TAIL_POS.y)]; // tail-only + kick → plain straight ollie
+  } else if (step === FIFTY_POP_STEP) {
+    // Shipping LMB pop: both contacts stay planted; the button selects tail.
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
     primary = true;
   } else {
-    contacts = [c(3, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // re-plant + ride
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
   }
-  return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary, secondary: false, auxiliary: false } };
+  return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary, secondary: false, auxiliary: step < FIFTY_POP_STEP } };
 }
 
-/** Fixed BOARDSLIDE script: a gentle nose-prep SLIDE (steer ~50° off the rail)
+/** Fixed BOARDSLIDE script: a held common-mode carve (steer off the rail)
  * before the pop; approach-align completes the turn onto the sliding ledge. */
 function scriptBoardslide(step: number, frameId: number): InjectableFrame | null {
   if (step < 60) return null; // settle drop
 
   let contacts: Contact[];
   let primary = false;
-  if (step < POP_STEP - 5) {
+  if (step < BOARDSLIDE_POP_STEP - 5) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // cruise
-  } else if (step < POP_STEP) {
-    const i = step - (POP_STEP - 6); // 1..5 gentle nose-prep slide (steering yaw)
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y - 0.12 * i), c(2, TAIL_POS.x, TAIL_POS.y)];
-  } else if (step === POP_STEP) {
-    contacts = [c(2, TAIL_POS.x, TAIL_POS.y)];
+  } else if (step < BOARDSLIDE_POP_STEP) {
+    const i = step - (BOARDSLIDE_POP_STEP - 6);
+    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, i * 10);
+    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, i * 10);
+    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
+  } else if (step === BOARDSLIDE_POP_STEP) {
+    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, 50);
+    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, 50);
+    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
     primary = true;
   } else {
     contacts = [c(3, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // re-plant + ride
   }
-  return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary, secondary: false, auxiliary: false } };
+  return {
+    schemaVersion: 1,
+    frameId,
+    tPerfMs: step * DT_MS,
+    contacts,
+    buttons: { primary, secondary: false, auxiliary: step < BOARDSLIDE_POP_STEP - 5 },
+  };
 }
 
 async function recordSession(

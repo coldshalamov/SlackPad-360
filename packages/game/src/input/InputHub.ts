@@ -64,6 +64,7 @@ export class InputHub {
   private readonly pending: QueuedFrame[] = [];
   private readonly sources = new Set<string>();
   private seq = 0;
+  private paused = false;
 
   constructor(private readonly telemetry: Telemetry) {}
 
@@ -86,6 +87,10 @@ export class InputHub {
    * fault (gt-malformed suite).
    */
   push(frame: ContactFrame): boolean {
+    // Paused play must not accumulate a second-by-second replay of stale
+    // trackpad frames. Deliberately drop at the intake boundary instead of
+    // logging every suppressed 120 Hz device frame.
+    if (this.paused) return false;
     // Hostile inputs (getter-throwing objects, Proxy traps) must not escape
     // this boundary either — validation AND canonicalization run inside the
     // guard so "NEVER throws" holds for arbitrary junk, not just plain data.
@@ -121,6 +126,15 @@ export class InputHub {
   /** Number of frames waiting to be consumed by the next step. */
   pendingCount(): number {
     return this.pending.length;
+  }
+
+  /**
+   * Gate live input while a menu owns the game. Pausing immediately discards
+   * any queued pre-menu samples but preserves known sources for normal resume.
+   */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (paused) this.pending.length = 0;
   }
 
   /**

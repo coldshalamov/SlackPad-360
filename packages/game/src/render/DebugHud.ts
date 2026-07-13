@@ -247,7 +247,8 @@ export class DebugHud {
     this.#phaseText.textContent = `${obs.phase.toUpperCase()}${obs.label ? ` · ${obs.label}` : ''}`;
 
     this.#stats.textContent =
-      `step ${obs.step}   ${speed.toFixed(2)} m/s\n` +
+      `score ${obs.score}   ${speed.toFixed(2)} m/s\n` +
+      `step ${obs.step}\n` +
       `feet  nose ${glyph(obs.feet.nose.planted)}   tail ${glyph(obs.feet.tail.planted)}\n` +
       `src ${obs.inputSource ?? 'none'}   L${obs.assistLevel}`;
     this.#trickChip.textContent = `trick ${this.#lastTrick}`;

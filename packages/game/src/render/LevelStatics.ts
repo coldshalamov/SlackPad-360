@@ -17,6 +17,10 @@
 import * as THREE from 'three';
 import { FLAT_DEV_LEDGE, FLAT_DEV_RAIL } from '../sim/levels/flat-dev';
 import { LEDGE as LAB_LEDGE, RAIL as LAB_RAIL } from '../sim/levels/grind-lab';
+import {
+  PLAYABLE_PARK_LAYOUT,
+  type ParkPieceDescriptor,
+} from '../sim/levels/playable-park';
 
 interface ObstacleDesc {
   kind: 'ledge' | 'rail';
@@ -65,6 +69,10 @@ function concreteMaterial(): THREE.MeshStandardMaterial {
 export function buildLevelStatics(levelId: string): THREE.Group {
   const group = new THREE.Group();
   group.name = `LevelStatics_${levelId}`;
+  if (levelId === PLAYABLE_PARK_LAYOUT.id) {
+    buildPlayableParkStatics(group, PLAYABLE_PARK_LAYOUT.pieces);
+    return group;
+  }
   const obstacles = LEVEL_OBSTACLES[levelId] ?? [];
 
   for (const o of obstacles) {
@@ -122,4 +130,30 @@ export function buildLevelStatics(levelId: string): THREE.Group {
   }
 
   return group;
+}
+
+function buildPlayableParkStatics(
+  group: THREE.Group,
+  pieces: readonly ParkPieceDescriptor[],
+): void {
+  for (const piece of pieces) {
+    const material = piece.kind === 'rail' || piece.kind === 'support'
+      ? metalMaterial()
+      : concreteMaterial();
+    const [sx, sy, sz] = piece.size;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
+    mesh.name = `ParkPiece_${piece.id}`;
+    mesh.position.set(...piece.center);
+    mesh.rotation.set(
+      piece.rotation?.x ?? 0,
+      piece.rotation?.y ?? 0,
+      piece.rotation?.z ?? 0,
+      'XYZ',
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.parkColliderPieceId = piece.id;
+    group.add(mesh);
+
+  }
 }

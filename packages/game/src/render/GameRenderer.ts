@@ -17,7 +17,7 @@
  */
 
 import * as THREE from 'three';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import type { SimConfig, ObserveState, Stance } from '@slackpad/shared';
 import type { RenderPose } from '../sim/SimWorld';
 import { AssetLoader, type WheelHandle } from './AssetLoader';
@@ -59,7 +59,6 @@ export class GameRenderer {
 
   #lastPose: RenderPose | null = null;
   #lastObs: ObserveState | null = null;
-  #lastMs = 0;
   #ready = false;
 
   // Scratch.
@@ -80,7 +79,7 @@ export class GameRenderer {
     this.#renderer.toneMappingExposure = 1.0;
     this.#renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.#renderer.shadowMap.enabled = true;
-    this.#renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.#renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.#renderer.domElement);
 
     this.#scene = new THREE.Scene();
@@ -129,7 +128,7 @@ export class GameRenderer {
   // --- Environment (HDRI → PMREM) ---------------------------------------
   async #loadEnv(): Promise<void> {
     try {
-      const hdr = await new RGBELoader().loadAsync(HDRI_URL);
+      const hdr = await new HDRLoader().loadAsync(HDRI_URL);
       hdr.mapping = THREE.EquirectangularReflectionMapping;
       const pmrem = new THREE.PMREMGenerator(this.#renderer);
       pmrem.compileEquirectangularShader();
@@ -145,18 +144,24 @@ export class GameRenderer {
 
   // --- Ground (tiled concrete PBR) --------------------------------------
   #buildGround(): void {
-    const size = 60;
-    const geo = new THREE.PlaneGeometry(size, size, 1, 1);
+    // The render floor and Rapier floor must share their extents. A visible
+    // floor beyond the collider makes the player appear to fall through solid
+    // concrete before they ever reach the map boundary.
+    const bounds = this.#config.physics.ground.halfExtents;
+    const sizeX = bounds.x * 2;
+    const sizeZ = bounds.z * 2;
+    const geo = new THREE.PlaneGeometry(sizeX, sizeZ, 1, 1);
     geo.rotateX(-Math.PI / 2);
     // aoMap needs a second UV set; PlaneGeometry ships only uv.
     geo.setAttribute('uv2', new THREE.BufferAttribute((geo.attributes.uv as THREE.BufferAttribute).array, 2));
 
     const tex = new THREE.TextureLoader();
-    const reps = size / GROUND_TILE_M;
+    const repsX = sizeX / GROUND_TILE_M;
+    const repsZ = sizeZ / GROUND_TILE_M;
     const wrap = (t: THREE.Texture, srgb: boolean): THREE.Texture => {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(reps, reps);
+      t.repeat.set(repsX, repsZ);
       t.anisotropy = Math.min(8, this.#renderer.capabilities.getMaxAnisotropy());
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
       return t;
@@ -222,15 +227,22 @@ export class GameRenderer {
     this.#boardGroup.attach(tailShoe);
     this.#boardGroup.remove(shoes.root);
 
+    // AssetLoader returns sockets in board.root local space; convert them into
+    // boardGroup local space before assigning the reparented shoes. This avoids
+    // treating the GLB's lateral review-pair offsets as gameplay stance data.
+    const noseSocket = this.#boardGroup.worldToLocal(board.root.localToWorld(board.socketNose.clone()));
+    const tailSocket = this.#boardGroup.worldToLocal(board.root.localToWorld(board.socketTail.clone()));
+    ShoeAnimator.placeAtSockets(noseShoe, tailShoe, noseSocket, tailSocket, stance);
+
     this.#shoeAnimator = new ShoeAnimator(noseShoe, tailShoe, this.#config.presentation, base);
   }
 
   // --- Per-frame render --------------------------------------------------
   /** Draw one frame from an interpolated pose + observation. Reads only. */
-  render(pose: RenderPose, obs: ObserveState): void {
-    const now = performance.now();
-    const dt = this.#lastMs === 0 ? 1 / 60 : Math.min(0.1, Math.max(0, (now - this.#lastMs) / 1000));
-    this.#lastMs = now;
+  render(pose: RenderPose, obs: ObserveState, frameDeltaSeconds = 1 / 60): void {
+    const dt = Number.isFinite(frameDeltaSeconds)
+      ? Math.min(2 / this.#config.physics.hz, Math.max(0, frameDeltaSeconds))
+      : 1 / this.#config.physics.hz;
     this.#lastPose = pose;
     this.#lastObs = obs;
 

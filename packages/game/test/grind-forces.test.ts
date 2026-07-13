@@ -111,6 +111,35 @@ describe('grindLatchImpulse — yaw alignment', () => {
     expect(Math.abs(mean - 90)).toBeLessThan(6);
   });
 
+  it('damps a fast entry spin into the boardslide envelope through the landing window', () => {
+    const L = DEFAULT_SIM_CONFIG.physics.boardLength;
+    const W = DEFAULT_SIM_CONFIG.physics.boardWidth;
+    const Iyaw = (MASS * (L * L + W * W)) / 12;
+    const dt = 1 / HZ;
+    // Candidate assistance begins only after the free-spinning board enters
+    // the boardslide family (~55 degrees), not at takeoff.
+    let theta = -55;
+    let omega = -6;
+    const acuteHeadings: number[] = [];
+    for (let s = 0; s < 42; s++) {
+      const { yaw } = grindLatchImpulse(
+        { q: yawQ(theta), lv: { x: 0, y: 0, z: 5 }, av: { x: 0, y: omega, z: 0 } },
+        params({ family: 'boardslide', approachOnly: true }),
+        G,
+        MASS,
+        HZ,
+      );
+      omega += yaw / Iyaw;
+      theta += (omega * dt * 180) / Math.PI;
+      const wrapped = ((theta % 180) + 180) % 180;
+      acuteHeadings.push(Math.min(wrapped, 180 - wrapped));
+    }
+
+    // This is the descending/contact part of the scripted approach. Alignment
+    // must not oscillate back out of the boardslide family before the rail hit.
+    for (const acute of acuteHeadings.slice(26)) expect(acute).toBeGreaterThan(52);
+  });
+
   it('WITHOUT alignment (L0, springGain 0) the same spinning board PIVOTS OFF — the fix is load-bearing', () => {
     const dt = 1 / HZ;
     const L = DEFAULT_SIM_CONFIG.physics.boardLength;

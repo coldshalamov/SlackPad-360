@@ -21,8 +21,8 @@ import type { SimConfig } from '@slackpad/shared';
 export interface GameLoopHooks {
   /** Advance the sim exactly one fixed step (drain-all-then-step-once lives here). */
   onStep: () => void;
-  /** Render with interpolation alpha in [0, 1). */
-  onRender: (alpha: number) => void;
+  /** Render with interpolation alpha and the rAF-derived presentation delta. */
+  onRender: (alpha: number, frameDeltaSeconds: number) => void;
   /** Optional: called when backlog beyond the step cap was discarded (ms dropped). */
   onSaturated?: (droppedMs: number) => void;
 }
@@ -73,7 +73,13 @@ export class GameLoop {
    */
   tick(nowMs: number): void {
     // Negative elapsed (clock adjustment / first-frame ordering) folds to 0.
-    const elapsed = Math.min(Math.max(0, nowMs - this.lastMs), this.maxFrameMs);
+    const rawElapsed = Math.max(0, nowMs - this.lastMs);
+    const elapsed = Math.min(rawElapsed, this.maxFrameMs);
+    // Camera/shoe/wheel presentation must not leap by a tenth of a second when
+    // a native WebView or background tab resumes. Use the same rAF clock as the
+    // accumulator, but cap visual integration to two fixed steps (33.3 ms at
+    // 60 Hz). Simulation overload handling below remains unchanged.
+    const presentationElapsed = Math.min(rawElapsed, this.dtMs * 2);
     this.lastMs = nowMs;
     this.accumulatorMs += elapsed;
 
@@ -95,7 +101,7 @@ export class GameLoop {
       this.accumulatorMs = remainder;
     }
 
-    this.hooks.onRender(this.accumulatorMs / this.dtMs);
+    this.hooks.onRender(this.accumulatorMs / this.dtMs, presentationElapsed / 1000);
   }
 
   private readonly frame = (nowMs: number): void => {

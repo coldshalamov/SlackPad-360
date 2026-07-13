@@ -116,9 +116,11 @@ internal static class Win32
 
     // Virtual-key codes (GetAsyncKeyState). LMB/RMB reflect the OS-synthesized
     // left/right button state — the only place truthful L vs R lives, since the
-    // raw HID report exposes only report-level Button 1. F11 drives fullscreen.
+    // raw HID report exposes only report-level Button 1. Ctrl is the explicit
+    // accelerate modifier; F11 drives fullscreen.
     public const int VK_LBUTTON = 0x01;
     public const int VK_RBUTTON = 0x02;
+    public const int VK_CONTROL = 0x11;
     public const int VK_F11 = 0x7A;
 
     [DllImport("user32.dll")]
@@ -128,7 +130,12 @@ internal static class Win32
     public static extern IntPtr GetForegroundWindow();
 
     /// <summary>True while the given virtual key is currently pressed (high-order bit set).</summary>
-    public static bool IsKeyDown(int vKey) => (GetAsyncKeyState(vKey) & 0x8000) != 0;
+    public static bool IsKeyDown(int vKey) => IsKeyDown(GetAsyncKeyState(vKey));
+
+    public static bool IsKeyDown(short state) => (state & 0x8000) != 0;
+
+    /// <summary>True when Windows observed a press since the previous query (low-order bit).</summary>
+    public static bool WasPressedSinceLastRead(short state) => (state & 0x0001) != 0;
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RegisterRawInputDevices(

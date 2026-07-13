@@ -12,6 +12,7 @@ import type { Vec3 } from '@slackpad/shared';
 
 export type ManeuverCommand =
   | PopManeuverCommand
+  | OllieLevelManeuverCommand
   | FlipTorqueManeuverCommand
   | CatchManeuverCommand
   | CatchQuantizeManeuverCommand
@@ -31,6 +32,17 @@ export interface PopManeuverCommand {
   jY: number;
   /** Signed pitch torque impulse about board-right, N·m·s (clamped). */
   pitchTorqueImpulse: number;
+}
+
+/**
+ * Per-step physical pitch guide for a basic ollie/nollie. It targets a clear
+ * snap angle early in flight, then ramps to level. SimWorld applies only a
+ * clamped PD torque about the live board-right axis; no pose is written.
+ */
+export interface OllieLevelManeuverCommand {
+  kind: 'ollieLevel';
+  /** Signed target pitch, rad. Positive raises the nose. */
+  targetPitch: number;
 }
 
 /**
@@ -65,8 +77,9 @@ export interface CatchManeuverCommand {
 /**
  * Catch-time quantize (M5; final-physics §3.4). When the completed rotation at
  * catch lands inside the assist-level cone of a whole trick (k·360° flip / k·180°
- * shuv), remove `damp` of the ON-AXIS spin so the residual bleeds off and the
- * trick settles ON the level. SimWorld removes only the axis-projected component:
+ * shuv), remove `damp` of the ON-AXIS spin so continued over-rotation bleeds
+ * off and the catch stays inside the completion cone. SimWorld removes only
+ * the axis-projected component:
  *   av' = av − damp·(av·axisWorld)·axisWorld
  * This is EXTRA angular damping about one axis — never a pose write, never a
  * teleport to a perfect pose. L0 never emits this (cone 0 / damp 0).
@@ -132,4 +145,6 @@ export interface GrindLatchManeuverCommand {
   springGain: number;
   /** Signed balance lateral force, N (SimWorld folds into the capped lateral force). */
   balanceLateral: number;
+  /** One-shot upward impulse used only by an automatic rail dismount. */
+  dismountLiftImpulse: number;
 }

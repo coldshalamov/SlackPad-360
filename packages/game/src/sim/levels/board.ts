@@ -2,13 +2,13 @@
  * Shared Model A board construction (M4 refactor: flat-dev and test-obstacle
  * build the identical board so maneuver behavior is level-independent).
  *
- * One dynamic rigid body: deck cuboid carries the mass, two massless truck
- * boxes are the ground-contact geometry (final-physics-animation-camera-spec
- * §1). Construction order is fixed (body → deck → front truck → rear truck)
- * and all variation comes from the seeded rng, so every reset with the same
- * seed is bit-identical.
+ * One dynamic rigid body: the deck cuboid carries the mass and collision shape.
+ * Four ray-cast wheels are attached by SimWorld after level construction; fake
+ * truck-box ground support does not belong to the rigid-body model. Construction
+ * order is fixed and all variation comes from the seeded rng, so every reset
+ * with the same seed is bit-identical.
  *
- * M4: all three board colliders emit CONTACT_FORCE_EVENTS so SimWorld can
+ * M4: the board collider emits CONTACT_FORCE_EVENTS so SimWorld can
  * observe hard-collision magnitudes for the maneuver interrupt rule
  * (final-physics §3.3). The report threshold is set to HALF the configured
  * interrupt threshold — the exact comparison happens in GestureFSM against
@@ -18,6 +18,10 @@
 
 import type { RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
 import type { SimConfig } from '@slackpad/shared';
+import {
+  DECK_COLLISION_GROUPS,
+  TRUCK_HANGER_COLLISION_GROUPS,
+} from '../collisionGroups';
 import type { RapierModule, Rng } from './types';
 
 export interface BoardSpawn {
@@ -61,26 +65,26 @@ export function buildBoard(
       .setMass(phys.boardMass)
       .setFriction(phys.boardFriction)
       .setRestitution(phys.boardRestitution)
+      .setCollisionGroups(DECK_COLLISION_GROUPS)
       .setActiveEvents(rapier.ActiveEvents.CONTACT_FORCE_EVENTS)
       .setContactForceEventThreshold(forceThreshold),
     board,
   );
 
-  // Two truck boxes below the deck at ±truckInsetZ (massless collision geo).
-  // The trucks are the ground-contact geometry and use the low `truckFriction`
-  // so the board ROLLS (M3 ground locomotion); the deck keeps `boardFriction`.
-  const t = phys.truckHalfExtents;
+  // Rail-only truck hangers. Their lower face shares the ray-wheel ride height
+  // (truckDropY + truckHalfExtents.y), but collision filtering prevents them
+  // from ever supporting the board on ordinary floor, ramps, stairs, or walls.
+  const hangerHalfY = Math.min(0.01, phys.truckHalfExtents.y);
+  const hangerDropY = phys.truckDropY + phys.truckHalfExtents.y - hangerHalfY;
   for (const insetZ of [phys.truckInsetZ, -phys.truckInsetZ]) {
     world.createCollider(
-      rapier.ColliderDesc.cuboid(t.x, t.y, t.z)
-        .setTranslation(0, -phys.truckDropY, insetZ)
+      rapier.ColliderDesc.cuboid(phys.boardWidth / 2, hangerHalfY, phys.truckHalfExtents.z)
+        .setTranslation(0, -hangerDropY, insetZ)
         .setDensity(0)
         .setFriction(phys.truckFriction)
-        // Min combine rule: the trucks glide at THEIR low friction regardless of
-        // the (grippy) ground, so cruise/push forces are not eaten by the
-        // averaged coefficient (Average would give ~0.48 → ~11 N of drag).
         .setFrictionCombineRule(rapier.CoefficientCombineRule.Min)
         .setRestitution(phys.boardRestitution)
+        .setCollisionGroups(TRUCK_HANGER_COLLISION_GROUPS)
         .setActiveEvents(rapier.ActiveEvents.CONTACT_FORCE_EVENTS)
         .setContactForceEventThreshold(forceThreshold),
       board,

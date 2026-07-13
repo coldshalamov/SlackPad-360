@@ -17,6 +17,10 @@
 import type { LevelBuilder } from './types';
 import type { RailDescriptor } from '../rails';
 import { buildBoard } from './board';
+import {
+  GRINDABLE_COLLISION_GROUPS,
+  ORDINARY_WORLD_COLLISION_GROUPS,
+} from '../collisionGroups';
 
 /**
  * Ledge geometry (level data, not a physics tunable). Board 50-50s the top. The
@@ -38,7 +42,8 @@ export const grindLab: LevelBuilder = (rapier, world, config, rng) => {
   world.createCollider(
     rapier.ColliderDesc.cuboid(g.x, g.y, g.z)
       .setTranslation(0, -g.y, 0)
-      .setFriction(phys.ground.friction),
+      .setFriction(phys.ground.friction)
+      .setCollisionGroups(ORDINARY_WORLD_COLLISION_GROUPS),
   );
 
   const built = buildBoard(rapier, world, config, rng);
@@ -55,6 +60,7 @@ export const grindLab: LevelBuilder = (rapier, world, config, rng) => {
     rapier.ColliderDesc.cuboid(LEDGE.halfWidth, lHalfY, lHalfZ)
       .setTranslation(LEDGE.cx, lHalfY, lCz)
       .setFriction(RAIL_FRICTION)
+      .setCollisionGroups(GRINDABLE_COLLISION_GROUPS)
       .setFrictionCombineRule(rapier.CoefficientCombineRule.Min),
   );
 
@@ -66,6 +72,7 @@ export const grindLab: LevelBuilder = (rapier, world, config, rng) => {
     rapier.ColliderDesc.cuboid(RAIL.halfWidth, rHalfY, rHalfZ)
       .setTranslation(RAIL.cx, RAIL.topY - rHalfY, rCz)
       .setFriction(RAIL_FRICTION)
+      .setCollisionGroups(GRINDABLE_COLLISION_GROUPS)
       .setFrictionCombineRule(rapier.CoefficientCombineRule.Min),
   );
 

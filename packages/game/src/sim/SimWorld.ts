@@ -13,7 +13,12 @@
  */
 
 import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import type { EventQueue, RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
+import type {
+  DynamicRayCastVehicleController,
+  EventQueue,
+  RigidBody,
+  World,
+} from '@dimforge/rapier3d-deterministic-compat';
 import type { Quat, SimConfig, Vec3 } from '@slackpad/shared';
 import { getLevelBuilder } from './levels/index';
 import type { Rng } from './levels/types';
@@ -36,6 +41,35 @@ export interface RenderPose {
   p: Vec3;
   q: Quat;
 }
+
+export type WheelId = 'nose-left' | 'nose-right' | 'tail-left' | 'tail-right';
+
+/** Fresh plain-data wheel telemetry. Physics handles never cross this boundary. */
+export interface WheelObservation {
+  id: WheelId;
+  inContact: boolean;
+  contactPoint: Vec3 | null;
+  contactNormal: Vec3 | null;
+  suspensionLength: number;
+  rotation: number;
+}
+
+const WHEEL_IDS: readonly WheelId[] = [
+  'nose-left',
+  'nose-right',
+  'tail-left',
+  'tail-right',
+];
+
+/** Deterministic world-level recovery causes surfaced to the harness. */
+export type WorldRecoveryReason = 'out-of-bounds' | 'unrideable';
+
+export interface WorldStepResult {
+  recovery: WorldRecoveryReason | null;
+}
+
+/** Distance below the physical ground at which a malformed/stuck fall resets. */
+const KILL_DEPTH_BELOW_GROUND_M = 2;
 
 // --- Rapier init (module-level guard: init exactly once) --------------------
 let rapierInit: Promise<void> | null = null;
@@ -86,6 +120,7 @@ export class SimWorld {
   // runtime from anything holding a SimWorld (G6 anti-cheat hardening).
   #world: World | null = null;
   #board: RigidBody | null = null;
+  #vehicle: DynamicRayCastVehicleController | null = null;
   #eventQueue: EventQueue | null = null;
   private stepCount = 0;
   private seed = 0;
@@ -100,6 +135,13 @@ export class SimWorld {
   #bailStepsLeft: number | null = null;
   /** Max board contact impulse (N·s) observed during the LAST step(). */
   #lastContactImpulse = 0;
+  /** Vertical-dominant subset of the last contact impulse (floor/rail support). */
+  #lastSupportContactImpulse = 0;
+  #steerAnchor: { inputAngle: number; boardYaw: number } | null = null;
+  /** Consecutive floor-supported steps with the deck outside the rideable cone. */
+  #unrideableSupportSteps = 0;
+  /** False while a real pop/air/catch/grind/bail outcome owns recovery. */
+  #unrideableRecoveryEnabled = true;
 
   /** Pose snapshots for render interpolation (previous + current step). */
   private prevPose: RenderPose = { p: zero(), q: { x: 0, y: 0, z: 0, w: 1 } };
@@ -119,6 +161,9 @@ export class SimWorld {
   async reset(seed: number, levelId: string): Promise<void> {
     await ensureRapier();
     this.free();
+    this.#steerAnchor = null;
+    this.#unrideableSupportSteps = 0;
+    this.#unrideableRecoveryEnabled = true;
 
     const phys = this.config.physics;
     const world = new RAPIER.World(phys.gravity);
@@ -129,6 +174,8 @@ export class SimWorld {
 
     this.#world = world;
     this.#board = handle.board;
+    this.#vehicle = world.createVehicleController(handle.board);
+    this.#configureWheels(this.#vehicle);
     this.#eventQueue = new RAPIER.EventQueue(true);
     this.#spawn = { ...handle.spawn };
     this.#rails = handle.rails ? handle.rails.map((r) => ({ ...r })) : [];
@@ -144,8 +191,26 @@ export class SimWorld {
   }
 
   /** Advance exactly one fixed step and refresh pose snapshots. */
-  step(): void {
+  step(): WorldStepResult {
     const world = this.requireWorld();
+    const hz = this.config.physics.hz;
+    this.#vehicle?.updateVehicle(1 / hz);
+    // Ray wheels do not emit Rapier collider contact-force events. Preserve
+    // their real suspension support as a narrow impulse observation so the
+    // landing FSM judges the board at first wheel strike, before suspension
+    // can settle a badly pitched deck into the clean cone.
+    let wheelSupportImpulse = 0;
+    if (this.#vehicle) {
+      for (let i = 0; i < this.#vehicle.numWheels(); i++) {
+        if (!this.#vehicle.wheelIsInContact(i)) continue;
+        // A just-entered ray contact can report zero spring force for its first
+        // sample. It is still the physical first wheel strike the landing FSM
+        // needs to classify, so retain a positive contact marker.
+        wheelSupportImpulse = Math.max(wheelSupportImpulse, Number.EPSILON);
+        const force = this.#vehicle.wheelSuspensionForce(i);
+        if (Number.isFinite(force)) wheelSupportImpulse = Math.max(wheelSupportImpulse, force! / hz);
+      }
+    }
     const queue = this.#eventQueue;
     if (queue) {
       world.step(queue);
@@ -153,14 +218,23 @@ export class SimWorld {
       // step, converted to an impulse magnitude (N·s) at the fixed timestep so
       // the FSM compares directly against physics.interruptCollisionImpulse.
       let maxForce = 0;
+      let maxSupportForce = 0;
       queue.drainContactForceEvents((ev) => {
         const f = ev.maxForceMagnitude();
         if (Number.isFinite(f) && f > maxForce) maxForce = f;
+        const total = ev.totalForce();
+        const vertical = Math.abs(total.y);
+        const horizontal = Math.hypot(total.x, total.z);
+        if (Number.isFinite(vertical) && vertical > horizontal * 0.7 && f > maxSupportForce) {
+          maxSupportForce = f;
+        }
       });
-      this.#lastContactImpulse = maxForce / this.config.physics.hz;
+      this.#lastContactImpulse = maxForce / hz;
+      this.#lastSupportContactImpulse = Math.max(maxSupportForce / hz, wheelSupportImpulse);
     } else {
       world.step();
       this.#lastContactImpulse = 0;
+      this.#lastSupportContactImpulse = wheelSupportImpulse;
     }
     this.stepCount += 1;
 
@@ -173,8 +247,21 @@ export class SimWorld {
       if (this.#bailStepsLeft <= 0) this.#respawn();
     }
 
+    // World recovery is simulation-owned so live play, replay, and headless
+    // tests agree. A player can never remain in the `none` state below a finite
+    // floor after rolling past the map edge.
+    let recovery: WorldRecoveryReason | null = null;
+    if (this.#needsWorldRecovery()) {
+      this.#respawn();
+      recovery = 'out-of-bounds';
+    } else if (this.#needsUnrideableRecovery()) {
+      this.#respawn();
+      recovery = 'unrideable';
+    }
+
     this.prevPose = this.currPose;
     this.currPose = this.readRenderPose();
+    return { recovery };
   }
 
   /** Deterministic checkpoint respawn to the level spawn marker (bail rule). */
@@ -188,6 +275,7 @@ export class SimWorld {
     body.setLinearDamping(phys.linearDamping);
     body.setAngularDamping(phys.angularDamping);
     this.#bailStepsLeft = null;
+    this.#unrideableSupportSteps = 0;
   }
 
   getStep(): number {
@@ -218,18 +306,50 @@ export class SimWorld {
   }
 
   /**
-   * Ground-proximity read (M3). True when the board center is within
-   * `physics.groundedTolerance` of its resting height (truckDropY + truck
-   * half-height). During the spawn drop the board is high, so this reads false
-   * until it settles — the controller applies no ground forces mid-air. This is
-   * the narrow query BoardController may consult; it never exposes the body.
+   * Rideable-ground read (M3). At least two real wheel rays must be in contact
+   * and the deck-up vector must remain inside the configured upright cone. A
+   * deck balanced on its side can touch the floor, but it is not a stance a
+   * rider can stand on or drive from.
    */
   isGrounded(): boolean {
     const body = this.requireBoard();
     const phys = this.config.physics;
-    const restHeight = phys.truckDropY + phys.truckHalfExtents.y;
-    const y = body.translation().y;
-    return Number.isFinite(y) && y <= restHeight + phys.groundedTolerance;
+    const q = body.rotation();
+    const deckUpY = 1 - 2 * (q.x * q.x + q.z * q.z);
+    return (
+      Number.isFinite(deckUpY) &&
+      deckUpY >= phys.ridableDeckUpDot &&
+      this.#wheelContactCount() >= 2
+    );
+  }
+
+  /** Four copied ray-wheel observations for tests and rendering only. */
+  wheelObservations(): WheelObservation[] {
+    const vehicle = this.#vehicle;
+    if (!vehicle) throw new Error('SimWorld.reset() must run before use');
+    return WHEEL_IDS.map((id, index) => {
+      const point = vehicle.wheelContactPoint(index);
+      const normal = vehicle.wheelContactNormal(index);
+      const suspensionLength = vehicle.wheelSuspensionLength(index);
+      const rotation = vehicle.wheelRotation(index);
+      return {
+        id,
+        inContact: vehicle.wheelIsInContact(index),
+        contactPoint: point ? { x: point.x, y: point.y, z: point.z } : null,
+        contactNormal: normal ? { x: normal.x, y: normal.y, z: normal.z } : null,
+        suspensionLength: Number.isFinite(suspensionLength) ? suspensionLength! : 0,
+        rotation: Number.isFinite(rotation) ? rotation! : 0,
+      };
+    });
+  }
+
+  /**
+   * Limit the generic stuck-on-edge fallback to idle/riding states. Active
+   * maneuvers own their more specific landing and bail classifications.
+   */
+  setUnrideableRecoveryEnabled(enabled: boolean): void {
+    this.#unrideableRecoveryEnabled = enabled;
+    if (!enabled) this.#unrideableSupportSteps = 0;
   }
 
   /**
@@ -258,7 +378,12 @@ export class SimWorld {
    * Must be called BEFORE step() so the impulses integrate this tick.
    */
   applyGroundForces(cmd: GroundCommand): void {
-    if (!cmd.active) return;
+    if (!cmd.active || cmd.steerAngle == null) this.#steerAnchor = null;
+    if (!cmd.active) {
+      this.#setWheelEngineForce(0);
+      this.#setWheelBrake(0);
+      return;
+    }
     const body = this.requireBoard();
     const phys = this.config.physics;
     const loco = this.config.locomotion;
@@ -291,14 +416,18 @@ export class SimWorld {
     impulse.x -= rf * mass * lv.x * dt;
     impulse.z -= rf * mass * lv.z * dt;
 
-    // --- Cruise drive: force-based saturation toward cruiseTargetSpeed --------
+    // --- Cruise drive: wheel engine force toward cruiseTargetSpeed ---------
+    // The ray-vehicle solver owns longitudinal tire impulses. Applying this as
+    // a second chassis impulse makes its no-slip solve fight acceleration, so
+    // feed the same clamped force through the four physical wheels instead.
+    let wheelDriveForce = 0;
     if (hasForward && loco.cruiseTargetSpeed > 1e-4) {
       const drive = clampNum(cmd.driveForce, 0, loco.cruiseDriveForce);
       const scale = clampNum(1 - fwdSpeed / loco.cruiseTargetSpeed, 0, 1);
-      const mag = drive * scale * dt;
-      impulse.x += fx * mag;
-      impulse.z += fz * mag;
+      wheelDriveForce = drive * scale;
     }
+    this.#setWheelEngineForce(wheelDriveForce);
+    this.#setWheelBrake(clampNum(cmd.brakeForce, 0, loco.coastBrakeForce));
 
     // --- Push pulse: one-shot impulse, momentum-capped at maxGroundSpeed ------
     if (hasForward) {
@@ -315,8 +444,24 @@ export class SimWorld {
       body.applyImpulse({ x: impulse.x, y: 0, z: impulse.z }, true);
     }
 
-    // --- Steering: torque servo toward the clamped target yaw rate ------------
-    const targetYaw = clampNum(cmd.targetYawRate, -phys.steerYawRateMax, phys.steerYawRateMax);
+    // --- Steering: the two-finger segment is a heading, not a throttle --------
+    // Capture board + pad headings together at the start of every dual-plant
+    // steering session. Subsequent segment rotation becomes an equal desired
+    // board-heading rotation; the angular-velocity term is only feed-forward.
+    let headingRate = 0;
+    if (cmd.steerAngle != null && Number.isFinite(cmd.steerAngle)) {
+      const boardYaw = Math.atan2(fwd.x, fwd.z);
+      if (!this.#steerAnchor) this.#steerAnchor = { inputAngle: cmd.steerAngle, boardYaw };
+      const inputDelta = wrapPi(cmd.steerAngle - this.#steerAnchor.inputAngle);
+      const desiredYaw = this.#steerAnchor.boardYaw + inputDelta;
+      const headingError = wrapPi(desiredYaw - boardYaw);
+      headingRate = loco.steerHeadingBiasGain * headingError;
+    }
+    const targetYaw = clampNum(
+      cmd.targetYawRate + headingRate,
+      -phys.steerYawRateMax,
+      phys.steerYawRateMax,
+    );
     const yawErr = targetYaw - av.y;
     const yawTorque = clampNum(loco.steerServoGain * yawErr, -loco.steerMaxTorque, loco.steerMaxTorque);
     const yawImpulse = yawTorque * dt;
@@ -325,9 +470,18 @@ export class SimWorld {
     const rollTorque = clampNum(cmd.rollTorque, -loco.leanMaxRollTorque, loco.leanMaxRollTorque);
     const rollImpulse = rollTorque * dt;
 
-    const tx = fwd.x * rollImpulse;
-    const ty = yawImpulse + fwd.y * rollImpulse;
-    const tz = fwd.z * rollImpulse;
+    // Engine forces act below this unusually light chassis and would otherwise
+    // wheelie the deck until its ray origins sink through the floor. Model the
+    // planted rider's neutral fore/aft balance as an equal counter-pitch torque;
+    // this changes no pose and leaves trick/air steps untouched (engine=0).
+    const right = quatRotate(q, 1, 0, 0);
+    const drivenWheels = this.#vehicle?.numWheels() ?? 0;
+    const enginePitchImpulse =
+      wheelDriveForce * drivenWheels * (phys.truckDropY + phys.truckHalfExtents.y) * dt;
+
+    const tx = fwd.x * rollImpulse + right.x * enginePitchImpulse;
+    const ty = yawImpulse + fwd.y * rollImpulse + right.y * enginePitchImpulse;
+    const tz = fwd.z * rollImpulse + right.z * enginePitchImpulse;
     if (Number.isFinite(tx) && Number.isFinite(ty) && Number.isFinite(tz)) {
       body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
     }
@@ -340,6 +494,11 @@ export class SimWorld {
    */
   lastContactImpulseMagnitude(): number {
     return this.#lastContactImpulse;
+  }
+
+  /** Last vertical-dominant contact impulse: floor/rail support, not wall hits. */
+  lastSupportContactImpulseMagnitude(): number {
+    return this.#lastSupportContactImpulse;
   }
 
   /**
@@ -370,9 +529,9 @@ export class SimWorld {
       case 'pop': {
         const jY = clampNum(cmd.jY, 0, pop.jMax);
         body.applyImpulse({ x: 0, y: jY, z: 0 }, true);
-        // Pitch torque impulse about the world-space board-right axis. Sign
-        // convention (right-handed, nose = local +Z, right = local +X): a
-        // NEGATIVE impulse about board-right pitches the nose UP.
+        // The snap is a real angular impulse about the live board-right axis;
+        // the follow-up ollieLevel command then supplies the front-foot guide
+        // torque. Neither path writes a pose or animates a second fake board.
         const pitch = clampNum(
           cmd.pitchTorqueImpulse,
           -pop.pitchTorqueImpulseMax,
@@ -385,6 +544,27 @@ export class SimWorld {
             true,
           );
         }
+        break;
+      }
+      case 'ollieLevel': {
+        const right = quatRotate(q, 1, 0, 0);
+        const forward = quatRotate(q, 0, 0, 1);
+        const currentPitch = Math.asin(clampNum(forward.y, -1, 1));
+        const target = clampNum(
+          cmd.targetPitch,
+          -pop.noseUpTargetDeg * Math.PI / 180,
+          pop.noseUpTargetDeg * Math.PI / 180,
+        );
+        const pitchRate = av.x * right.x + av.y * right.y + av.z * right.z;
+        // Positive rotation about board-right lowers the nose, so pitch error
+        // and torque have opposite signs in this axis convention.
+        const tau = clampNum(
+          -pop.levelKp * (target - currentPitch) - pop.levelKd * pitchRate,
+          -pop.levelTorqueMax,
+          pop.levelTorqueMax,
+        );
+        const imp = tau / phys.hz;
+        body.applyTorqueImpulse({ x: right.x * imp, y: right.y * imp, z: right.z * imp }, true);
         break;
       }
       case 'flipTorque': {
@@ -413,8 +593,8 @@ export class SimWorld {
       }
       case 'catchQuantize': {
         // Extra ON-AXIS catch damping (spec §3.4 quantize). Removes a fraction
-        // of the spin about the trick axis only, so the residual bleeds off and
-        // the trick settles on the level. Never a pose write / teleport.
+        // of the spin about the trick axis only, so continued over-rotation
+        // bleeds off inside the completion cone. Never a pose write / teleport.
         const damp = clampNum(cmd.damp, 0, 1);
         if (damp <= 0) break;
         const axis = flipAxisWorld(q, cmd.axis);
@@ -462,8 +642,31 @@ export class SimWorld {
         if (Number.isFinite(lin.x) && Number.isFinite(lin.z) && (lin.x !== 0 || lin.z !== 0)) {
           body.applyImpulse({ x: lin.x, y: 0, z: lin.z }, true);
         }
+        const lift = clampNum(cmd.dismountLiftImpulse, 0, this.config.grind.dismountLiftImpulse);
+        if (lift > 0) body.applyImpulse({ x: 0, y: lift, z: 0 }, true);
         if (Number.isFinite(yaw) && yaw !== 0) {
           body.applyTorqueImpulse({ x: 0, y: yaw, z: 0 }, true);
+        }
+        // A hanger-on-rail contact is a narrow line support. Without the
+        // rider's balancing torque the deck can lever onto its side while the
+        // logical 50-50 remains latched, then dismount inverted. Default assist
+        // adds a bounded physical roll PD around board-forward; L0
+        // (springGain=0), approaches, and one-shot exits remain pure physics.
+        if (!cmd.approachOnly && cmd.springGain > 0) {
+          const forward = quatRotate(q, 0, 0, 1);
+          const right = quatRotate(q, 1, 0, 0);
+          const roll = Math.asin(clampNum(right.y, -1, 1));
+          const rollRate = av.x * forward.x + av.y * forward.y + av.z * forward.z;
+          const rollTau = clampNum(
+            -this.config.grind.latchRollAlignGain * roll - this.config.grind.latchRollDamp * rollRate,
+            -this.config.grind.latchRollTorqueMax,
+            this.config.grind.latchRollTorqueMax,
+          );
+          const rollImp = rollTau / phys.hz;
+          body.applyTorqueImpulse(
+            { x: forward.x * rollImp, y: forward.y * rollImp, z: forward.z * rollImp },
+            true,
+          );
         }
         break;
       }
@@ -495,6 +698,7 @@ export class SimWorld {
       this.#world.free();
       this.#world = null;
       this.#board = null;
+      this.#vehicle = null;
     }
   }
 
@@ -506,6 +710,116 @@ export class SimWorld {
       p: { x: p.x, y: p.y, z: p.z },
       q: { x: q.x, y: q.y, z: q.z, w: q.w },
     };
+  }
+
+  #configureWheels(vehicle: DynamicRayCastVehicleController): void {
+    const phys = this.config.physics;
+    vehicle.indexUpAxis = 1;
+    vehicle.setIndexForwardAxis = 2;
+    // Start rays at the deck centre, not its lower face. If a hard landing
+    // compresses suspension all the way to deck contact, this keeps the ray
+    // origin above the floor so wheel support can recover instead of becoming
+    // permanently trapped inside the ground collider.
+    const hardPointY = 0;
+    const suspensionRestLength = phys.wheelSuspensionRestLength + phys.deckThickness / 2;
+    const connections = [
+      { x: -phys.wheelHalfTrack, y: hardPointY, z: phys.truckInsetZ },
+      { x: phys.wheelHalfTrack, y: hardPointY, z: phys.truckInsetZ },
+      { x: -phys.wheelHalfTrack, y: hardPointY, z: -phys.truckInsetZ },
+      { x: phys.wheelHalfTrack, y: hardPointY, z: -phys.truckInsetZ },
+    ];
+    for (const connection of connections) {
+      vehicle.addWheel(
+        connection,
+        { x: 0, y: -1, z: 0 },
+        { x: -1, y: 0, z: 0 },
+        suspensionRestLength,
+        phys.wheelRadius,
+      );
+      const i = vehicle.numWheels() - 1;
+      vehicle.setWheelMaxSuspensionTravel(i, phys.wheelMaxSuspensionTravel);
+      vehicle.setWheelSuspensionStiffness(i, phys.wheelSuspensionStiffness);
+      vehicle.setWheelSuspensionCompression(i, phys.wheelSuspensionCompression);
+      vehicle.setWheelSuspensionRelaxation(i, phys.wheelSuspensionRelaxation);
+      vehicle.setWheelMaxSuspensionForce(i, phys.wheelMaxSuspensionForce);
+      vehicle.setWheelFrictionSlip(i, phys.wheelFrictionSlip);
+      vehicle.setWheelSideFrictionStiffness(i, phys.wheelSideFrictionStiffness);
+    }
+  }
+
+  #wheelContactCount(): number {
+    const vehicle = this.#vehicle;
+    if (!vehicle) return 0;
+    let contacts = 0;
+    for (let i = 0; i < vehicle.numWheels(); i++) {
+      if (vehicle.wheelIsInContact(i)) contacts += 1;
+    }
+    return contacts;
+  }
+
+  #setWheelEngineForce(totalForce: number): void {
+    const vehicle = this.#vehicle;
+    if (!vehicle) return;
+    const count = vehicle.numWheels();
+    // Rapier interprets engine force per wheel. The gameplay drive tunable is
+    // therefore applied to each of the four tiny wheels, matching the vehicle
+    // controller's own examples and its measured traction scale.
+    const perWheel = count > 0 && Number.isFinite(totalForce) ? totalForce : 0;
+    for (let i = 0; i < count; i++) vehicle.setWheelEngineForce(i, perWheel);
+  }
+
+  #setWheelBrake(perWheelForce: number): void {
+    const vehicle = this.#vehicle;
+    if (!vehicle) return;
+    const brake = Number.isFinite(perWheelForce) ? Math.max(0, perWheelForce) : 0;
+    for (let i = 0; i < vehicle.numWheels(); i++) vehicle.setWheelBrake(i, brake);
+  }
+
+  /** True when the board leaves the finite floor or drops below its kill plane. */
+  #needsWorldRecovery(): boolean {
+    const p = this.requireBoard().translation();
+    const ground = this.config.physics.ground.halfExtents;
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return true;
+    return (
+      Math.abs(p.x) > ground.x ||
+      Math.abs(p.z) > ground.z ||
+      p.y < -KILL_DEPTH_BELOW_GROUND_M
+    );
+  }
+
+  /**
+   * A board that has settled on an edge is a bail state, not locomotion. Give
+   * real dynamics a short window to right the deck; if the low, slow and
+   * unrideable pose persists, recover to the deterministic checkpoint.
+   */
+  #needsUnrideableRecovery(): boolean {
+    // GestureFSM already classified a real maneuver failure and started the
+    // normal bail countdown. Preserve that more specific outcome (inverted,
+    // over-rotation, hard-impact) instead of overwriting it with the generic
+    // stuck-deck fallback.
+    if (!this.#unrideableRecoveryEnabled || this.#bailStepsLeft !== null) {
+      this.#unrideableSupportSteps = 0;
+      return false;
+    }
+    const body = this.requireBoard();
+    const phys = this.config.physics;
+    const p = body.translation();
+    const q = body.rotation();
+    const lv = body.linvel();
+    const deckUpY = 1 - 2 * (q.x * q.x + q.z * q.z);
+    const supportedHeight = phys.boardLength * 0.55;
+    const supportedAndUnrideable =
+      Number.isFinite(p.y) &&
+      Number.isFinite(lv.y) &&
+      Number.isFinite(deckUpY) &&
+      p.y <= supportedHeight &&
+      Math.abs(lv.y) < 0.75 &&
+      deckUpY < phys.ridableDeckUpDot;
+
+    this.#unrideableSupportSteps = supportedAndUnrideable
+      ? this.#unrideableSupportSteps + 1
+      : 0;
+    return this.#unrideableSupportSteps >= Math.max(1, Math.floor(phys.unrideableRecoverSteps));
   }
 
   private requireWorld(): World {
@@ -522,6 +836,13 @@ export class SimWorld {
 function clampNum(v: number, lo: number, hi: number): number {
   if (!Number.isFinite(v)) return 0;
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+function wrapPi(angle: number): number {
+  let x = angle;
+  while (x > Math.PI) x -= Math.PI * 2;
+  while (x <= -Math.PI) x += Math.PI * 2;
+  return x;
 }
 
 /** Rotate the vector (x,y,z) by quaternion q. Returns a plain Vec3. */

@@ -25,7 +25,7 @@ import {
   REPLAY_VERSION,
   deepFreezeConfig,
   fnv1a,
-} from '@slackpad/shared';
+} from "@slackpad/shared";
 import type {
   ContactFrame,
   ContactFrameSource,
@@ -35,34 +35,34 @@ import type {
   ReplayHeader,
   SessionTrace,
   SimConfig,
-} from '@slackpad/shared';
-import { SimWorld } from '../sim/SimWorld';
-import type { BoardPose, RenderPose } from '../sim/SimWorld';
-import { InputHub } from '../input/InputHub';
-import { Telemetry } from '../telemetry/Telemetry';
-import { FootTracker } from '../input/FootTracker';
-import type { FeetState } from '../input/FootTracker';
-import { BoardController } from '../control/BoardController';
-import { KickArbiter } from '../control/KickArbiter';
-import { GestureFSM } from '../control/GestureFSM';
-import { ManeuverAssist } from '../control/ManeuverAssist';
-import { DEFAULT_LEVEL_ID } from '../sim/levels/index';
+} from "@slackpad/shared";
+import { SimWorld } from "../sim/SimWorld";
+import type { BoardPose, RenderPose } from "../sim/SimWorld";
+import { InputHub } from "../input/InputHub";
+import { Telemetry } from "../telemetry/Telemetry";
+import { FootTracker } from "../input/FootTracker";
+import type { FeetState } from "../input/FootTracker";
+import { BoardController } from "../control/BoardController";
+import { KickArbiter } from "../control/KickArbiter";
+import { GestureFSM } from "../control/GestureFSM";
+import { ManeuverAssist } from "../control/ManeuverAssist";
+import { DEFAULT_LEVEL_ID } from "../sim/levels/index";
 
 /** Reads the current InputProfile snapshot on each reset (dev ProfileStore). */
 export type ProfileProvider = () => InputProfile;
 
 /** Pinned versions recorded in replay headers (must match package.json). */
-export const GAME_VERSION = '0.1.0';
-export const RAPIER_VERSION = '0.19.3';
+export const GAME_VERSION = "0.1.0";
+export const RAPIER_VERSION = "0.19.3";
 
 /** Pose hashing precision: round to 1e-6 before hashing (micrometer / µquat). */
 const HASH_QUANT = 1_000_000;
 
 /** Digest seed for the consumed-frame input digest (FNV offset basis, hex). */
-const INPUT_DIGEST_SEED = '811c9dc5';
+const INPUT_DIGEST_SEED = "811c9dc5";
 
 /** A frame the agent may inject; `source` is optional and defaults to 'agent'. */
-export type InjectableFrame = Omit<ContactFrame, 'source'> & {
+export type InjectableFrame = Omit<ContactFrame, "source"> & {
   source?: ContactFrameSource;
 };
 
@@ -78,13 +78,13 @@ export type ScreenshotProvider = () => Promise<string | null> | string | null;
 export function checkpointHash(
   pose: BoardPose | RenderPose,
   phase: string,
-  inputDigest = '',
+  inputDigest = "",
 ): string {
   const { p, q } = pose;
   const parts = [p.x, p.y, p.z, q.x, q.y, q.z, q.w].map((v) =>
     Math.round(v * HASH_QUANT).toString(),
   );
-  return fnv1a(`${parts.join(',')}|${phase}|${inputDigest}`);
+  return fnv1a(`${parts.join(",")}|${phase}|${inputDigest}`);
 }
 
 export class AgentHarness {
@@ -108,6 +108,7 @@ export class AgentHarness {
 
   #assistLevel: 0 | 1 | 2;
   #lastInputSource: ContactFrameSource | null = null;
+  #score = 0;
 
   /** Running FNV-chain digest over every frame consumed since reset. */
   #inputDigest = INPUT_DIGEST_SEED;
@@ -120,9 +121,38 @@ export class AgentHarness {
 
   #screenshotProvider: ScreenshotProvider | null = null;
 
-  constructor(config: SimConfig = DEFAULT_SIM_CONFIG, profileProvider: ProfileProvider | null = null) {
+  constructor(
+    config: SimConfig = DEFAULT_SIM_CONFIG,
+    profileProvider: ProfileProvider | null = null,
+  ) {
     this.#config = config;
     this.#telemetry = new Telemetry(config.runtime.telemetry.ringCapacity);
+    this.#telemetry.subscribe((event) => {
+      if (event.type === "trickCompleted") {
+        const label = String(event.label);
+        const base = /flip|heel/i.test(label)
+          ? 300
+          : /shuv/i.test(label)
+            ? 250
+            : 100;
+        const clean = event.cleanliness === "clean" ? 1.5 : 1;
+        const flips =
+          typeof event.flipRotations === "number" ? event.flipRotations : 0;
+        const shuv =
+          typeof event.shuvDegrees === "number" ? event.shuvDegrees : 0;
+        const rotation = Math.round(
+          Math.abs(flips) * 100 + Math.abs(shuv) * 0.5,
+        );
+        this.#score += Math.round(base * clean) + rotation;
+      } else if (event.type === "grindCompleted") {
+        const cleanFraction =
+          typeof event.cleanFraction === "number" ? event.cleanFraction : 0;
+        const durationSteps =
+          typeof event.durationSteps === "number" ? event.durationSteps : 0;
+        const quality = 0.5 + 0.5 * cleanFraction;
+        this.#score += Math.max(25, Math.round(durationSteps * 5 * quality));
+      }
+    });
     this.#world = new SimWorld(config);
     this.#inputHub = new InputHub(this.#telemetry);
     this.#profileProvider = profileProvider;
@@ -134,12 +164,18 @@ export class AgentHarness {
     this.#boardController = this.#makeBoardController();
     this.#kickArbiter = this.#makeKickArbiter();
     this.#fsm = this.#makeGestureFsm();
-    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel, this.#telemetry);
+    this.#assist = new ManeuverAssist(
+      this.#config,
+      this.#assistLevel,
+      this.#telemetry,
+    );
   }
 
   /** Deep-frozen private copy of the current profile — trackers only read it. */
   #snapshotProfile(): InputProfile {
-    const src = this.#profileProvider ? this.#profileProvider() : DEFAULT_INPUT_PROFILE;
+    const src = this.#profileProvider
+      ? this.#profileProvider()
+      : DEFAULT_INPUT_PROFILE;
     return deepFreezeConfig(structuredClone(src));
   }
 
@@ -166,7 +202,12 @@ export class AgentHarness {
   }
 
   #makeGestureFsm(): GestureFSM {
-    return new GestureFSM(this.#config, this.#assistLevel, this.#profile.stance, this.#telemetry);
+    return new GestureFSM(
+      this.#config,
+      this.#assistLevel,
+      this.#profile.stance,
+      this.#telemetry,
+    );
   }
 
   /** One-time engine init (idempotent). reset() also awaits this. */
@@ -179,12 +220,13 @@ export class AgentHarness {
     await this.#world.reset(seed, levelId);
     this.#inputHub.clear();
     this.#telemetry.clear();
-    this.#inputHub.registerSource('agent');
+    this.#inputHub.registerSource("agent");
     this.#recording = false;
     this.#recordHeader = null;
     this.#recordedFrames = [];
     this.#recordedCheckpoints = [];
     this.#lastInputSource = null;
+    this.#score = 0;
     this.#inputDigest = INPUT_DIGEST_SEED;
     // Re-read the profile immutably and rebuild the recognizer/controller so a
     // dev profile edit (stance/calibration/assist) applies from step 0.
@@ -194,9 +236,13 @@ export class AgentHarness {
     this.#boardController = this.#makeBoardController();
     this.#kickArbiter = this.#makeKickArbiter();
     this.#fsm = this.#makeGestureFsm();
-    this.#assist = new ManeuverAssist(this.#config, this.#assistLevel, this.#telemetry);
+    this.#assist = new ManeuverAssist(
+      this.#config,
+      this.#assistLevel,
+      this.#telemetry,
+    );
     this.#feetState = null;
-    this.#telemetry.log({ type: 'reset', step: 0, seed, levelId });
+    this.#telemetry.log({ type: "reset", step: 0, seed, levelId });
   }
 
   /**
@@ -208,10 +254,37 @@ export class AgentHarness {
     const frames = Array.isArray(input) ? input : [input];
     let accepted = 0;
     for (const f of frames) {
-      const stamped: ContactFrame = { ...f, source: f.source ?? 'agent' } as ContactFrame;
+      const stamped: ContactFrame = {
+        ...f,
+        source: f.source ?? "agent",
+      } as ContactFrame;
       if (this.#inputHub.push(stamped)) accepted += 1;
     }
-    this.#telemetry.log({ type: 'frameInjected', source: 'agent', count: accepted });
+    this.#telemetry.log({
+      type: "frameInjected",
+      source: "agent",
+      count: accepted,
+    });
+  }
+
+  /**
+   * Drop every live control latch without resetting the run. Native focus loss
+   * can otherwise leave the last two contacts planted indefinitely because no
+   * further hardware frame is guaranteed to arrive while the window is idle.
+   */
+  releaseInputs(reason = "focus-lost"): void {
+    this.#inputHub.setPaused(true);
+    this.#inputHub.setPaused(false);
+    this.#footTracker = this.#makeFootTracker();
+    this.#boardController = this.#makeBoardController();
+    this.#kickArbiter = this.#makeKickArbiter();
+    this.#feetState = null;
+    this.#lastInputSource = null;
+    this.#telemetry.log({
+      type: "inputReleased",
+      reason,
+      step: this.#world.getStep(),
+    });
   }
 
   /** Advance the sim by n fixed steps (default 1). */
@@ -235,11 +308,11 @@ export class AgentHarness {
       label: this.#fsm.label?.label ?? null,
       assistLevel: this.#assistLevel,
       feet: {
-        nose: this.#footObservation('nose'),
-        tail: this.#footObservation('tail'),
+        nose: this.#footObservation("nose"),
+        tail: this.#footObservation("tail"),
       },
       grind: this.#fsm.grindObservation(),
-      score: 0, // M9 owns scoring; trickCompleted telemetry feeds it later
+      score: this.#score,
       lastFailReason: this.#fsm.lastFailReason,
       inputSource: this.#lastInputSource,
     };
@@ -252,10 +325,13 @@ export class AgentHarness {
    * contract. Calibrated pad offset-from-rest maps to a board-local socket
    * offset by locomotion.padToBoardScale (presentation only).
    */
-  #footObservation(role: 'nose' | 'tail'): { planted: boolean; offset: { x: number; y: number; z: number } } {
+  #footObservation(role: "nose" | "tail"): {
+    planted: boolean;
+    offset: { x: number; y: number; z: number };
+  } {
     const inset = this.#config.physics.truckInsetZ;
     const deckTop = this.#config.physics.deckThickness / 2;
-    const baseZ = role === 'nose' ? inset : -inset;
+    const baseZ = role === "nose" ? inset : -inset;
     const foot = this.#feetState ? this.#feetState[role] : null;
     if (!foot || !foot.planted) {
       return { planted: false, offset: { x: 0, y: deckTop, z: baseZ } };
@@ -266,7 +342,10 @@ export class AgentHarness {
       offset: {
         x: scale * foot.offsetFromRest.x,
         y: deckTop,
-        z: baseZ + scale * foot.offsetFromRest.y,
+        // Native pad Y grows toward the player's palm; board +Z points toward
+        // the nose/screen. Invert it so sliding a finger forward moves the
+        // matching virtual foot forward instead of backward.
+        z: baseZ - scale * foot.offsetFromRest.y,
       },
     };
   }
@@ -305,13 +384,16 @@ export class AgentHarness {
     this.#recordedFrames = [];
     this.#recordedCheckpoints = [];
     this.#recording = true;
-    this.#telemetry.log({ type: 'recordingStarted', step: this.#world.getStep() });
+    this.#telemetry.log({
+      type: "recordingStarted",
+      step: this.#world.getStep(),
+    });
   }
 
   /** Stop recording and return the accumulated SessionTrace (deep-copied). */
   stopRecording(): SessionTrace {
     if (!this.#recordHeader) {
-      throw new Error('stopRecording() called without startRecording()');
+      throw new Error("stopRecording() called without startRecording()");
     }
     // Frames were canonicalized (quantized) at intake, so the stored stream is
     // exactly what the sim consumed — no re-quantization step to diverge from.
@@ -325,7 +407,7 @@ export class AgentHarness {
     };
     this.#recording = false;
     this.#telemetry.log({
-      type: 'recordingStopped',
+      type: "recordingStopped",
       step: this.#world.getStep(),
       frames: trace.frames.length,
       checkpoints: trace.checkpoints.length,
@@ -357,7 +439,10 @@ export class AgentHarness {
       else framesByStep.set(step, [frame]);
     }
 
-    const lastCheckpointStep = trace.checkpoints.reduce((m, c) => Math.max(m, c.step), 0);
+    const lastCheckpointStep = trace.checkpoints.reduce(
+      (m, c) => Math.max(m, c.step),
+      0,
+    );
     const out: ReplayCheckpoint[] = [];
 
     while (this.#world.getStep() < lastCheckpointStep) {
@@ -384,7 +469,7 @@ export class AgentHarness {
   }
 
   /** Append a diagnostic/telemetry event. */
-  log(event: Parameters<Telemetry['log']>[0]): void {
+  log(event: Parameters<Telemetry["log"]>[0]): void {
     this.#telemetry.log(event);
   }
 
@@ -395,7 +480,7 @@ export class AgentHarness {
   async captureScreenshot(): Promise<string | null> {
     const provider = this.#screenshotProvider;
     const result = provider ? await provider() : null;
-    this.#telemetry.log({ type: 'screenshot', captured: result !== null });
+    this.#telemetry.log({ type: "screenshot", captured: result !== null });
     return result;
   }
 
@@ -430,21 +515,30 @@ export class AgentHarness {
       // Fold every consumed frame into the running digest. JSON order is
       // deterministic here because InputHub canonicalization rebuilds frames
       // with a fixed field order.
-      this.#inputDigest = fnv1a(`${this.#inputDigest}|${JSON.stringify(frame)}`);
-      if (this.#recording) this.#recordedFrames.push({ step: consumeStep, frame });
+      this.#inputDigest = fnv1a(
+        `${this.#inputDigest}|${JSON.stringify(frame)}`,
+      );
+      if (this.#recording)
+        this.#recordedFrames.push({ step: consumeStep, frame });
     }
 
     this.#runRecognizer(frames);
-    this.#world.step();
-
-    const newStep = this.#world.getStep();
-    if (this.#recording && newStep % this.#config.runtime.replay.checkpointEverySteps === 0) {
-      const hash = this.#checkpointHash();
-      this.#recordedCheckpoints.push({ step: newStep, hash });
-      this.#telemetry.log({ type: 'checkpoint', step: newStep, hash });
+    const worldStep = this.#world.step();
+    if (worldStep.recovery) {
+      this.#fsm.recoverFromWorld(worldStep.recovery, this.#world.getStep());
     }
 
-    this.#telemetry.log({ type: 'stepped', step: newStep });
+    const newStep = this.#world.getStep();
+    if (
+      this.#recording &&
+      newStep % this.#config.runtime.replay.checkpointEverySteps === 0
+    ) {
+      const hash = this.#checkpointHash();
+      this.#recordedCheckpoints.push({ step: newStep, hash });
+      this.#telemetry.log({ type: "checkpoint", step: newStep, hash });
+    }
+
+    this.#telemetry.log({ type: "stepped", step: newStep });
   }
 
   /**
@@ -453,7 +547,11 @@ export class AgentHarness {
    * never diverge on what goes into the hash.
    */
   #checkpointHash(): string {
-    return checkpointHash(this.#world.boardPose(), this.#fsm.phase, this.#inputDigest);
+    return checkpointHash(
+      this.#world.boardPose(),
+      this.#fsm.phase,
+      this.#inputDigest,
+    );
   }
 
   /**
@@ -481,12 +579,19 @@ export class AgentHarness {
     const grounded = this.#world.isGrounded();
     const pose = this.#world.boardPose();
     const contactImpulse = this.#world.lastContactImpulseMagnitude();
+    const supportContactImpulse =
+      this.#world.lastSupportContactImpulseMagnitude();
     const railProximity = this.#world.railProximity();
     // Impact observability (deterministic — derived from sim state only).
     // Normal rolling stays well under 0.5 N·s per step; landings + wall hits
     // show up here, which is what interrupt tuning reads.
     if (contactImpulse > 0.5) {
-      this.#telemetry.log({ type: 'contactImpulse', step, impulse: contactImpulse, grounded });
+      this.#telemetry.log({
+        type: "contactImpulse",
+        step,
+        impulse: contactImpulse,
+        grounded,
+      });
     }
 
     // Arbitrate kicks against the PREVIOUS step's phase (the FSM gate): pop
@@ -494,7 +599,8 @@ export class AgentHarness {
     // hop the KickArbiter explicitly reserves — "mid-maneuver kicks ... e.g.
     // grind hop"). buttonSide attribution routes a mid-grind click straight to a
     // pop with no locomotion leak.
-    const popAllowed = this.#fsm.phase === 'ground' || this.#fsm.phase === 'grind';
+    const popAllowed =
+      this.#fsm.phase === "ground" || this.#fsm.phase === "grind";
     const arb = this.#kickArbiter.update(feet, kicks, popAllowed, step);
 
     const fsmResult = this.#fsm.update({
@@ -503,16 +609,29 @@ export class AgentHarness {
       grounded,
       pose,
       contactImpulse,
+      supportContactImpulse,
       railProximity,
       step,
     });
 
-    const maneuverCmds = this.#assist.update(fsmResult, step);
+    // A generic side-rest fallback must never preempt an active maneuver's
+    // physical landing classification. It is eligible only after the FSM says
+    // the board is idle/riding (the screenshot failure was ground → none).
+    this.#world.setUnrideableRecoveryEnabled(
+      fsmResult.phase === "none" || fsmResult.phase === "ground",
+    );
+
+    const maneuverCmds = this.#assist.update(fsmResult, step, feet);
 
     // Ground locomotion runs only while riding on the ground — no drive/steer
     // during pop/air/catch/bail (kicks the arbiter released come through here).
-    const groundControlActive = grounded && fsmResult.phase === 'ground';
-    const cmd = this.#boardController.applyGroundControl(feet, arb.locomotion, groundControlActive, step);
+    const groundControlActive = grounded && fsmResult.phase === "ground";
+    const cmd = this.#boardController.applyGroundControl(
+      feet,
+      arb.locomotion,
+      groundControlActive,
+      step,
+    );
     this.#world.applyGroundForces(cmd);
     for (const mc of maneuverCmds) this.#world.applyManeuver(mc);
 
@@ -550,7 +669,9 @@ export class AgentHarness {
       }
     }
     if (problems.length > 0) {
-      throw new Error(`replay: incompatible trace header — ${problems.join('; ')}`);
+      throw new Error(
+        `replay: incompatible trace header — ${problems.join("; ")}`,
+      );
     }
   }
 }

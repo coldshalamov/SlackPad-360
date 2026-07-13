@@ -44,9 +44,18 @@ public class HostButtonMergeTests
     }
 
     [Fact]
-    public void Auxiliary_AlwaysFalse()
+    public void Auxiliary_DefaultsFalseForExistingCallers()
     {
         Assert.False(HostButtonMerge.Merge(true, true).Auxiliary);
         Assert.False(HostButtonMerge.Merge(false, false).Auxiliary);
+    }
+
+    [Fact]
+    public void Ctrl_SetsAuxiliaryWithoutChangingMouseButtons()
+    {
+        var b = HostButtonMerge.Merge(leftDown: false, rightDown: false, auxiliaryDown: true);
+        Assert.False(b.Primary);
+        Assert.False(b.Secondary);
+        Assert.True(b.Auxiliary);
     }
 }

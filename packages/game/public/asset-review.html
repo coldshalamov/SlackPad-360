@@ -22,7 +22,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const W = 960, H = 540;
@@ -32,7 +32,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -60,7 +60,7 @@ let hdriLoaded = false;
 async function loadHdri() {
   if (hdriLoaded) return;
   try {
-    const hdr = await new RGBELoader().loadAsync(
+    const hdr = await new HDRLoader().loadAsync(
       '/@fs/C:/Users/93rob/Documents/GitHub/SlackPad 360/assets/source/vendor/ph-kloppenheim-05-puresky/kloppenheim_05_puresky_1k.hdr'
     );
     hdr.mapping = THREE.EquirectangularReflectionMapping;

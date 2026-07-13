@@ -14,21 +14,28 @@
  * here directly.
  */
 
-import type { ContactFrame } from '@slackpad/shared';
-import { isHostToPageEnvelope } from '@slackpad/shared';
-import type { InputHub } from './InputHub';
-import type { Telemetry } from '../telemetry/Telemetry';
+import type { ContactFrame } from "@slackpad/shared";
+import { isHostToPageEnvelope } from "@slackpad/shared";
+import type { InputHub } from "./InputHub";
+import type { Telemetry } from "../telemetry/Telemetry";
 
 /** The subset of the WebView2 host object the page uses. */
 interface WebViewHostApi {
-  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-  removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+  addEventListener(
+    type: "message",
+    listener: (event: { data: unknown }) => void,
+  ): void;
+  removeEventListener(
+    type: "message",
+    listener: (event: { data: unknown }) => void,
+  ): void;
   postMessage(message: unknown): void;
 }
 
 function getWebViewHost(): WebViewHostApi | null {
-  if (typeof window === 'undefined') return null;
-  const host = (window as unknown as { chrome?: { webview?: WebViewHostApi } }).chrome?.webview;
+  if (typeof window === "undefined") return null;
+  const host = (window as unknown as { chrome?: { webview?: WebViewHostApi } })
+    .chrome?.webview;
   return host ?? null;
 }
 
@@ -40,6 +47,7 @@ export class HostInputSource {
   constructor(
     private readonly inputHub: InputHub,
     private readonly telemetry: Telemetry,
+    private readonly onFocusChanged?: (focused: boolean) => void,
   ) {
     this.host = getWebViewHost();
   }
@@ -62,29 +70,40 @@ export class HostInputSource {
     if (!this.host || this.attached) return false;
     this.attached = true;
 
-    this.host.addEventListener('message', this.onMessage);
-    this.inputHub.registerSource('hardware');
+    this.host.addEventListener("message", this.onMessage);
+    this.inputHub.registerSource("hardware");
     this.mountChip();
 
     // Tell the host the page is ready to receive frames (host logs it; a future
     // build may gate streaming on it). Sent exactly once.
     try {
-      this.host.postMessage({ v: 1, type: 'ready', payload: {} });
+      this.host.postMessage({ v: 1, type: "ready", payload: {} });
     } catch {
       // Posting can throw only if the bridge tore down mid-attach; ignore.
     }
 
-    this.telemetry.log({ type: 'hostSourceAttached' });
+    this.telemetry.log({ type: "hostSourceAttached" });
     return true;
   }
 
   dispose(): void {
     if (this.host && this.attached) {
-      this.host.removeEventListener('message', this.onMessage);
+      this.host.removeEventListener("message", this.onMessage);
     }
     this.attached = false;
     this.chip?.remove();
     this.chip = null;
+  }
+
+  /** Ask the native host to close the game. Returns false in a plain browser. */
+  quit(): boolean {
+    if (!this.host) return false;
+    try {
+      this.host.postMessage({ v: 1, type: "quit", payload: {} });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // Arrow fn so `this` is bound when used as an event listener.
@@ -94,7 +113,7 @@ export class HostInputSource {
     if (!isHostToPageEnvelope(data)) return;
 
     switch (data.type) {
-      case 'contactBatch': {
+      case "contactBatch": {
         // Frames already carry source:'hardware'; InputHub validates each and
         // rejects malformed ones without throwing (gt-malformed contract). Guard
         // the array itself so a malformed batch can never throw out of the
@@ -105,15 +124,19 @@ export class HostInputSource {
         }
         return;
       }
-      case 'focus':
+      case "focus":
+        this.onFocusChanged?.(data.payload.focused);
         this.setChipFocused(data.payload.focused);
-        this.telemetry.log({ type: 'hostFocus', focused: data.payload.focused });
+        this.telemetry.log({
+          type: "hostFocus",
+          focused: data.payload.focused,
+        });
         return;
-      case 'hostInfo':
-        this.telemetry.log({ type: 'hostInfo', payload: data.payload });
+      case "hostInfo":
+        this.telemetry.log({ type: "hostInfo", payload: data.payload });
         return;
-      case 'settings':
-        this.telemetry.log({ type: 'hostSettings', payload: data.payload });
+      case "settings":
+        this.telemetry.log({ type: "hostSettings", payload: data.payload });
         return;
       default:
         return;
@@ -122,22 +145,22 @@ export class HostInputSource {
 
   // --- "TRACKPAD LIVE" chip (top-right, unobtrusive) -----------------------
   private mountChip(): void {
-    if (typeof document === 'undefined' || !document.body) return;
-    const chip = document.createElement('div');
-    chip.textContent = '● TRACKPAD LIVE';
+    if (typeof document === "undefined" || !document.body) return;
+    const chip = document.createElement("div");
+    chip.textContent = "● TRACKPAD LIVE";
     Object.assign(chip.style, {
-      position: 'fixed',
-      top: '12px',
-      right: '12px',
-      padding: '4px 10px',
-      borderRadius: '999px',
-      font: '600 11px system-ui, sans-serif',
-      letterSpacing: '0.04em',
-      color: 'rgba(120,235,160,0.98)',
-      background: 'rgba(12,20,16,0.62)',
-      border: '1px solid rgba(120,235,160,0.35)',
-      pointerEvents: 'none',
-      zIndex: '20',
+      position: "fixed",
+      top: "12px",
+      right: "12px",
+      padding: "4px 10px",
+      borderRadius: "999px",
+      font: "600 11px system-ui, sans-serif",
+      letterSpacing: "0.04em",
+      color: "rgba(120,235,160,0.98)",
+      background: "rgba(12,20,16,0.62)",
+      border: "1px solid rgba(120,235,160,0.35)",
+      pointerEvents: "none",
+      zIndex: "20",
     } satisfies Partial<CSSStyleDeclaration>);
     document.body.appendChild(chip);
     this.chip = chip;
@@ -145,7 +168,9 @@ export class HostInputSource {
 
   private setChipFocused(focused: boolean): void {
     if (!this.chip) return;
-    this.chip.textContent = focused ? '● TRACKPAD LIVE' : '○ TRACKPAD (window inactive)';
-    this.chip.style.opacity = focused ? '1' : '0.55';
+    this.chip.textContent = focused
+      ? "● TRACKPAD LIVE"
+      : "○ TRACKPAD (window inactive)";
+    this.chip.style.opacity = focused ? "1" : "0.55";
   }
 }

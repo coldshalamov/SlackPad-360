@@ -1,13 +1,17 @@
 /**
  * GT-land (M4) — landing cones (final-physics §3.2): board-up vs world-up θ
- * classifies clean (≤25°) / dirty (≤45°, speed scrub) / bail (beyond, or
- * inverted deck). Cone entry is engineered by scaling the pop pitch torque via
- * config overrides (harness constructor config — never a pose write).
+ * classifies clean (≤25°) / dirty (≤70°, speed scrub) / bail (beyond, or
+ * inverted deck). Binary click pop strength is fixed, so cone entry is
+ * engineered by scaling pop pitch torque via config overrides (never a pose
+ * write or a lift-derived quality script).
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SIM_CONFIG, deepFreezeConfig } from '@slackpad/shared';
 import type { SimConfig } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
+import { GestureFSM } from '../src/control/GestureFSM';
+import type { FsmInputs } from '../src/control/GestureFSM';
+import type { FeetState } from '../src/input/FootTracker';
 import { eventsOf, flyOut, lastEventOf, scriptOllie, settled } from './helpers/maneuver';
 import type { FlightResult } from './helpers/maneuver';
 
@@ -30,12 +34,20 @@ async function popAndLand(
   return { h, flight };
 }
 
-const MID_Q = { gapSteps: 2 }; // timing-only q=0.25 pop — small, safe
-const MAX_Q = { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 }; // q=1
+const CLICK = {};
+
+function dirtyPitchConfig(scrub = DEFAULT_SIM_CONFIG.land.dirtySpeedScrub): SimConfig {
+  return configWith((c) => {
+    (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.12;
+    (c.pop as { levelKp: number }).levelKp = 0;
+    (c.pop as { levelKd: number }).levelKd = 0;
+    (c.land as { dirtySpeedScrub: number }).dirtySpeedScrub = scrub;
+  });
+}
 
 describe('GT-land: landing cones', () => {
   it('small pop lands CLEAN: θ ≤ thetaCleanDeg, phase ground, no fail reason', async () => {
-    const { h, flight } = await popAndLand(0x1a2d1, undefined, MID_Q);
+    const { h, flight } = await popAndLand(0x1a2d1, undefined, CLICK);
     expect(flight.outcome).toBe('clean');
     expect(flight.thetaDeg).not.toBeNull();
     expect(flight.thetaDeg!).toBeLessThanOrEqual(DEFAULT_SIM_CONFIG.land.thetaCleanDeg);
@@ -47,18 +59,17 @@ describe('GT-land: landing cones', () => {
     expect(trick.cleanliness).toBe('clean');
   });
 
-  it('uncaught max pop lands DIRTY: θ in the dirty cone + speed scrub applied', async () => {
-    const { h, flight } = await popAndLand(0x1a2d2, undefined, MAX_Q);
+  it('an engineered pitched click-pop lands DIRTY: θ in cone + speed scrub applied', async () => {
+    const cfg = dirtyPitchConfig();
+    const { h, flight } = await popAndLand(0x1a2d2, cfg, CLICK);
     expect(flight.outcome).toBe('dirty');
     expect(flight.thetaDeg!).toBeGreaterThan(DEFAULT_SIM_CONFIG.land.thetaCleanDeg);
     expect(flight.thetaDeg!).toBeLessThanOrEqual(DEFAULT_SIM_CONFIG.land.thetaDirtyDeg);
     expect(h.observe().phase).toBe('ground');
 
     // Scrub isolation: identical run with dirtySpeedScrub = 0 keeps more speed.
-    const noScrub = configWith((c) => {
-      (c.land as { dirtySpeedScrub: number }).dirtySpeedScrub = 0;
-    });
-    const control = await popAndLand(0x1a2d2, noScrub, MAX_Q);
+    const noScrub = dirtyPitchConfig(0);
+    const control = await popAndLand(0x1a2d2, noScrub, CLICK);
     expect(control.flight.outcome).toBe('dirty'); // same cone, no scrub
     const speedOf = (x: AgentHarness): number => {
       const lv = x.observe().board.lv;
@@ -67,22 +78,78 @@ describe('GT-land: landing cones', () => {
     expect(speedOf(h)).toBeLessThan(speedOf(control.h) - 0.5);
   });
 
-  it('over-pitched pop BAILS with reason over-rotation', async () => {
+  it('a landing outside the configured dirty cone BAILS with reason over-rotation', async () => {
     const cfg = configWith((c) => {
-      (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.056;
+      (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.12;
+      (c.pop as { levelKp: number }).levelKp = 0;
+      (c.pop as { levelKd: number }).levelKd = 0;
+      // Collapse the dirty cone onto the clean cone. The same click landing
+      // proven dirty above must now exercise the over-rotation path.
+      (c.land as { thetaDirtyDeg: number }).thetaDirtyDeg = c.land.thetaCleanDeg;
     });
-    const { h, flight } = await popAndLand(0x1a2d3, cfg, MAX_Q);
+    const { h, flight } = await popAndLand(0x1a2d3, cfg, CLICK);
     expect(flight.outcome).toBe('bail');
     expect(h.observe().lastFailReason).toBe('over-rotation');
     expect(eventsOf(h, 'bail')[0]!.reason).toBe('over-rotation');
   });
 
-  it('tumbling pop lands INVERTED → bail with reason inverted', async () => {
-    const cfg = configWith((c) => {
-      (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.2;
+  it('an inverted deck at landing contact bails with reason inverted', () => {
+    // Ray wheels correctly point away from the floor while upside down, so an
+    // integration fixture can side-rest without ever producing a wheel-support
+    // landing edge. Exercise the deterministic landing classifier directly at
+    // the contact pose; the other three cases above retain full rigid-body runs.
+    const feet: FeetState = {
+      nose: {
+        role: 'nose', planted: true, pos: { x: 0.6, y: 0.5 }, vel: { x: 0, y: 0 },
+        offsetFromRest: { x: 0, y: 0 }, contactId: 1,
+      },
+      tail: {
+        role: 'tail', planted: true, pos: { x: 0.4, y: 0.5 }, vel: { x: 0, y: 0 },
+        offsetFromRest: { x: 0, y: 0 }, contactId: 2,
+      },
+      segment: {
+        valid: true, angle: 0, angleFromRest: 0, angVel: 0,
+        midpoint: { x: 0.5, y: 0.5 }, midpointOffsetFromRest: { x: 0, y: 0 },
+        midpointVel: { x: 0, y: 0 }, lengthRatio: 1,
+      },
+      bothPlanted: true,
+      plantCount: 2,
+    };
+    const upright = {
+      p: { x: 0, y: 0.1, z: 0 }, q: { x: 0, y: 0, z: 0, w: 1 },
+      lv: { x: 0, y: 0, z: 2 }, av: { x: 0, y: 0, z: 0 },
+    };
+    const input = (step: number, patch: Partial<FsmInputs> = {}): FsmInputs => ({
+      feet,
+      pops: [],
+      grounded: false,
+      pose: upright,
+      contactImpulse: 0,
+      supportContactImpulse: 0,
+      railProximity: null,
+      step,
+      ...patch,
     });
-    const { h, flight } = await popAndLand(0x1a2d4, cfg, MAX_Q);
-    expect(flight.outcome).toBe('bail');
-    expect(h.observe().lastFailReason).toBe('inverted');
+    const fsm = new GestureFSM(DEFAULT_SIM_CONFIG, 1, 'regular');
+    fsm.update(input(0, { grounded: true }));
+    fsm.update(input(1, {
+      grounded: true,
+      pops: [{ step: 1, label: 'ollie', q: DEFAULT_SIM_CONFIG.pop.clickQuality }],
+    }));
+    fsm.update(input(2, {
+      pose: { ...upright, p: { x: 0, y: 0.5, z: 0 }, lv: { x: 0, y: 1, z: 2 } },
+    }));
+    const result = fsm.update(input(3, {
+      grounded: true,
+      supportContactImpulse: 1,
+      pose: {
+        ...upright,
+        q: { x: 1, y: 0, z: 0, w: 0 },
+        lv: { x: 0, y: -1, z: 2 },
+      },
+    }));
+    expect(result.phase).toBe('bail');
+    expect(result.lastFailReason).toBe('inverted');
+    expect(result.events).toContainEqual({ kind: 'bail', reason: 'inverted' });
   });
 });

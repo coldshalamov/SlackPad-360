@@ -13,6 +13,7 @@ import type { FeetState } from '../../src/input/FootTracker';
 import type { GrindInputs } from '../../src/control/GrindSystem';
 import { NOSE_POS, TAIL_POS, scriptOllie } from './maneuver';
 import type { PadDriver } from './maneuver';
+import { rotateAboutCenter } from '../../src/input/FootTracker';
 
 /** A single long straight ledge along +Z at x = 0, top at y = 0.15. */
 export const TEST_RAIL: RailDescriptor = {
@@ -116,7 +117,7 @@ export function makeInputs(opts: {
  * and descends onto the top → soft-snap latch → clean 50-50 ride.
  */
 export function scriptFiftyFifty(d: PadDriver, opts: { cruiseSteps?: number; rideSteps?: number } = {}): void {
-  const cruiseSteps = opts.cruiseSteps ?? 100;
+  const cruiseSteps = opts.cruiseSteps ?? 70;
   const rideSteps = opts.rideSteps ?? 90;
   d.cruise(cruiseSteps);
   scriptOllie(d, {}); // plain ollie: q≈0.5 from timing, no yaw-inducing prep slide
@@ -125,16 +126,23 @@ export function scriptFiftyFifty(d: PadDriver, opts: { cruiseSteps?: number; rid
 
 /**
  * Full-pipeline scripted BOARDSLIDE on the `grind-lab` ledge: cruise, then an
- * ollie with a gentle nose-prep SLIDE that steers the board ~50° off the rail
+ * ollie after a held common-mode carve that steers the board off the rail
  * before takeoff (a bounded ground-steer yaw, NOT the 180°-targeting shuv). The
  * grind approach-align then completes the rotation toward the perpendicular as
  * the board descends onto the low-friction ledge, where the deck SLIDES (keeps
  * speed) → a stable boardslide that the yaw-align holds near 90°.
  */
 export function scriptBoardslide(d: PadDriver, opts: { cruiseSteps?: number; rideSteps?: number } = {}): void {
-  const cruiseSteps = opts.cruiseSteps ?? 96;
+  const cruiseSteps = opts.cruiseSteps ?? 70;
   const rideSteps = opts.rideSteps ?? 90;
   d.cruise(cruiseSteps);
-  scriptOllie(d, { prepMoveFrames: 5, prepSpeedPerFrame: 0.12 }); // gentle steer → yawed approach
+  let tail = TAIL_POS;
+  for (let i = 1; i <= 5; i++) {
+    const deg = i * 10;
+    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, deg);
+    tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, deg);
+    d.drive({ nose, tail });
+  }
+  d.drive({ nose: rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, 50), tail, primary: true });
   for (let i = 0; i < rideSteps; i++) d.drive({ nose: NOSE_POS, tail: TAIL_POS });
 }

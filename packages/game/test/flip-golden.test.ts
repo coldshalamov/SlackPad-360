@@ -1,9 +1,9 @@
 /// <reference types="node" />
 /**
  * Flip golden (M5). A fixed scripted session (~500 steps):
- *   settle → cruise → ollie+KICKFLIP+catch (clean) → cruise →
- *   ollie+HEELFLIP, missed catch (fails readably) → cruise →
- *   ollie+BS-SHUV-180+catch (clean) → cruise.
+ *   settle → Ctrl-cruise → LMB ollie + forgiving KICKFLIP swipe + auto-catch →
+ *   cruise → LMB ollie + HEELFLIP swipe + auto-catch → cruise →
+ *   LMB ollie + BS-SHUV-180 sweep + auto-catch → cruise.
  * Record/replay must agree AND the checkpoint sequence is pinned in
  * goldens/baselines.json (UPDATE_GOLDENS=1 regenerates; run with
  * --no-file-parallelism because the golden files share the baseline file).
@@ -19,7 +19,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import type { ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
-import { PadDriver, scriptOllie, flyWithGesture, eventsOf, NOSE_POS, TAIL_POS } from './helpers/maneuver';
+import {
+  eventsOf,
+  gesturePos,
+  lastEventOf,
+  NOSE_POS,
+  PadDriver,
+  scriptOllie,
+  TAIL_POS,
+} from './helpers/maneuver';
+import type { GestureScript } from './helpers/maneuver';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'baselines.json');
 const UPDATE_GOLDENS = process.env.UPDATE_GOLDENS === '1';
@@ -48,26 +57,47 @@ function toGround(d: PadDriver, max = 220): void {
   d.cruise(20); // stabilize + refresh the rest pose before the next pop
 }
 
+/** Shipping gesture flight: both contacts remain down and L1 auto-catches. */
+function flyHeldGesture(
+  d: PadDriver,
+  gesture: GestureScript,
+  perFrame = 0.08,
+  frames = 6,
+): void {
+  let airStart: number | null = null;
+  let gi = 0;
+  for (let i = 0; i < 240; i++) {
+    const obs = d.harness.observe();
+    if ((obs.phase === 'air' || obs.phase === 'catch') && airStart == null) airStart = obs.step;
+    const done = lastEventOf(d.harness, 'trickCompleted') ?? lastEventOf(d.harness, 'bail');
+    if (done && (obs.phase === 'ground' || obs.phase === 'bail')) break;
+    if (airStart != null && obs.step >= airStart + 2 && gi < frames) gi += 1;
+    d.drive({
+      nose: NOSE_POS,
+      tail: gi > 0 ? gesturePos(gesture, gi, perFrame, frames) : TAIL_POS,
+    });
+  }
+}
+
 /** Drive the full scripted session on `h` (assumes reset + startRecording done). */
 function driveSession(h: AgentHarness): void {
   const d = new PadDriver(h);
   d.idle(60); // settle
   d.cruise(30);
 
-  // 1) Kickflip: heelside flick, caught → clean.
-  scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
-  flyWithGesture(d, { gesture: 'flip-heel', perFrame: 0.13, catchAfterApexSteps: 6, frames: 6, startAfterAir: 2 });
+  // 1) Kickflip: forgiving heelside swipe, stable stance auto-catches clean.
+  scriptOllie(d);
+  flyHeldGesture(d, 'flip-heel', 0.08);
   toGround(d);
 
-  // 2) Heelflip: toeside flick, NO catch → readable fail (missed catch); wait
-  //    out the bail→respawn so the board is riding again for the next pop.
-  scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
-  flyWithGesture(d, { gesture: 'flip-toe', perFrame: 0.13, catchAfterApexSteps: null, frames: 6, startAfterAir: 2 });
+  // 2) Heelflip: mirrored forgiving swipe, same held-stance auto-catch.
+  scriptOllie(d);
+  flyHeldGesture(d, 'flip-toe', 0.08);
   toGround(d);
 
-  // 3) BS shuv 180: yaw sweep, caught → clean.
-  scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
-  flyWithGesture(d, { gesture: 'shuv-bs', catchAfterApexSteps: 8, frames: 6, startAfterAir: 2 });
+  // 3) BS shuv 180: smooth yaw sweep, stable stance auto-catches.
+  scriptOllie(d);
+  flyHeldGesture(d, 'shuv-bs');
   toGround(d);
 }
 
@@ -111,12 +141,13 @@ describe('flip golden (M5)', () => {
     expect(shuv, 'a clean bs-shuv completed').toBeDefined();
     expect(shuv!.cleanliness).toBe('clean');
     expect(shuv!.shuvDegrees as number).toBeGreaterThan(120);
-    // …and the uncaught heelflip did NOT land clean (bailed or dirty — readable).
-    const heelClean = tricks.find((t) => t.label === 'heelflip' && t.cleanliness === 'clean');
-    expect(heelClean, 'the missed-catch heelflip must not land clean').toBeUndefined();
-    const heelFailed =
-      bails.length > 0 || tricks.some((t) => t.label === 'heelflip' && t.cleanliness === 'dirty');
-    expect(heelFailed, 'the heelflip attempt resolved to a readable fail').toBe(true);
+    // …and the mirrored heelflip also completes under the same forgiving
+    // held-stance contract. None of the three scripted tricks silently bails.
+    const heel = tricks.find((t) => t.label === 'heelflip');
+    expect(heel, 'a clean heelflip completed').toBeDefined();
+    expect(heel!.cleanliness).toBe('clean');
+    expect(heel!.flipRotations as number).toBeLessThan(-0.8);
+    expect(bails.length).toBe(0);
 
     // --- Determinism: record → replay reproduces the pinned checkpoints -------
     const replayed = await harness.replay(trace);

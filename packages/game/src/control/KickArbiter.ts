@@ -4,12 +4,12 @@
  *
  * TWO ATTRIBUTION MODES (profile.kickAttribution, IMPL-007):
  *
- * 'buttonSide' (default — the product owner's Tech Deck model): both feet stay
+ * 'buttonSide' (shipping Skate-like profile): both feet stay
  * planted like a real ollie stance and the BUTTON picks the kicking end —
  * LMB/primary = back-foot kick → ollie, RMB/secondary = front-foot kick →
- * nollie, resolved INSTANTLY (no lookahead latency). Single-foot-planted
- * clicks follow the planted foot regardless of button (a foot that is not on
- * the board cannot kick). Clicks never mean push (cruise drive covers push).
+ * nollie, resolved INSTANTLY (no lookahead latency or lift choreography).
+ * A tiny stable-two-contact debounce rejects the click produced by an initial
+ * finger slap. Clicks never mean push (Ctrl/trackpad travel own propulsion).
  *
  * 'plantMask' (M4 legacy): on a kick (primary rising edge) the plant mask
  * decides the path:
@@ -18,7 +18,8 @@
  *   | ---------- | ------------------------------------------------------- |
  *   | tail only  | OLLIE pop path (prep quality from the lookback buffer)  |
  *   | nose only  | NOLLIE pop path (mirrored)                               |
- *   | both       | bothClickMeans 'ollie' → ollie; 'push' → HELD PENDING    |
+ *   | both       | bothClickMeans 'ignore' → no action; 'ollie' → ollie;     |
+ *   |            | 'push' → HELD PENDING                                     |
  *   |            | for popLookaheadMs: a nose lift within the window makes  |
  *   |            | it an ollie ("clicked slightly before the lift" — the    |
  *   |            | forgiveness case, research/control-grammar §6.2), a tail |
@@ -37,8 +38,9 @@
  *   timing = 1 − |lift↔click gap| / windowSide   (click-centered)
  *   crisp  = liftSpeed ≥ prepLiftSpeedMin ? min(liftSpeed / prepLiftSpeedForMaxQ, 1) : 0
  *   q      = qTimingWeight·timing + qCrispWeight·crisp
- * No prep lift found in the lookback → q = 0 (weak jMin pop — still an ollie
- * occurrence; under-popped is the game, not a failure).
+ * No prep lift found in the lookback → unarmed click, ignored in the shipping
+ * plant-mask profile. Shipping button-side clicks use the fixed configured
+ * clickQuality instead; no lift timing is involved.
  *
  * Determinism: step-count arithmetic only (ms → steps via hz); no wall clock.
  *
@@ -94,6 +96,7 @@ export class KickArbiter {
   private readonly pop: PopConfig;
   private readonly lookbackSteps: number;
   private readonly lookaheadSteps: number;
+  private readonly stableClickSteps: number;
 
   /** Ring of recent per-step feet snapshots (lookback + lookahead + slack). */
   private readonly buffer: FeetSnapshot[] = [];
@@ -111,6 +114,7 @@ export class KickArbiter {
     const hz = config.physics.hz;
     this.lookbackSteps = msToSteps(this.rec.popLookbackMs, hz);
     this.lookaheadSteps = msToSteps(this.rec.popLookaheadMs, hz);
+    this.stableClickSteps = msToSteps(this.rec.stableClickContactMs, hz);
     this.bufferCap = this.lookbackSteps + this.lookaheadSteps + 4;
   }
 
@@ -184,16 +188,17 @@ export class KickArbiter {
       // board cannot kick). Clicks never mean push here — cruise drive covers
       // push, so the plantMask pending machinery is bypassed entirely.
       if (this.profile.kickAttribution === 'buttonSide') {
-        if (kick.mask === 'none') {
-          this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-none', mask: kick.mask });
+        if (kick.mask !== 'both' || !this.hadStableTwoFingerStanceBefore(step)) {
+          this.telemetry?.log({
+            type: 'kickArbitrated',
+            step,
+            decision: kick.mask === 'none' ? 'ignored-none' : 'ignored-unstable-contact',
+            mask: kick.mask,
+          });
           continue;
         }
-        let label: 'ollie' | 'nollie';
-        if (kick.mask === 'tail') label = 'ollie';
-        else if (kick.mask === 'nose') label = 'nollie';
-        else label = kick.button === 'secondary' ? 'nollie' : 'ollie';
-        const prepFoot = label === 'ollie' ? 'nose' : 'tail';
-        out.pops.push({ step, label, q: this.lookbackQuality(prepFoot, step) });
+        const label: 'ollie' | 'nollie' = kick.button === 'secondary' ? 'nollie' : 'ollie';
+        out.pops.push({ step, label, q: clamp01(this.pop.clickQuality) });
         this.telemetry?.log({
           type: 'kickArbitrated',
           step,
@@ -207,17 +212,35 @@ export class KickArbiter {
       // --- 'plantMask' attribution (M4 legacy behavior, unchanged) ----------
       switch (kick.mask) {
         case 'tail':
-          out.pops.push({ step, label: 'ollie', q: this.lookbackQuality('nose', step) });
-          this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ollie', mask: kick.mask });
+          {
+            const q = this.lookbackQuality('nose', step);
+            if (q == null) {
+              this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-unarmed', mask: kick.mask });
+            } else {
+              out.pops.push({ step, label: 'ollie', q });
+              this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ollie', mask: kick.mask });
+            }
+          }
           break;
         case 'nose':
-          out.pops.push({ step, label: 'nollie', q: this.lookbackQuality('tail', step) });
-          this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'nollie', mask: kick.mask });
+          {
+            const q = this.lookbackQuality('tail', step);
+            if (q == null) {
+              this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-unarmed', mask: kick.mask });
+            } else {
+              out.pops.push({ step, label: 'nollie', q });
+              this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'nollie', mask: kick.mask });
+            }
+          }
           break;
         case 'both':
-          if (this.profile.bothClickMeans === 'ollie') {
+          if (this.profile.bothClickMeans === 'ignore') {
+            // Shipping Tech Deck profile: an unprepared click is commonly an
+            // OS tap-to-click produced while planting. It cannot be a jump.
+            this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ignored-unarmed', mask: kick.mask });
+          } else if (this.profile.bothClickMeans === 'ollie') {
             // Advanced mapping: both-planted click pops directly.
-            out.pops.push({ step, label: 'ollie', q: this.lookbackQuality('nose', step) });
+            out.pops.push({ step, label: 'ollie', q: this.lookbackQuality('nose', step) ?? 0 });
             this.telemetry?.log({ type: 'kickArbitrated', step, decision: 'ollie-both', mask: kick.mask });
           } else if (this.pending == null && out.pops.length === 0) {
             this.pending = { kickStep: step, expiresStep: step + this.lookaheadSteps };
@@ -237,12 +260,25 @@ export class KickArbiter {
     return out;
   }
 
+  /** Completed steps before the click must already show a two-finger stance. */
+  private hadStableTwoFingerStanceBefore(kickStep: number): boolean {
+    let stable = 0;
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      const s = this.buffer[i]!;
+      if (s.step >= kickStep) continue;
+      if (!s.nosePlanted || !s.tailPlanted) return false;
+      stable += 1;
+      if (stable >= this.stableClickSteps) return true;
+    }
+    return false;
+  }
+
   /**
    * Prep quality for a kick whose mask already committed the pop: search the
    * lookback window for the most recent lift edge of the PREP foot (nose for
    * ollie, tail for nollie); timing is click-centered on that edge.
    */
-  private lookbackQuality(prepFoot: 'nose' | 'tail', kickStep: number): number {
+  private lookbackQuality(prepFoot: 'nose' | 'tail', kickStep: number): number | null {
     const planted = (s: FeetSnapshot): boolean => (prepFoot === 'nose' ? s.nosePlanted : s.tailPlanted);
     const speed = (s: FeetSnapshot): number => (prepFoot === 'nose' ? s.noseSpeed : s.tailSpeed);
     for (let i = this.buffer.length - 1; i >= 1; i--) {
@@ -256,7 +292,7 @@ export class KickArbiter {
         return this.quality(timing, this.crispness(speed(before)));
       }
     }
-    return 0; // no prep found → weakest (jMin) pop, still an occurrence
+    return null; // no lift preparation: likely an accidental plant/tap click
   }
 
   /** Crispness ∈ [0,1] from the prep foot's pad speed at the lift instant. */

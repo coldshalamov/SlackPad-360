@@ -19,6 +19,10 @@ import type { LevelBuilder } from './types';
 import type { RailDescriptor } from '../rails';
 import { buildBoard } from './board';
 import { RAIL_FRICTION } from './grind-lab';
+import {
+  GRINDABLE_COLLISION_GROUPS,
+  ORDINARY_WORLD_COLLISION_GROUPS,
+} from '../collisionGroups';
 
 /** Playable grind obstacles (level geometry; offset in X off the test run line). */
 export const FLAT_DEV_LEDGE = { cx: 4, topY: 0.15, halfWidth: 0.15, z0: 2, z1: 30 };
@@ -32,7 +36,8 @@ export const flatDev: LevelBuilder = (rapier, world, config, rng) => {
   world.createCollider(
     rapier.ColliderDesc.cuboid(g.x, g.y, g.z)
       .setTranslation(0, -g.y, 0)
-      .setFriction(phys.ground.friction),
+      .setFriction(phys.ground.friction)
+      .setCollisionGroups(ORDINARY_WORLD_COLLISION_GROUPS),
   );
 
   const built = buildBoard(rapier, world, config, rng);
@@ -45,6 +50,7 @@ export const flatDev: LevelBuilder = (rapier, world, config, rng) => {
     rapier.ColliderDesc.cuboid(L.halfWidth, lHalfY, lHalfZ)
       .setTranslation(L.cx, lHalfY, (L.z0 + L.z1) / 2)
       .setFriction(RAIL_FRICTION)
+      .setCollisionGroups(GRINDABLE_COLLISION_GROUPS)
       .setFrictionCombineRule(rapier.CoefficientCombineRule.Min),
   );
 
@@ -56,6 +62,7 @@ export const flatDev: LevelBuilder = (rapier, world, config, rng) => {
     rapier.ColliderDesc.cuboid(R.halfWidth, rHalfY, rHalfZ)
       .setTranslation(R.cx, R.topY - rHalfY, (R.z0 + R.z1) / 2)
       .setFriction(RAIL_FRICTION)
+      .setCollisionGroups(GRINDABLE_COLLISION_GROUPS)
       .setFrictionCombineRule(rapier.CoefficientCombineRule.Min),
   );
 

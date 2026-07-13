@@ -31,9 +31,9 @@ internal sealed class GameForm : Form
     private readonly WebViewBridge _bridge = new();
 
     // ~125 Hz UI tick: drain assembled frames into a contactBatch and sample the
-    // click/F11 keys (GetAsyncKeyState is a poll, not a message).
+    // click/Ctrl/F11 keys (GetAsyncKeyState is a poll, not a message).
     private readonly System.Windows.Forms.Timer _batchTimer = new() { Interval = 8 };
-    private readonly List<ContactFrame> _pendingBatch = new();
+    private readonly HostButtonFramePump _buttonPump = new();
 
     private readonly bool _devTools;
     private Label _messageLabel = null!;
@@ -166,19 +166,11 @@ internal sealed class GameForm : Form
 
     private void OnFrame(ContactFrame frame)
     {
-        _pendingBatch.Add(frame);
-        if (_pendingBatch.Count > 512)
-        {
-            _pendingBatch.RemoveRange(0, _pendingBatch.Count - 512);
-        }
+        _buttonPump.Enqueue(frame);
     }
 
     private void OnTick(object? sender, EventArgs e)
     {
-        // Truthful L/R comes from the OS-synthesized button state, sampled here.
-        bool lmb = Win32.IsKeyDown(Win32.VK_LBUTTON);
-        bool rmb = Win32.IsKeyDown(Win32.VK_RBUTTON);
-
         // F11 → fullscreen, rising-edge + only when we are the foreground window
         // (GetAsyncKeyState is global, so gate it or a background F11 flips us).
         bool f11 = Win32.IsKeyDown(Win32.VK_F11);
@@ -188,20 +180,39 @@ internal sealed class GameForm : Form
         }
         _f11WasDown = f11;
 
-        if (_bridge.Available && _pendingBatch.Count > 0)
+        // Do not drain contacts before the WebView2 bridge is ready: a player
+        // who already has two fingers planted at startup still needs that first
+        // cached snapshot to reach the page once it finishes loading.
+        if (!_bridge.Available)
         {
-            foreach (var frame in _pendingBatch)
-            {
-                frame.Buttons = HostButtonMerge.Merge(lmb, rmb);
-            }
+            return;
+        }
+
+        // Truthful L/R comes from the OS-synthesized button state. The low bit
+        // retains a short completed click between timer ticks, so a player can
+        // pop while holding perfectly still without waiting for a new HID frame.
+        short lmbState = Win32.GetAsyncKeyState(Win32.VK_LBUTTON);
+        short rmbState = Win32.GetAsyncKeyState(Win32.VK_RBUTTON);
+        short ctrlState = Win32.GetAsyncKeyState(Win32.VK_CONTROL);
+        bool auxiliaryDown = Win32.GetForegroundWindow() == Handle && Win32.IsKeyDown(ctrlState);
+        var frames = _buttonPump.Drain(
+            new HostButtonSample(
+                Win32.IsKeyDown(lmbState),
+                Win32.IsKeyDown(rmbState),
+                Win32.WasPressedSinceLastRead(lmbState),
+                Win32.WasPressedSinceLastRead(rmbState),
+                auxiliaryDown),
+            PerfClock.NowMs());
+
+        if (frames.Count > 0)
+        {
             var batch = new ContactBatchEnvelope
             {
                 Source = "hardware",
                 HostTPerfMs = PerfClock.NowMs(),
-                Frames = new List<ContactFrame>(_pendingBatch),
+                Frames = new List<ContactFrame>(frames),
             };
             _bridge.PostContactBatch(batch);
-            _pendingBatch.Clear();
         }
     }
 
@@ -255,6 +266,7 @@ internal sealed class GameForm : Form
     protected override void OnDeactivate(EventArgs e)
     {
         base.OnDeactivate(e);
+        _buttonPump.ResetForFocusLoss();
         _bridge.PostFocus(false);
     }
 

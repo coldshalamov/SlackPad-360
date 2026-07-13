@@ -16,14 +16,22 @@ export interface GroundCommand {
    * a force, not a velocity write.
    */
   driveForce: number;
+  /** Physical per-wheel brake force while Ctrl is released. */
+  brakeForce: number;
   /** One-shot forward push impulse this step, N·s. SimWorld caps it at maxGroundSpeed. */
   pushImpulse: number;
   /** Desired board yaw rate about world +Y, rad/s. SimWorld clamps + servos toward it. */
   targetYawRate: number;
+  /**
+   * Signed calibrated two-finger segment angle, rad. While this is present,
+   * SimWorld anchors the board heading to the segment at first plant and then
+   * tracks subsequent segment rotation one-for-one. null releases the anchor.
+   */
+  steerAngle: number | null;
   /** Cosmetic lean roll torque about board-forward, N·m. SimWorld clamps it small. */
   rollTorque: number;
 }
 
 export function idleGroundCommand(): GroundCommand {
-  return { active: false, driveForce: 0, pushImpulse: 0, targetYawRate: 0, rollTorque: 0 };
+  return { active: false, driveForce: 0, brakeForce: 0, pushImpulse: 0, targetYawRate: 0, steerAngle: null, rollTorque: 0 };
 }

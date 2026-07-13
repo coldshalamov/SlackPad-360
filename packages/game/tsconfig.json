@@ -8,6 +8,6 @@
     "outDir": "dist-types",
     "types": ["vite/client"]
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "vite-plugin-external-rapier-wasm.ts"],
   "references": [{ "path": "../shared" }]
 }

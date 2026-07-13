@@ -8,18 +8,22 @@
  * "Impulses/torques clamps" applied by SimWorld, "Skipping Rapier" forbidden).
  *
  * Ground vocabulary implemented here (final-input-and-trick-spec §5):
- *  - Cruise: both feet planted → forward drive toward cruiseTargetSpeed.
+ *  - Ride:   Ctrl is the only source of forward drive; release applies brakes.
  *  - Push:   both-planted kick (bothClickMeans 'push') → forward impulse.
- *  - Steer:  segment angular velocity → yaw rate (primary), + heading bias.
- *  - Lean:   midpoint lateral offset → mild carve yaw + cosmetic roll.
+ *  - Steer:  common two-finger lateral displacement → sustained carve rate.
+ *  - Lean:   the same common-mode input adds a small cosmetic roll.
  * Air control (M4/M5) is out of scope: no ground forces unless grounded.
  */
 
-import type { LocomotionConfig, PhysicsConfig, InputProfile } from '@slackpad/shared';
-import type { Telemetry } from '../telemetry/Telemetry';
-import type { FeetState, KickEvent } from '../input/FootTracker';
-import type { GroundCommand } from './GroundCommand';
-import { idleGroundCommand } from './GroundCommand';
+import type {
+  LocomotionConfig,
+  PhysicsConfig,
+  InputProfile,
+} from "@slackpad/shared";
+import type { Telemetry } from "../telemetry/Telemetry";
+import type { FeetState, KickEvent } from "../input/FootTracker";
+import type { GroundCommand } from "./GroundCommand";
+import { idleGroundCommand } from "./GroundCommand";
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -31,61 +35,85 @@ export class BoardController {
   constructor(
     private readonly loco: LocomotionConfig,
     private readonly physics: PhysicsConfig,
-    private readonly profile: Pick<InputProfile, 'stance' | 'bothClickMeans'>,
+    private readonly profile: Pick<InputProfile, "stance" | "bothClickMeans">,
     private readonly telemetry?: Telemetry,
   ) {}
 
-  /**
-   * Steering world-sign per stance. This is the single load-bearing steering
-   * sign: with regular stance, a CCW segment rotation in calibrated pad space
-   * (segment angVel > 0) must yaw the board LEFT (world av.y < 0). Goofy inverts
-   * it. The ground-locomotion sign test pins both directions and the mutation
-   * guard flips this to prove it is load-bearing.
-   */
+  /** Regular/goofy mirror for the optional two-finger twist carve. */
   private stanceSign(): number {
     return this.profile.stance === 'regular' ? -1 : 1;
   }
 
-  applyGroundControl(feet: FeetState, kicks: KickEvent[], grounded: boolean, step: number): GroundCommand {
-    if (!grounded) return idleGroundCommand();
+  /** Deadzoned analog response for a held common-mode pad displacement. */
+  private steerInput(lateral: number): number {
+    const magnitude = Math.abs(lateral);
+    const deadzone = this.loco.steerInputDeadzone;
+    if (magnitude <= deadzone) return 0;
+    const span = Math.max(1e-6, this.loco.steerInputFullScale - deadzone);
+    const normalized = clamp((magnitude - deadzone) / span, 0, 1);
+    return Math.sign(lateral) * normalized;
+  }
+
+  applyGroundControl(
+    feet: FeetState,
+    kicks: KickEvent[],
+    grounded: boolean,
+    step: number,
+  ): GroundCommand {
+    if (!grounded) {
+      return idleGroundCommand();
+    }
 
     const cmd: GroundCommand = {
       active: true,
       driveForce: 0,
+      brakeForce: 0,
       pushImpulse: 0,
       targetYawRate: 0,
+      steerAngle: null,
       rollTorque: 0,
     };
 
     const seg = feet.segment;
+    const driveAllowed =
+      feet.bothPlanted && seg.valid && feet.accelerating === true;
+    cmd.brakeForce = driveAllowed ? 0 : this.loco.coastBrakeForce;
 
-    // Cruise: hold both feet on the board to accelerate.
-    if (feet.bothPlanted) {
-      cmd.driveForce = this.loco.cruiseDriveForce;
+    // Ctrl is the only propulsion input. Pad travel is reserved for steering
+    // and tricks, so swiping can never create confusing phantom speed.
+    if (feet.bothPlanted && seg.valid) {
+      cmd.driveForce = driveAllowed ? this.loco.cruiseDriveForce : 0;
     }
 
     // Steer + lean (need a valid board-contact segment).
     if (feet.bothPlanted && seg.valid) {
-      const s = this.stanceSign();
-      let yaw =
-        s * (this.loco.steerYawGain * seg.angVel + this.loco.steerHeadingBiasGain * seg.angleFromRest);
-      // Lean: lateral midpoint offset adds a mild carve and a cosmetic roll.
       const lateral = seg.midpointOffsetFromRest.x;
-      yaw += s * this.loco.leanCarveGain * lateral;
-      cmd.targetYawRate = clamp(yaw, -this.physics.steerYawRateMax, this.physics.steerYawRateMax);
-      cmd.rollTorque = this.loco.leanRollGain * lateral;
+      const steer = this.steerInput(lateral);
+      // Common-mode movement is deliberately stance-independent, like Skate's
+      // left stick: sliding both fingers right always carves right. Individual
+      // relative foot motion remains reserved for Flick-It trick recognition.
+      const twistCarve =
+        this.stanceSign() *
+        (this.loco.steerYawGain * seg.angVel +
+          this.loco.steerHeadingBiasGain * seg.angleFromRest);
+      cmd.targetYawRate = clamp(
+        steer * this.loco.steerRateAtFull + twistCarve,
+        -this.physics.steerYawRateMax,
+        this.physics.steerYawRateMax,
+      );
+      cmd.rollTorque = this.loco.leanRollGain * steer;
     }
 
     // Push pulse: both-planted kick, respecting bothClickMeans + cooldown.
-    if (this.profile.bothClickMeans === 'push') {
+    if (this.profile.bothClickMeans === "push") {
       for (const k of kicks) {
-        if (k.mask !== 'both') continue;
+        if (k.mask !== "both") continue;
         if (step - this.lastPushStep < this.loco.pushCooldownSteps) continue;
         cmd.pushImpulse = this.physics.pushImpulse;
         this.lastPushStep = step;
         // Distinct 'push' event — FootTracker already logs the 'kick' (with
         // mask) for attribution; this records the pulse actually applied.
-        this.telemetry?.log({ type: 'push', step, mask: k.mask });
+        this.telemetry?.log({ type: "push", step, mask: k.mask });
         break;
       }
     }
@@ -93,7 +121,7 @@ export class BoardController {
     // Sampled ground-control telemetry (throttled so the ring is not flooded).
     if (this.telemetry && step % this.loco.groundControlLogEvery === 0) {
       this.telemetry.log({
-        type: 'groundControl',
+        type: "groundControl",
         step,
         drive: cmd.driveForce,
         yaw: cmd.targetYawRate,

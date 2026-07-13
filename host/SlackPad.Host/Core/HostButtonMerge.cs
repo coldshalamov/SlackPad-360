@@ -14,7 +14,8 @@ namespace SlackPad.Host.Core;
 /// that split. So the host samples <c>GetAsyncKeyState(VK_LBUTTON/VK_RBUTTON)</c>
 /// on the batch timer and maps:
 ///   primary   = left mouse button down,
-///   secondary = right mouse button down.
+///   secondary = right mouse button down,
+///   auxiliary = foreground Ctrl down.
 ///
 /// The HID Button-1 bit is intentionally DISCARDED rather than OR-ed in: OR-ing
 /// would set <c>primary</c> true on a right-click-zone press (HID Button 1 is
@@ -22,10 +23,13 @@ namespace SlackPad.Host.Core;
 /// </summary>
 public static class HostButtonMerge
 {
-    public static ContactFrameButtons Merge(bool leftDown, bool rightDown) => new()
+    public static ContactFrameButtons Merge(
+        bool leftDown,
+        bool rightDown,
+        bool auxiliaryDown = false) => new()
     {
         Primary = leftDown,
         Secondary = rightDown,
-        Auxiliary = false,
+        Auxiliary = auxiliaryDown,
     };
 }

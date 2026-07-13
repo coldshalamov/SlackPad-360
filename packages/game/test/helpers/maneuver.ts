@@ -13,9 +13,9 @@ import type { TelemetryEvent } from '../../src/telemetry/Telemetry';
 
 export const DT_MS = 1000 / DEFAULT_SIM_CONFIG.physics.hz;
 
-/** Default calibrated foot positions (regular stance: pad-left = nose). */
-export const NOSE_POS = { x: 0.4, y: 0.5 };
-export const TAIL_POS = { x: 0.6, y: 0.5 };
+/** Default right-hand stance: index/pad-left=tail, middle/pad-right=nose. */
+export const TAIL_POS = { x: 0.4, y: 0.5 };
+export const NOSE_POS = { x: 0.6, y: 0.5 };
 
 export interface FootInput {
   x: number;
@@ -30,6 +30,8 @@ export interface DriveOptions {
   primary?: boolean;
   /** RMB — front-foot kick under 'buttonSide' attribution (IMPL-007). */
   secondary?: boolean;
+  /** Explicit acceleration action (native/DEV Ctrl). */
+  auxiliary?: boolean;
 }
 
 /**
@@ -69,7 +71,11 @@ export class PadDriver {
       frameId: this.frameId++,
       tPerfMs: this.step * DT_MS,
       contacts,
-      buttons: { primary: opts.primary ?? false, secondary: opts.secondary ?? false, auxiliary: false },
+      buttons: {
+        primary: opts.primary ?? false,
+        secondary: opts.secondary ?? false,
+        auxiliary: opts.auxiliary ?? false,
+      },
     };
     this.harness.injectContactFrame(frame);
     this.harness.step(1);
@@ -80,9 +86,9 @@ export class PadDriver {
     this.harness.step(n);
   }
 
-  /** Both feet planted at rest positions for n steps (cruise). */
+  /** Both feet planted with explicit acceleration for n steps (cruise). */
   cruise(n: number): void {
-    for (let i = 0; i < n; i++) this.drive({ nose: NOSE_POS, tail: TAIL_POS });
+    for (let i = 0; i < n; i++) this.drive({ nose: NOSE_POS, tail: TAIL_POS, auxiliary: true });
   }
 }
 
@@ -138,9 +144,9 @@ export function lastEventOf(h: AgentHarness, type: string): Record<string, unkno
 }
 
 /**
- * Scripted ollie: from a settled, cruising state — crisp nose prep (fast
- * pad movement), nose lift, kick. Returns the pop step. `gapSteps` separates
- * the lift and the kick (0 = same step → perfect click-centering).
+ * Scripted shipping ollie: two stable contacts + LMB. Legacy timing options
+ * remain accepted so older scenario callers do not need custom setup, but no
+ * lift is required and the click uses the binary configured pop quality.
  */
 export function scriptOllie(
   d: PadDriver,
@@ -154,14 +160,10 @@ export function scriptOllie(
   for (let i = 1; i <= prepFrames; i++) {
     d.drive({ nose: { x: NOSE_POS.x, y: NOSE_POS.y - speed * i }, tail: TAIL_POS });
   }
-  // Lift the nose; wait `gap` steps; kick on a tail-only frame.
-  if (gap === 0) {
-    d.drive({ tail: TAIL_POS, primary: true });
-  } else {
-    d.drive({ tail: TAIL_POS });
-    for (let i = 1; i < gap; i++) d.drive({ tail: TAIL_POS });
-    d.drive({ tail: TAIL_POS, primary: true });
-  }
+  // Restore the stable stance, optionally wait, then click with both planted.
+  d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+  for (let i = 0; i < gap; i++) d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+  d.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
   return d.step - 1; // the sim step at which the kick was consumed
 }
 

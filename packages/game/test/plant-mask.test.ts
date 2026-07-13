@@ -71,15 +71,15 @@ describe('plant-mask attribution truth table', () => {
   });
 
   it('left contact alone flips role by stance', () => {
-    // regular: padLeft = nose → nose-only; goofy: padLeft = tail → tail-only.
-    expect(maskFor('regular', 'left')).toBe('nose');
-    expect(maskFor('goofy', 'left')).toBe('tail');
+    // regular: padLeft = tail; goofy mirrors to nose.
+    expect(maskFor('regular', 'left')).toBe('tail');
+    expect(maskFor('goofy', 'left')).toBe('nose');
   });
 
   it('right contact alone flips role by stance', () => {
-    // regular: padRight = tail → tail-only; goofy: padRight = nose → nose-only.
-    expect(maskFor('regular', 'right')).toBe('tail');
-    expect(maskFor('goofy', 'right')).toBe('nose');
+    // regular: padRight = nose; goofy mirrors to tail.
+    expect(maskFor('regular', 'right')).toBe('nose');
+    expect(maskFor('goofy', 'right')).toBe('tail');
   });
 
   it('no feet planted + click → "none"', () => {

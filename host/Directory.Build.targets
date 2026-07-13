@@ -1,0 +1,13 @@
+<Project>
+
+  <!-- WebView2's transitive targets add both WinForms and WPF assemblies to
+       every modern .NET desktop project. SlackPad's host and tests are
+       WinForms-only; removing the unused WPF reference avoids its WindowsBase
+       5.0/10.0 binding conflict in both projects. -->
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

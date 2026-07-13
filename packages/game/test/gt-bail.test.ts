@@ -14,18 +14,21 @@ import type { SessionTrace, SimConfig } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import { eventsOf, PadDriver, scriptOllie, settled, TAIL_POS } from './helpers/maneuver';
 
-/** Over-pitched pops bail reliably (see gt-land): scale 0.056 over-rotates. */
+/** Engineer a pitched binary click landing outside a deliberately tight cone. */
 function bailConfig(): SimConfig {
   const cfg = structuredClone(DEFAULT_SIM_CONFIG) as SimConfig;
-  (cfg.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.056;
+  (cfg.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.12;
+  (cfg.pop as { levelKp: number }).levelKp = 0;
+  (cfg.pop as { levelKd: number }).levelKd = 0;
+  (cfg.land as { thetaDirtyDeg: number }).thetaDirtyDeg = cfg.land.thetaCleanDeg;
   return deepFreezeConfig(cfg);
 }
 
-/** Drive to a bail: settle, cruise, max-q ollie, fly uncaught until bail. */
+/** Drive to a bail: settle, cruise, binary LMB pop, fly until impact. */
 async function driveToBail(h: AgentHarness): Promise<PadDriver> {
   const d = await settled(0xba11, 'flat-dev', h);
   d.cruise(90);
-  scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
+  scriptOllie(d);
   for (let i = 0; i < 120 && h.observe().phase !== 'bail'; i++) d.drive({ tail: TAIL_POS });
   return d;
 }
@@ -75,7 +78,7 @@ describe('GT-bail: fail state, damping, respawn', () => {
       const d = new PadDriver(h);
       d.idle(60);
       d.cruise(90);
-      scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
+      scriptOllie(d);
       for (let i = 0; i < 90; i++) d.drive({ tail: TAIL_POS }); // flight + bail (fixed length)
       d.idle(DEFAULT_SIM_CONFIG.bail.recoverSteps + 90); // respawn + settle
       return h.stopRecording();

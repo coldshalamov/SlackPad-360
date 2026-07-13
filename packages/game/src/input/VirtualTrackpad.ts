@@ -8,11 +8,10 @@
  *
  * Interaction (bottom-left panel):
  *  - Hold LEFT mouse = foot A planted at the cursor.
- *  - Hold SHIFT (with LMB) = foot B, mirrored across the pad vertical center, so
- *    dragging + rotating the pair steers. Hold CTRL to LOCK B for independent A.
+ *  - Hold SHIFT (with LMB) = foot B. Dragging translates the pair as one
+ *    steering stick; hold ALT to move A independently for manual trick input.
  *  - SPACE = primary click (kick) while held.
- *  - X = suspend foot A while held (M4: lifts A without dropping B, so nollie
- *    prep is performable — releasing X replants A, which is also the catch).
+ *  - X = suspend foot A while held (optional advanced manual-foot control).
  *  - S toggle stance · C capture padYawOffset from the current segment ·
  *    F swap feet · 0/1/2 set assist level (via ProfileStore, persisted).
  *  - M5 air gestures (press AFTER a pop, while airborne): K = kickflip flick,
@@ -21,18 +20,17 @@
  *    arc for shuvs) over ~6 emitted frames through the SAME emitter, so it drives
  *    the real AirGestureClassifier. On the ground the flick is ignored (§3.1).
  *
- * M4 ollie recipe (regular stance, A on the pad-right = tail, B = nose):
- *   hold LMB right-of-center + SHIFT (cruise) → release SHIFT (nose lift) →
- *   SPACE within the pop window → pop/air → re-press SHIFT after the apex
- *   (replant near the socket) → catch → clean land. Nollie mirrors with X.
+ * Skate-like recipe: hold LMB + SHIFT for two feet, hold Ctrl to accelerate,
+ * then SPACE for an ollie (N/RMB for nollie). Press K/H/J/L after the pop for
+ * a forgiving trick; default assists catch while both contacts remain planted.
  *
  * Frames emit at ~120 Hz on a UI-side wall clock — legitimate here because this
  * is an input DEVICE; those timestamps simply become tPerfMs downstream.
  */
 
-import type { ContactFrame } from '@slackpad/shared';
-import type { InputHub } from './InputHub';
-import type { ProfileStore } from './ProfileStore';
+import type { ContactFrame } from "@slackpad/shared";
+import type { InputHub } from "./InputHub";
+import type { ProfileStore } from "./ProfileStore";
 
 const PANEL_W = 260;
 const PANEL_H = 180;
@@ -46,7 +44,7 @@ const FLICK_STEP = 0.05;
 const SWEEP_RADIUS = 0.16;
 const SWEEP_SPAN = Math.PI * 0.75;
 
-type GestureKind = 'kickflip' | 'heelflip' | 'bs-shuv' | 'fs-shuv';
+type GestureKind = "kickflip" | "heelflip" | "bs-shuv" | "fs-shuv";
 
 interface Vec2 {
   x: number;
@@ -71,7 +69,8 @@ export class VirtualTrackpad {
 
   private shiftHeld = false;
   private ctrlHeld = false;
-  /** X held: foot A is suspended (lifted) without dropping B — nollie prep. */
+  private altHeld = false;
+  /** X held: optional advanced manual lift for foot A. */
   private aSuspended = false;
   private bId = 0;
   private bPos: Vec2 = { x: 0.5, y: 0.5 };
@@ -87,34 +86,35 @@ export class VirtualTrackpad {
     private readonly inputHub: InputHub,
     private readonly profile: ProfileStore,
   ) {
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = PANEL_W * (window.devicePixelRatio || 1);
     canvas.height = PANEL_H * (window.devicePixelRatio || 1);
     Object.assign(canvas.style, {
-      position: 'fixed',
-      left: '16px',
-      bottom: '16px',
+      position: "fixed",
+      left: "16px",
+      bottom: "16px",
       width: `${PANEL_W}px`,
       height: `${PANEL_H}px`,
-      borderRadius: '12px',
-      background: 'rgba(12,16,22,0.82)',
-      boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
-      cursor: 'crosshair',
-      touchAction: 'none',
-      zIndex: '10',
+      borderRadius: "12px",
+      background: "rgba(12,16,22,0.82)",
+      boxShadow: "0 6px 24px rgba(0,0,0,0.45)",
+      cursor: "crosshair",
+      touchAction: "none",
+      zIndex: "10",
     });
     container.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('VirtualTrackpad: 2D canvas context unavailable');
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("VirtualTrackpad: 2D canvas context unavailable");
     this.canvas = canvas;
     this.ctx = ctx;
 
-    canvas.addEventListener('mousedown', this.onMouseDown);
-    canvas.addEventListener('contextmenu', this.onContextMenu);
-    window.addEventListener('mousemove', this.onMouseMove);
-    window.addEventListener('mouseup', this.onMouseUp);
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
+    canvas.addEventListener("mousedown", this.onMouseDown);
+    canvas.addEventListener("contextmenu", this.onContextMenu);
+    window.addEventListener("mousemove", this.onMouseMove);
+    window.addEventListener("mouseup", this.onMouseUp);
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.releaseControls);
 
     this.emitTimer = setInterval(this.emit, 1000 / EMIT_HZ);
     this.draw();
@@ -122,12 +122,13 @@ export class VirtualTrackpad {
 
   dispose(): void {
     clearInterval(this.emitTimer);
-    this.canvas.removeEventListener('mousedown', this.onMouseDown);
-    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
-    window.removeEventListener('mousemove', this.onMouseMove);
-    window.removeEventListener('mouseup', this.onMouseUp);
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("contextmenu", this.onContextMenu);
+    window.removeEventListener("mousemove", this.onMouseMove);
+    window.removeEventListener("mouseup", this.onMouseUp);
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("blur", this.releaseControls);
     this.canvas.remove();
   }
 
@@ -164,8 +165,26 @@ export class VirtualTrackpad {
 
   private onMouseMove = (e: MouseEvent): void => {
     if (!this.aDown) return;
-    this.aPos = this.toPad(e.clientX, e.clientY);
-    if (this.bId && !this.ctrlHeld) this.bPos = this.mirror(this.aPos);
+    const next = this.toPad(e.clientX, e.clientY);
+    if (this.bId && !this.altHeld) {
+      // Preserve the pair geometry while translating its centroid. This makes
+      // ordinary two-finger travel a stable steering axis instead of also
+      // looking like a relative-foot trick gesture.
+      const wantedX = next.x - this.aPos.x;
+      const wantedY = next.y - this.aPos.y;
+      const dx = Math.max(
+        -Math.min(this.aPos.x, this.bPos.x),
+        Math.min(1 - Math.max(this.aPos.x, this.bPos.x), wantedX),
+      );
+      const dy = Math.max(
+        -Math.min(this.aPos.y, this.bPos.y),
+        Math.min(1 - Math.max(this.aPos.y, this.bPos.y), wantedY),
+      );
+      this.aPos = { x: this.aPos.x + dx, y: this.aPos.y + dy };
+      this.bPos = { x: this.bPos.x + dx, y: this.bPos.y + dy };
+    } else {
+      this.aPos = next;
+    }
   };
 
   private onMouseUp = (e: MouseEvent): void => {
@@ -182,61 +201,66 @@ export class VirtualTrackpad {
   private plantB(): void {
     if (this.bId) return;
     this.bId = this.nextContactId++;
-    this.bPos = this.ctrlHeld ? this.bPos : this.mirror(this.aPos);
+    this.bPos = this.altHeld ? this.bPos : this.mirror(this.aPos);
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === 'Shift') {
+    if (e.key === "Shift") {
       this.shiftHeld = true;
       if (this.aDown) this.plantB();
       return;
     }
-    if (e.key === 'Control') {
+    if (e.key === "Control") {
       this.ctrlHeld = true;
       return;
     }
-    if (e.code === 'Space') {
+    if (e.key === "Alt") {
+      this.altHeld = true;
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "Space") {
       this.primary = true;
       e.preventDefault();
       return;
     }
     switch (e.key.toLowerCase()) {
-      case 'n':
+      case "n":
         this.secondary = true; // keyboard alternative to RMB (nollie kick)
         break;
-      case 'x':
-        this.aSuspended = true; // lift foot A while held (nollie prep)
+      case "x":
+        this.aSuspended = true; // optional manual foot lift
         break;
-      case 's':
+      case "s":
         this.profile.toggleStance();
         break;
-      case 'c':
+      case "c":
         this.captureCalibration();
         break;
-      case 'f':
+      case "f":
         this.profile.toggleSwapFeet();
         break;
-      case '0':
+      case "0":
         this.profile.setAssistLevel(0);
         break;
-      case '1':
+      case "1":
         this.profile.setAssistLevel(1);
         break;
-      case '2':
+      case "2":
         this.profile.setAssistLevel(2);
         break;
       // M5 scripted air gestures (perform AFTER a pop, while airborne).
-      case 'k':
-        this.startGesture('kickflip');
+      case "k":
+        this.startGesture("kickflip");
         break;
-      case 'h':
-        this.startGesture('heelflip');
+      case "h":
+        this.startGesture("heelflip");
         break;
-      case 'j':
-        this.startGesture('bs-shuv');
+      case "j":
+        this.startGesture("bs-shuv");
         break;
-      case 'l':
-        this.startGesture('fs-shuv');
+      case "l":
+        this.startGesture("fs-shuv");
         break;
       default:
         break;
@@ -260,12 +284,12 @@ export class VirtualTrackpad {
     if (!g) return null;
     const i = g.i + 1;
     let p: Vec2;
-    if (g.kind === 'kickflip' || g.kind === 'heelflip') {
+    if (g.kind === "kickflip" || g.kind === "heelflip") {
       // Heelside = pad-down (+y) for a regular rider (see AirGestureClassifier).
-      const dir = g.kind === 'kickflip' ? 1 : -1;
+      const dir = g.kind === "kickflip" ? 1 : -1;
       p = { x: g.base.x, y: clamp01(g.base.y + dir * FLICK_STEP * i) };
     } else {
-      const dir = g.kind === 'bs-shuv' ? 1 : -1;
+      const dir = g.kind === "bs-shuv" ? 1 : -1;
       const a0 = -Math.PI / 2;
       const a = a0 + dir * SWEEP_SPAN * (i / GESTURE_FRAMES);
       p = {
@@ -279,16 +303,18 @@ export class VirtualTrackpad {
   }
 
   private onKeyUp = (e: KeyboardEvent): void => {
-    if (e.key === 'Shift') {
+    if (e.key === "Shift") {
       this.shiftHeld = false;
       this.bId = 0; // releasing SHIFT lifts foot B
-    } else if (e.key === 'Control') {
+    } else if (e.key === "Control") {
       this.ctrlHeld = false;
-    } else if (e.code === 'Space') {
+    } else if (e.key === "Alt") {
+      this.altHeld = false;
+    } else if (e.code === "Space") {
       this.primary = false;
-    } else if (e.key.toLowerCase() === 'n') {
+    } else if (e.key.toLowerCase() === "n") {
       this.secondary = false;
-    } else if (e.key.toLowerCase() === 'x') {
+    } else if (e.key.toLowerCase() === "x") {
       this.aSuspended = false;
       // Re-plant is a fresh hardware contact: new id (real pads never reuse).
       if (this.aDown) this.aId = this.nextContactId++;
@@ -298,7 +324,9 @@ export class VirtualTrackpad {
   /** C: set padYawOffset from the current raw segment angle (both feet down). */
   private captureCalibration(): void {
     if (!this.aDown || !this.bId) return;
-    const deg = (Math.atan2(this.bPos.y - this.aPos.y, this.bPos.x - this.aPos.x) * 180) / Math.PI;
+    const deg =
+      (Math.atan2(this.bPos.y - this.aPos.y, this.bPos.x - this.aPos.x) * 180) /
+      Math.PI;
     this.profile.setPadYawOffset(deg);
   }
 
@@ -308,19 +336,35 @@ export class VirtualTrackpad {
     const scripted = this.tickGesture();
     if (scripted) {
       this.aPos = scripted;
-      if (this.bId && !this.ctrlHeld) this.bPos = this.mirror(this.aPos);
     }
-    const contacts: ContactFrame['contacts'] = [];
+    const contacts: ContactFrame["contacts"] = [];
     if (this.aDown && !this.aSuspended)
-      contacts.push({ id: this.aId, tip: true, x: this.aPos.x, y: this.aPos.y, confidence: true });
-    if (this.bId) contacts.push({ id: this.bId, tip: true, x: this.bPos.x, y: this.bPos.y, confidence: true });
+      contacts.push({
+        id: this.aId,
+        tip: true,
+        x: this.aPos.x,
+        y: this.aPos.y,
+        confidence: true,
+      });
+    if (this.bId)
+      contacts.push({
+        id: this.bId,
+        tip: true,
+        x: this.bPos.x,
+        y: this.bPos.y,
+        confidence: true,
+      });
     const frame: ContactFrame = {
       schemaVersion: 1,
       frameId: this.frameCounter++,
       tPerfMs: performance.now(),
-      source: 'synthetic',
+      source: "synthetic",
       contacts,
-      buttons: { primary: this.primary, secondary: this.secondary, auxiliary: false },
+      buttons: {
+        primary: this.primary,
+        secondary: this.secondary,
+        auxiliary: this.ctrlHeld,
+      },
     };
     this.inputHub.push(frame);
     this.draw();
@@ -334,7 +378,7 @@ export class VirtualTrackpad {
     ctx.clearRect(0, 0, PANEL_W, PANEL_H);
 
     // Subtle grid.
-    ctx.strokeStyle = 'rgba(90,120,150,0.18)';
+    ctx.strokeStyle = "rgba(90,120,150,0.18)";
     ctx.lineWidth = 1;
     for (let i = 1; i < 6; i++) {
       const gx = (PANEL_W / 6) * i;
@@ -347,50 +391,77 @@ export class VirtualTrackpad {
       ctx.stroke();
     }
     // Vertical center (mirror axis).
-    ctx.strokeStyle = 'rgba(120,150,180,0.35)';
+    ctx.strokeStyle = "rgba(120,150,180,0.35)";
     ctx.beginPath();
     ctx.moveTo(PANEL_W / 2, 0);
     ctx.lineTo(PANEL_W / 2, PANEL_H);
     ctx.stroke();
 
     const prof = this.profile.get();
-    ctx.fillStyle = 'rgba(200,220,240,0.9)';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText('DEV PAD (non-representative)', 8, 15);
-    ctx.fillStyle = 'rgba(150,175,200,0.85)';
+    ctx.fillStyle = "rgba(200,220,240,0.9)";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillText("DEV PAD (non-representative)", 8, 15);
+    ctx.fillStyle = "rgba(150,175,200,0.85)";
     ctx.fillText(
-      `stance ${prof.stance}  swap ${prof.swapFeet ? 'on' : 'off'}  yaw ${prof.padYawOffset.toFixed(0)}°  assist ${prof.assistLevel}`,
+      `stance ${prof.stance}  swap ${prof.swapFeet ? "on" : "off"}  yaw ${prof.padYawOffset.toFixed(0)}°  assist ${prof.assistLevel}`,
       8,
       PANEL_H - 22,
     );
-    ctx.fillStyle = 'rgba(120,145,170,0.7)';
-    ctx.fillText('LMB=A · Shift=B · X=liftA · Ctrl=lockB · Space=click', 8, PANEL_H - 8);
-    ctx.fillStyle = this.gesture ? 'rgba(255,180,90,0.95)' : 'rgba(120,145,170,0.7)';
-    ctx.fillText('after pop: K/H=kick/heelflip · J/L=bs/fs shuv', 8, PANEL_H - 34);
+    ctx.fillStyle = "rgba(120,145,170,0.7)";
+    ctx.fillText(
+      "drag=steer · Alt=solo A · Ctrl=go · Space=ollie",
+      8,
+      PANEL_H - 8,
+    );
+    ctx.fillStyle = this.gesture
+      ? "rgba(255,180,90,0.95)"
+      : "rgba(120,145,170,0.7)";
+    ctx.fillText(
+      "after pop: K/H=kick/heelflip · J/L=bs/fs shuv",
+      8,
+      PANEL_H - 34,
+    );
 
     // Segment line between the two feet.
     if (this.aDown && this.bId) {
-      ctx.strokeStyle = this.primary ? 'rgba(255,120,90,0.9)' : 'rgba(120,200,160,0.8)';
+      ctx.strokeStyle = this.primary
+        ? "rgba(255,120,90,0.9)"
+        : "rgba(120,200,160,0.8)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(this.aPos.x * PANEL_W, this.aPos.y * PANEL_H);
       ctx.lineTo(this.bPos.x * PANEL_W, this.bPos.y * PANEL_H);
       ctx.stroke();
     }
-    if (this.aDown && !this.aSuspended) this.drawContact(this.aPos, '#4aa3ff', 'A');
-    if (this.bId) this.drawContact(this.bPos, '#4ade80', 'B');
+    if (this.aDown && !this.aSuspended)
+      this.drawContact(this.aPos, "#4aa3ff", "A");
+    if (this.bId) this.drawContact(this.bPos, "#4ade80", "B");
   }
+
+  /** Browser focus loss must never leave virtual fingers or buttons latched. */
+  private releaseControls = (): void => {
+    this.aDown = false;
+    this.aId = 0;
+    this.bId = 0;
+    this.shiftHeld = false;
+    this.ctrlHeld = false;
+    this.altHeld = false;
+    this.aSuspended = false;
+    this.primary = false;
+    this.secondary = false;
+    this.gesture = null;
+  };
 
   private drawContact(p: Vec2, color: string, label: string): void {
     const ctx = this.ctx;
     const x = p.x * PANEL_W;
     const y = p.y * PANEL_H;
     ctx.beginPath();
-    ctx.fillStyle = this.primary ? '#ff785a' : color;
+    ctx.fillStyle = this.primary ? "#ff785a" : color;
     ctx.arc(x, y, 9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#0b0d10';
-    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.fillStyle = "#0b0d10";
+    ctx.font = "bold 10px system-ui, sans-serif";
     ctx.fillText(label, x - 3, y + 3);
   }
 }

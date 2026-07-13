@@ -6,15 +6,14 @@
  * The shoes are co-authored in board-local space and parented under the board
  * group, so their AUTHORED local transform IS the resting nose/tail socket. Each
  * foot's live board-local offset (ObserveState.feet[role].offset) is expressed
- * relative to the harness rest base `(0, deckTop, ±truckInsetZ)`; the difference
- * is a "pad delta" added on top of the authored socket. This decouples the art's
- * socket position from the harness's rest convention (advisor note) and means
- * the ground-both case sits exactly on the authored sockets with zero delta.
+ * relative to the harness rest base `(0, deckTop, ±truckInsetZ)`. Hardware
+ * contact positions are control intent, not a second skeletal rig: planted
+ * shoes stay on their authored deck sockets instead of chasing raw HID jitter.
  *
  *   | Phase        | Placement                                              |
  *   | Ground both  | authored sockets, slight vertical squash               |
- *   | One plant    | planted foot follows its pad delta; free foot at socket |
- *   | Air          | freeze last offsets + subtle lean opposing flip roll   |
+ *   | Contact noise| remain on sockets (no cosmetic foot seizure)             |
+ *   | Pop / air    | rear-foot snap + front-foot slide, then level/catch      |
  *   | Catch        | ease delta → 0 (back to sockets) over the catch rate    |
  *   | Bail         | detach, integrate ballistic in render space, fade out   |
  *   | Respawn      | reattach cleanly at the sockets                        |
@@ -33,8 +32,10 @@ export interface ShoeRestBase {
   tailZ: number;
 }
 
-/** Clamp on the pad delta so a big foot slide never throws a shoe off the deck. */
-const MAX_DELTA = 0.3;
+const FREE_FOOT_LIFT = 0.075;
+const POP_FOOT_LIFT = 0.06;
+const GUIDE_FOOT_LIFT = 0.035;
+const GUIDE_SLIDE = 0.06;
 
 type Role = 'nose' | 'tail';
 
@@ -45,6 +46,8 @@ interface ShoeState {
   authoredPos: THREE.Vector3;
   authoredQuat: THREE.Quaternion;
   authoredScale: THREE.Vector3;
+  /** Conservative object-local bounds used to keep every sole above deck. */
+  boundsCorners: THREE.Vector3[];
   // Smoothed presentation state.
   delta: THREE.Vector3;
   scaleY: number;
@@ -67,6 +70,42 @@ function collectMaterials(obj: THREE.Object3D): THREE.Material[] {
     else if (m) out.push(m);
   });
   return out;
+}
+
+/**
+ * Measure a static shoe subtree in the shoe root's own coordinates. Keeping
+ * the eight corners of its conservative AABB is enough to enforce the live
+ * deck plane after cosmetic rotation without depending on an asset-specific
+ * pivot convention.
+ */
+function localBoundsCorners(obj: THREE.Object3D): THREE.Vector3[] {
+  obj.updateWorldMatrix(true, true);
+  const rootInv = obj.matrixWorld.clone().invert();
+  const bounds = new THREE.Box3();
+  const p = new THREE.Vector3();
+  obj.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    mesh.geometry.computeBoundingBox();
+    const b = mesh.geometry.boundingBox;
+    if (!b) return;
+    for (const x of [b.min.x, b.max.x]) {
+      for (const y of [b.min.y, b.max.y]) {
+        for (const z of [b.min.z, b.max.z]) {
+          p.set(x, y, z).applyMatrix4(mesh.matrixWorld).applyMatrix4(rootInv);
+          bounds.expandByPoint(p);
+        }
+      }
+    }
+  });
+  if (bounds.isEmpty()) bounds.set(new THREE.Vector3(), new THREE.Vector3());
+  const corners: THREE.Vector3[] = [];
+  for (const x of [bounds.min.x, bounds.max.x]) {
+    for (const y of [bounds.min.y, bounds.max.y]) {
+      for (const z of [bounds.min.z, bounds.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    }
+  }
+  return corners;
 }
 
 export class ShoeAnimator {
@@ -112,6 +151,35 @@ export class ShoeAnimator {
     return stance === 'goofy' ? { nose: 'R', tail: 'L' } : { nose: 'L', tail: 'R' };
   }
 
+  /**
+   * The shoe GLB is authored as a side-by-side asset-review pair. Once the
+   * renderer has assigned each shoe its stance role, its local position must be
+   * the matching board socket instead — a skateboard stance is fore/aft along
+   * the board's long axis, not left/right across the deck.
+   *
+   * Both shoes are also turned across the deck, the way feet (and two fingers
+   * pointing toward the screen) actually sit on a skateboard. Regular points
+   * toes toward +X; goofy mirrors toward -X.
+   */
+  static placeAtSockets(
+    shoeNose: THREE.Object3D,
+    shoeTail: THREE.Object3D,
+    socketNose: THREE.Vector3,
+    socketTail: THREE.Vector3,
+    stance: Stance = 'regular',
+  ): void {
+    shoeNose.position.copy(socketNose);
+    shoeTail.position.copy(socketTail);
+    const yaw = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      stance === 'regular' ? Math.PI / 2 : -Math.PI / 2,
+    );
+    // Runtime stance owns the orientation. Carrying arbitrary authored
+    // review-scene rotation into play can pitch a sole through the deck.
+    shoeNose.quaternion.copy(yaw);
+    shoeTail.quaternion.copy(yaw);
+  }
+
   #mkState(role: Role, obj: THREE.Object3D): ShoeState {
     return {
       role,
@@ -120,6 +188,7 @@ export class ShoeAnimator {
       authoredPos: obj.position.clone(),
       authoredQuat: obj.quaternion.clone(),
       authoredScale: obj.scale.clone(),
+      boundsCorners: localBoundsCorners(obj),
       delta: new THREE.Vector3(),
       scaleY: 1,
       lean: 0,
@@ -162,7 +231,13 @@ export class ShoeAnimator {
     const cfg = this.#cfg;
     const phase = obs.phase;
     const air = phase === 'air';
+    const pop = phase === 'pop';
     const isCatch = phase === 'catch';
+    const basicPop = obs.label === 'ollie' || obs.label === 'nollie';
+    const popDirection = obs.label === 'nollie' ? -1 : 1;
+    const guideRole: Role = obs.label === 'nollie' ? 'tail' : 'nose';
+    const popRole: Role = guideRole === 'nose' ? 'tail' : 'nose';
+    const rising = pop || obs.board.lv.y > 0.05;
 
     // Board-local roll rate for the air lean (cosmetic).
     this.#av.set(obs.board.av.x, obs.board.av.y, obs.board.av.z).applyQuaternion(this.#invQuat);
@@ -172,13 +247,6 @@ export class ShoeAnimator {
 
     for (const s of this.#shoes) {
       const foot = this.#foot(obs, s.role);
-
-      // Pad delta (board-local): live offset minus the harness rest base.
-      const baseZ = s.role === 'nose' ? this.#base.noseZ : this.#base.tailZ;
-      const dX = THREE.MathUtils.clamp(foot.offset.x - 0, -MAX_DELTA, MAX_DELTA);
-      const dY = THREE.MathUtils.clamp(foot.offset.y - this.#base.deckTopY, -MAX_DELTA, MAX_DELTA);
-      const dZ = THREE.MathUtils.clamp(foot.offset.z - baseZ, -MAX_DELTA, MAX_DELTA);
-
       let rate: number;
       let targetX = 0;
       let targetY = 0;
@@ -186,33 +254,45 @@ export class ShoeAnimator {
       let targetScaleY = 1;
       let targetLean = 0;
 
-      if (air) {
-        // Freeze offsets; only the lean tracks the flip roll.
-        rate = 0;
-        targetX = s.delta.x;
-        targetY = s.delta.y;
-        targetZ = s.delta.z;
-        targetScaleY = s.scaleY;
-        targetLean = targetLeanAir;
+      if (air || pop) {
+        // A basic pop has readable fingerboard choreography: the kicking foot
+        // snaps up from the tail/nose while the guide foot slides toward the
+        // opposite end, then both settle toward the deck on descent. The
+        // objects remain board children, so this is presentation layered over
+        // the real rigid-body pitch rather than a second board animation.
+        rate = cfg.shoeGroundBlendRate;
+        targetScaleY = 1;
+        targetLean = foot.planted ? 0 : targetLeanAir;
+        if (basicPop) {
+          const isGuide = s.role === guideRole;
+          const isPopFoot = s.role === popRole;
+          targetY = rising ? (isPopFoot ? POP_FOOT_LIFT : GUIDE_FOOT_LIFT) : 0.012;
+          targetZ += popDirection * (isGuide ? (rising ? GUIDE_SLIDE : GUIDE_SLIDE * 0.45) : -0.012);
+        } else {
+          targetY = foot.planted ? 0.012 : FREE_FOOT_LIFT;
+        }
       } else if (isCatch) {
         // Ease back to the sockets over the catch rate.
         rate = cfg.shoeCatchBlendRate;
         targetScaleY = 1;
       } else {
-        // Ground / none / pop: planted foot follows its pad delta, free rests.
+        // Ground / none / grind: both shoes are a stable readable stance.
+        // Contact loss and HID position spikes still matter to controls, but
+        // they do not make the presentation rig jump off or through the deck.
         rate = cfg.shoeGroundBlendRate;
-        if (foot.planted) {
-          targetX = dX;
-          targetY = dY;
-          targetZ = dZ;
-          targetScaleY = cfg.shoeSquashY;
-        }
+        targetScaleY = cfg.shoeSquashY;
       }
 
-      // Lean always eases (toward 0 unless in air) at the ground rate.
-      const leanRate = air ? cfg.shoeGroundBlendRate : cfg.shoeGroundBlendRate;
-      const aLean = 1 - Math.exp(-leanRate * dt);
-      s.lean += (targetLean - s.lean) * aLean;
+      // Replant/catch establishes sole contact immediately. Carrying a
+      // smoothed residual lean into that frame makes one end of the shoe pass
+      // through the deck before the easing catches up.
+      if (!air && !pop) {
+        s.lean = 0;
+      } else {
+        const leanRate = cfg.shoeGroundBlendRate;
+        const aLean = 1 - Math.exp(-leanRate * dt);
+        s.lean += (targetLean - s.lean) * aLean;
+      }
 
       if (rate > 0) {
         const a = 1 - Math.exp(-rate * dt);
@@ -227,7 +307,20 @@ export class ShoeAnimator {
       this.#leanQuat.setFromAxisAngle(this.#zAxis, s.lean);
       s.obj.quaternion.copy(this.#leanQuat).multiply(s.authoredQuat);
       s.obj.scale.set(s.authoredScale.x, s.authoredScale.y * s.scaleY, s.authoredScale.z);
+      this.#raiseSoleToDeck(s);
     }
+  }
+
+  /** Enforce the deck as a hard visual contact plane after all animation. */
+  #raiseSoleToDeck(s: ShoeState): void {
+    let minY = Number.POSITIVE_INFINITY;
+    for (const corner of s.boundsCorners) {
+      this.#tmp.copy(corner).multiply(s.obj.scale).applyQuaternion(s.obj.quaternion).add(s.obj.position);
+      minY = Math.min(minY, this.#tmp.y);
+    }
+    const deckPlane = Math.max(s.authoredPos.y, this.#base.deckTopY);
+    const penetration = deckPlane - minY;
+    if (penetration > 0) s.obj.position.y += penetration;
   }
 
   #updateBail(obs: ObserveState, dt: number): void {
