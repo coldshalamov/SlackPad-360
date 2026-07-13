@@ -25,8 +25,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run implementation smoke suite
-        run: npm run ci:smoke
+      - name: Validate research deliverables
+        run: node research/probes/validate-deliverables.mjs
+
+      - name: Validate research follow-up
+        run: node research/probes/validate-followup.mjs
+
+      - name: Validate implementation package
+        run: node preproduction/probes/validate-final.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit, property, and golden tests
+        run: npm test
+
+      - name: Regenerate golden reports
+        run: npm run goldens
+
+      - name: Build and validate authored assets
+        env:
+          RUN_ASSET_PIPELINE: '1'
+        run: npx vitest run packages/asset-pipeline
+
+      - name: Build production game
+        run: npm run build
 
       - name: Record bundle inventory
         shell: bash
