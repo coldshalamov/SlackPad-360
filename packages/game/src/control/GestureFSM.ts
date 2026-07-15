@@ -48,9 +48,10 @@
  * Math.random.
  */
 
-import type { SimConfig, Stance } from '@slackpad/shared';
+import { TRICK_INTENT_VERSION } from '@slackpad/shared';
+import type { SimConfig, Stance, TrickIntentV1 } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
-import type { FeetState } from '../input/FootTracker';
+import type { FeetSample, FeetState } from '../input/FootTracker';
 import type { BoardPose } from '../sim/SimWorld';
 import type { RailProximity } from '../sim/rails';
 import type { PopRecognition } from './KickArbiter';
@@ -111,6 +112,8 @@ export type FsmEvent =
 
 export interface FsmInputs {
   feet: FeetState;
+  /** Every calibrated contact sample consumed during this physics step. */
+  footSamples?: FeetSample[];
   pops: PopRecognition[];
   grounded: boolean;
   pose: BoardPose;
@@ -133,6 +136,8 @@ export interface FsmResult {
    * data ManeuverAssist flushes. Null outside the air/grind phases.
    */
   grind: GrindStepResult | null;
+  /** Current categorical player intent; base pop remains the safe fallback. */
+  intent: TrickIntentV1 | null;
 }
 
 function msToSteps(ms: number, hz: number): number {
@@ -142,6 +147,7 @@ function msToSteps(ms: number, hz: number): number {
 export class GestureFSM {
   #phase: GesturePhase = 'none';
   #label: RecognitionLabelState | null = null;
+  #intent: TrickIntentV1 | null = null;
   #lastFailReason: FailReason | null = null;
 
   // Maneuver bookkeeping (steps, not wall time).
@@ -177,7 +183,7 @@ export class GestureFSM {
   constructor(
     private readonly config: SimConfig,
     private readonly assistLevel: 0 | 1 | 2,
-    stance: Stance,
+    private readonly stance: Stance,
     private readonly telemetry?: Telemetry,
   ) {
     const hz = config.physics.hz;
@@ -195,6 +201,10 @@ export class GestureFSM {
   get label(): RecognitionLabelState | null {
     if (!this.#label) return null;
     return { ...this.#label, air: this.#label.air ? { ...this.#label.air } : null };
+  }
+
+  get intent(): TrickIntentV1 | null {
+    return this.#intent ? structuredClone(this.#intent) : null;
   }
 
   /** Signed completed roll (turns) since the pop — read by tests/telemetry. */
@@ -221,6 +231,7 @@ export class GestureFSM {
     const flipRotations = this.flipRotations;
     const shuvDegrees = this.shuvDegrees;
     this.#label = null;
+    this.#intent = null;
     this.#grind.reset();
     this.#lastGrind = null;
     this.#lastFailReason = reason;
@@ -390,6 +401,7 @@ export class GestureFSM {
       lastFailReason: this.#lastFailReason,
       events,
       grind: this.#lastGrind,
+      intent: this.intent,
     };
   }
 
@@ -475,6 +487,22 @@ export class GestureFSM {
       q: pop.q,
       air: null,
     };
+    this.#intent = {
+      version: TRICK_INTENT_VERSION,
+      attemptId: `${step}:${pop.label}`,
+      popSide: pop.label === 'ollie' ? 'tail' : 'nose',
+      base: pop.label,
+      family: 'ollie',
+      direction: 'none',
+      label: pop.label,
+      gestureSpeed: 0,
+      gestureAccuracy: 1,
+      confidence,
+      fallback: true,
+      stance: this.stance,
+      source: { popStep: step, recognizedStep: null },
+    };
+    this.telemetry?.log({ type: 'trickIntent', step, intent: this.intent! });
     this.#lastFailReason = null; // a new attempt clears the old failure
     this.#impulseWindow.length = 0; // fresh maneuver, fresh interrupt window
     this.#airClassifier.reset(); // fresh maneuver, fresh flick/sweep evidence
@@ -514,11 +542,14 @@ export class GestureFSM {
         shuvDegrees,
       });
       this.#label = null;
+      this.#intent = null;
       this.#phase = 'ground';
     };
 
-    if (thetaDeg <= land.thetaCleanDeg) finish('clean');
-    else if (thetaDeg <= land.thetaDirtyDeg) finish('dirty');
+    const cleanLimit = land.thetaCleanDeg + land.cleanAssistBonusDeg[this.assistLevel];
+    const dirtyLimit = land.thetaDirtyDeg + land.dirtyAssistBonusDeg[this.assistLevel];
+    if (thetaDeg <= cleanLimit) finish('clean');
+    else if (thetaDeg <= dirtyLimit) finish('dirty');
     else this.#bail(cos < 0 ? 'inverted' : 'over-rotation', inp.step, events);
   }
 
@@ -585,6 +616,7 @@ export class GestureFSM {
     const shuvDegrees = this.shuvDegrees;
     // Interrupt (§3.3): clear open labels/envelopes; physics continues.
     this.#label = null;
+    this.#intent = null;
     this.#grind.reset(); // a bail clears any grind candidate/latch too
     this.#lastFailReason = reason;
     this.#phase = 'bail';
@@ -661,13 +693,57 @@ export class GestureFSM {
    */
   #classifyAir(inp: FsmInputs): void {
     if (!this.#label || inp.step > this.#label.expireStep) return;
-    const g = this.#airClassifier.update({
-      step: inp.step,
-      dt: 1 / this.config.physics.hz,
-      nose: { planted: inp.feet.nose.planted, vel: inp.feet.nose.vel },
-      tail: { planted: inp.feet.tail.planted, vel: inp.feet.tail.vel },
-    });
+    const samples = inp.footSamples ?? [];
+    let g: AirGesture | null = null;
+    if (samples.length > 0) {
+      for (const sample of samples) {
+        const feet = sample.state;
+        g = this.#airClassifier.update({
+          step: inp.step,
+          dt: sample.dtSeconds,
+          nose: { planted: feet.nose.planted, vel: feet.nose.vel },
+          tail: { planted: feet.tail.planted, vel: feet.tail.vel },
+        });
+      }
+    } else {
+      g = this.#airClassifier.update({
+        step: inp.step,
+        dt: 1 / this.config.physics.hz,
+        nose: { planted: inp.feet.nose.planted, vel: inp.feet.nose.vel },
+        tail: { planted: inp.feet.tail.planted, vel: inp.feet.tail.vel },
+      });
+    }
     this.#label.air = g;
+    if (g) {
+      const direction: TrickIntentV1['direction'] =
+        g.label === 'kickflip'
+          ? 'heelside'
+          : g.label === 'heelflip'
+            ? 'toeside'
+            : g.label === 'fs-shuv'
+              ? 'frontside'
+              : 'backside';
+      const nextIntent: TrickIntentV1 = {
+        version: TRICK_INTENT_VERSION,
+        attemptId: this.#intent?.attemptId ?? `${this.#popStep}:${this.#label.label}`,
+        popSide: this.#label.label === 'ollie' ? 'tail' : 'nose',
+        base: this.#label.label,
+        family: g.kind,
+        direction,
+        label: g.label,
+        gestureSpeed: g.intensity,
+        gestureAccuracy: g.accuracy,
+        confidence: g.confidence,
+        fallback: false,
+        stance: this.stance,
+        source: { popStep: this.#popStep, recognizedStep: inp.step },
+      };
+      const changed =
+        this.#intent?.label !== nextIntent.label ||
+        this.#intent?.confidence !== nextIntent.confidence;
+      this.#intent = nextIntent;
+      if (changed) this.telemetry?.log({ type: 'trickIntent', step: inp.step, intent: this.intent! });
+    }
   }
 
   /**

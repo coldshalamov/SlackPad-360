@@ -72,7 +72,7 @@ describe('shuv-180: sweep → 180° yaw', () => {
       }));
       await h.reset(0x5b03, 'flat-dev');
       h.step(60);
-      const d = new PadDriver(h);
+      const d = new PadDriver(h, 'regular', 'plantMask');
       d.cruise(90);
       scriptOllie(d, { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 });
       const r = flyWithGesture(d, { gesture: 'shuv-bs', catchAfterApexSteps: 10, frames: 6, startAfterAir: 2 });
@@ -100,7 +100,7 @@ describe('shuv-180: sweep → 180° yaw', () => {
     }));
     await h.reset(0x5b04, 'test-obstacle');
     h.step(60);
-    const d = new PadDriver(h);
+    const d = new PadDriver(h, 'regular', 'plantMask');
 
     // Hold Ctrl until fast, while preserving enough clear run-up to pop before
     // the wall rather than colliding during the acceleration fixture itself.

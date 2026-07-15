@@ -2,10 +2,8 @@
  * ManeuverCommand — the plain-data hand-off from ManeuverAssist to SimWorld
  * (M4). Exactly the GroundCommand pattern: ManeuverAssist produces INTENTS
  * only; SimWorld.applyManeuver validates and clamps every component from
- * config and applies forces/impulses. There are NO pose writes here and no
- * velocity writes except the catch angular-damping multiplier, which the spec
- * itself defines as an omega scaling (final-physics §3.2:
- * `omega *= (1 - catchGain * assistScale)`).
+ * config and applies forces/impulses. There are NO pose or velocity writes in
+ * normal play; catch damping is an inertia-aware, bounded torque impulse.
  */
 
 import type { Vec3 } from '@slackpad/shared';
@@ -13,6 +11,7 @@ import type { Vec3 } from '@slackpad/shared';
 export type ManeuverCommand =
   | PopManeuverCommand
   | OllieLevelManeuverCommand
+  | FlipImpulseManeuverCommand
   | FlipTorqueManeuverCommand
   | CatchManeuverCommand
   | CatchQuantizeManeuverCommand
@@ -30,8 +29,12 @@ export interface PopManeuverCommand {
   kind: 'pop';
   /** Vertical pop impulse, N·s. SimWorld clamps to [0, pop.jMax]. */
   jY: number;
-  /** Signed pitch torque impulse about board-right, N·m·s (clamped). */
-  pitchTorqueImpulse: number;
+  /** Physical board end kicked downward while the pop impulse unloads it. */
+  popSide?: 'tail' | 'nose';
+  /** Downward point impulse at popSide; the opposing lift preserves net jY. */
+  kickImpulse?: number;
+  /** Legacy trace/test field accepted for v1 replay compatibility. */
+  pitchTorqueImpulse?: number;
 }
 
 /**
@@ -43,6 +46,14 @@ export interface OllieLevelManeuverCommand {
   kind: 'ollieLevel';
   /** Signed target pitch, rad. Positive raises the nose. */
   targetPitch: number;
+}
+
+/** One-shot physical angular impulse that starts a recognized flip or shuv. */
+export interface FlipImpulseManeuverCommand {
+  kind: 'flipImpulse';
+  axis: 'long' | 'up';
+  omegaTarget: number;
+  maxTorqueImpulse: number;
 }
 
 /**
@@ -66,29 +77,30 @@ export interface FlipTorqueManeuverCommand {
 }
 
 /**
- * Catch damping: the spec's own equation, implemented as an angular-velocity
- * scale. factor = 1 − catchGain·assistScale[assistLevel], clamped to [0, 1].
+ * Catch damping requests a fraction of angular motion to remove. SimWorld
+ * converts it to an inertia-aware torque impulse and clamps that impulse.
  */
 export interface CatchManeuverCommand {
   kind: 'catch';
   angularFactor: number;
+  maxTorqueImpulse?: number;
 }
 
 /**
  * Catch-time quantize (M5; final-physics §3.4). When the completed rotation at
  * catch lands inside the assist-level cone of a whole trick (k·360° flip / k·180°
  * shuv), remove `damp` of the ON-AXIS spin so continued over-rotation bleeds
- * off and the catch stays inside the completion cone. SimWorld removes only
- * the axis-projected component:
- *   av' = av − damp·(av·axisWorld)·axisWorld
- * This is EXTRA angular damping about one axis — never a pose write, never a
- * teleport to a perfect pose. L0 never emits this (cone 0 / damp 0).
+ * off and the catch stays inside the completion cone. SimWorld opposes only
+ * the axis-projected component with a bounded torque impulse. This is EXTRA
+ * angular damping about one axis — never a pose write, velocity write, or
+ * teleport to a perfect pose. Experienced emits none when its bundle is zero.
  */
 export interface CatchQuantizeManeuverCommand {
   kind: 'catchQuantize';
   axis: 'long' | 'up';
   /** Fraction of the on-axis angular velocity to remove, clamped to [0, 1]. */
   damp: number;
+  maxTorqueImpulse?: number;
 }
 
 /**

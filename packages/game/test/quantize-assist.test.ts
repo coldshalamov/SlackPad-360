@@ -41,7 +41,7 @@ async function runFlick(
     swapFeet: false,
     assistLevel,
     bothClickMeans: 'ignore',
-    kickAttribution: 'buttonSide',
+    kickAttribution: 'motionTap',
     tapToClickIsKick: false,
     accessibility: { reducedMotion: false, highContrastHud: false },
   }));

@@ -128,7 +128,10 @@ TO PLAY
   1. Extract this whole "${stageName}" folder anywhere (keep the files together).
   2. Double-click SlackPad.Host.exe.
   3. Plant TWO fingers on your Precision Touchpad to ride. Press F11 for fullscreen.
-     Left-click = back-foot kick / ollie, right-click = front-foot kick / nollie.
+     Rotate the two-finger line to set the board heading.
+     Lift + retap the rear finger for ollie; lift + retap front for nollie.
+     Hold Ctrl to accelerate. Swipe after a pop for flip/shuv intent.
+     Press V for the optional route camera. Press F8 for the Flick-It Lab.
      Close the window to quit.
 
 REQUIREMENTS
@@ -148,12 +151,16 @@ NOTES
 `;
 writeFileSync(path.join(stageDir, 'README.txt'), readme);
 
-// --- 6. Zip (PowerShell Compress-Archive; this is a Windows-only bundle) ------
+// --- 6. Zip (Windows ships bsdtar as tar.exe; avoid the optional and sometimes
+//         broken Microsoft.PowerShell.Archive module) -------------------------
 run(
   'zip bundle',
-  `powershell -NoProfile -Command "Compress-Archive -Path '${stageDir}' -DestinationPath '${zipPath}' -Force"`,
+  `tar.exe -a -c -f "${zipPath}" -C "${distReleaseDir}" "${stageName}"`,
 );
 if (!existsSync(zipPath)) pause('zip not produced', `expected ${path.relative(repoRoot, zipPath)}`);
+
+// A successful retry supersedes any prior honest pause packet.
+rmSync(path.join(evidenceDir, 'pause-packet.json'), { force: true });
 
 // --- 7. Inventory ------------------------------------------------------------
 const zipSize = statSync(zipPath).size;

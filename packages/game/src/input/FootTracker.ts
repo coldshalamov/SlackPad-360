@@ -4,7 +4,7 @@
  * Owns logical feet, stance, and the padYawOffset calibration (architecture §2:
  * FootTracker owns "Logical feet, stance, padYawOffset"; must not own
  * rendering). It consumes the ContactFrames drained for one sim step and emits a
- * per-step FeetState plus click-attribution KickEvents. It NEVER touches the
+ * per-step FeetState plus lift/retap (or explicit legacy click) KickEvents. It NEVER touches the
  * physics body — BoardController turns FeetState into intents downstream.
  *
  * Coordinate pipeline (research/control-grammar §3, input-platform-spec §6):
@@ -71,16 +71,39 @@ export interface FeetState {
   accelerating?: boolean;
 }
 
-/** Click attribution result on a primary/secondary button rising edge. */
+/**
+ * One calibrated tracker result for one accepted ContactFrame. Physics still
+ * advances at its fixed rate, but gesture recognition consumes this complete
+ * higher-rate sequence so an 8 ms flick is not flattened into one 16.7 ms
+ * endpoint.
+ */
+export interface FeetSample {
+  frameId: number;
+  tPerfMs: number;
+  /** Time since the preceding accepted hardware sample, seconds. */
+  dtSeconds: number;
+  state: FeetState;
+}
+
+/** A physical-button edge (legacy) or a lift-and-retap kick gesture. */
 export interface KickEvent {
   step: number;
   mask: PlantMask;
   /**
-   * Which physical button edge produced this kick. Primary = LMB (back-foot
-   * kick under 'buttonSide' attribution), secondary = RMB (front-foot kick).
-   * The KickArbiter owns the mapping; the tracker only reports truthfully.
+   * Compatibility side channel used by the legacy arbiter and trace schema.
+   * Motion taps also map tail/nose to primary/secondary, while `source` and
+   * `tapRole` remain the authoritative shipping fields.
    */
   button: "primary" | "secondary";
+  source?: "button" | "motionTap";
+  tapRole?: FootRole;
+  tapDurationMs?: number;
+  tapDistance?: number;
+}
+
+interface PendingMotionTap {
+  liftedAtMs: number;
+  from: Vec2;
 }
 
 interface RestPose {
@@ -162,6 +185,7 @@ export class FootTracker {
   private stance: InputProfile["stance"];
   private padYawOffset: number;
   private swapFeet: boolean;
+  private kickAttribution: InputProfile["kickAttribution"];
 
   private readonly roles: Record<FootRole, RoleSlot> = {
     nose: this.freshSlot("nose"),
@@ -194,12 +218,15 @@ export class FootTracker {
   private recenterActive = false;
 
   private pendingKicks: KickEvent[] = [];
+  private readonly pendingMotionTaps: Partial<Record<FootRole, PendingMotionTap>> = {};
+  private pendingSamples: FeetSample[] = [];
   private currentState: FeetState;
 
   constructor(
     cfg: FootTrackerConfig,
     plantSpeedEps: number,
-    profile: Pick<InputProfile, "stance" | "padYawOffset" | "swapFeet">,
+    profile: Pick<InputProfile, "stance" | "padYawOffset" | "swapFeet"> &
+      Partial<Pick<InputProfile, "kickAttribution">>,
     private readonly telemetry?: Telemetry,
   ) {
     this.cfg = cfg;
@@ -207,6 +234,9 @@ export class FootTracker {
     this.stance = profile.stance;
     this.padYawOffset = profile.padYawOffset;
     this.swapFeet = profile.swapFeet;
+    // Direct low-level tracker tests that predate the shipping motion profile
+    // keep the legacy button edge behavior. Product profiles always provide it.
+    this.kickAttribution = profile.kickAttribution ?? "buttonSide";
     this.currentState = this.buildLiveState();
   }
 
@@ -224,7 +254,19 @@ export class FootTracker {
 
   /** Consume the frames drained for `step`; return the post-frame FeetState. */
   update(frames: ContactFrame[], step: number): FeetState {
-    for (const frame of frames) this.processFrame(frame, step);
+    for (const frame of frames) {
+      const previousTPerfMs = this.lastFrameTPerfMs;
+      this.processFrame(frame, step);
+      this.pendingSamples.push({
+        frameId: frame.frameId,
+        tPerfMs: frame.tPerfMs,
+        dtSeconds:
+          previousTPerfMs == null
+            ? 0
+            : Math.max(0, frame.tPerfMs - previousTPerfMs) / 1000,
+        state: this.buildOutputState(),
+      });
+    }
     this.currentState = this.buildOutputState();
     return this.currentState;
   }
@@ -239,6 +281,14 @@ export class FootTracker {
     if (this.pendingKicks.length === 0) return [];
     const out = this.pendingKicks;
     this.pendingKicks = [];
+    return out;
+  }
+
+  /** Remove and return every per-frame calibrated sample since the last drain. */
+  drainSamples(): FeetSample[] {
+    if (this.pendingSamples.length === 0) return [];
+    const out = this.pendingSamples;
+    this.pendingSamples = [];
     return out;
   }
 
@@ -263,7 +313,18 @@ export class FootTracker {
     // 3. Assign contacts to roles.
     const assign = this.assignRoles(pts, step);
 
-    // 4. Update role slots (position, velocity, plant/lift).
+    // 4. Update role slots (position, velocity, plant/lift). Capture the
+    // previous state first so a new hardware contact id can still complete a
+    // tap for the logical role selected by proximity rebinding.
+    const wasBoth = this.roles.nose.planted && this.roles.tail.planted;
+    const wasPlanted: Record<FootRole, boolean> = {
+      nose: this.roles.nose.planted,
+      tail: this.roles.tail.planted,
+    };
+    const previousPos: Record<FootRole, Vec2> = {
+      nose: { ...this.roles.nose.pos },
+      tail: { ...this.roles.tail.pos },
+    };
     for (const role of ["nose", "tail"] as const) {
       const R = this.roles[role];
       const pt = assign.get(role);
@@ -290,6 +351,54 @@ export class FootTracker {
       }
     }
 
+    // A deliberate kick is the only meaningful 3D-like motion available
+    // without constraining hand rotation to a click zone: one role leaves the
+    // pad, then returns near its own socket while the other role stays planted.
+    for (const role of ["nose", "tail"] as const) {
+      const nowPlanted = this.roles[role].planted;
+      if (wasPlanted[role] && !nowPlanted && wasBoth) {
+        this.pendingMotionTaps[role] = { liftedAtMs: t, from: previousPos[role] };
+      } else if (!wasPlanted[role] && nowPlanted) {
+        const pending = this.pendingMotionTaps[role];
+        delete this.pendingMotionTaps[role];
+        if (!pending || this.kickAttribution !== "motionTap") continue;
+        const duration = t - pending.liftedAtMs;
+        const distance = Math.sqrt(dist2(pending.from, this.roles[role].pos));
+        const other: FootRole = role === "nose" ? "tail" : "nose";
+        if (
+          this.roles[other].planted &&
+          duration >= this.cfg.motionTapMinLiftMs &&
+          duration <= this.cfg.motionTapMaxLiftMs &&
+          distance <= this.cfg.motionTapReplantRadius
+        ) {
+          const kick: KickEvent = {
+            step,
+            mask: "both",
+            button: role === "tail" ? "primary" : "secondary",
+            source: "motionTap",
+            tapRole: role,
+            tapDurationMs: duration,
+            tapDistance: distance,
+          };
+          this.pendingKicks.push(kick);
+          this.telemetry?.log({
+            type: "kick",
+            step,
+            mask: "both",
+            button: kick.button,
+            source: "motionTap",
+            role,
+            durationMs: duration,
+            distance,
+          });
+        }
+      }
+      const pending = this.pendingMotionTaps[role];
+      if (pending && t - pending.liftedAtMs > this.cfg.motionTapMaxLiftMs) {
+        delete this.pendingMotionTaps[role];
+      }
+    }
+
     // 5. Segment + rest + recenter.
     const both = this.roles.nose.planted && this.roles.tail.planted;
     if (both) this.updateSegment(t, dt);
@@ -301,14 +410,14 @@ export class FootTracker {
     // 6. Dual-lift ballistic hold / clear.
     this.updateDualLift(both, dtMs);
 
-    // 7. Click attribution on primary/secondary rising edges. Both may rise in
-    // one frame (rare, host-batched) — emit both; the arbiter takes one pop.
-    if (!this.prevPrimary && frame.buttons.primary) {
+    // 7. Physical buttons remain available only to explicit legacy profiles.
+    // The shipping motionTap profile deliberately ignores them.
+    if (this.kickAttribution !== "motionTap" && !this.prevPrimary && frame.buttons.primary) {
       const mask = this.plantMask();
       this.pendingKicks.push({ step, mask, button: "primary" });
       this.telemetry?.log({ type: "kick", step, mask, button: "primary" });
     }
-    if (!this.prevSecondary && frame.buttons.secondary) {
+    if (this.kickAttribution !== "motionTap" && !this.prevSecondary && frame.buttons.secondary) {
       const mask = this.plantMask();
       this.pendingKicks.push({ step, mask, button: "secondary" });
       this.telemetry?.log({ type: "kick", step, mask, button: "secondary" });

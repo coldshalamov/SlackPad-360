@@ -348,6 +348,12 @@ export class GameRenderer {
   get cameraRig(): CameraRig {
     return this.#rig;
   }
+  cameraState(): {
+    p: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+  } {
+    return this.#rig.telemetryState();
+  }
   get domElement(): HTMLCanvasElement {
     return this.#renderer.domElement;
   }

@@ -34,6 +34,8 @@ export interface PlayableParkLayout {
   pieces: readonly ParkPieceDescriptor[];
   /** A readable spawn-to-runout line: bank → deck → bank → flatbar. */
   featuredLine: readonly string[];
+  /** Two authored ways to turn the line back through the plaza. */
+  returnRoutes: readonly (readonly string[])[];
 }
 
 const FUNBOX_RISE = 0.3;
@@ -57,6 +59,13 @@ const SIDE_BANK_LENGTH = Math.hypot(SIDE_BANK_RUN, SIDE_BANK_RISE);
 const SIDE_BANK_THICKNESS = 0.12;
 const SIDE_BANK_CENTER_Y =
   SIDE_BANK_RISE / 2 - Math.cos(SIDE_BANK_TILT) * SIDE_BANK_THICKNESS / 2;
+const RETURN_BANK_RISE = 1.05;
+const RETURN_BANK_RUN = 4;
+const RETURN_BANK_TILT = Math.atan(RETURN_BANK_RISE / RETURN_BANK_RUN);
+const RETURN_BANK_LENGTH = Math.hypot(RETURN_BANK_RUN, RETURN_BANK_RISE);
+const RETURN_BANK_THICKNESS = 0.12;
+const RETURN_BANK_CENTER_Y =
+  RETURN_BANK_RISE / 2 - Math.cos(RETURN_BANK_TILT) * RETURN_BANK_THICKNESS / 2;
 
 /**
  * One plain-data source for BOTH Rapier and Three.js. The centre lane gives a
@@ -91,6 +100,12 @@ const PLAYABLE_PARK_CORE_PIECES: readonly ParkPieceDescriptor[] = [
       center: [1.1, 0.28, 22],
       size: [0.08, 0.04, 10],
       grind: { ledge: false },
+    },
+    {
+      id: 'manual-pad',
+      kind: 'platform',
+      center: [-2.5, 0.07, 20],
+      size: [2.6, 0.14, 4.5],
     },
 
     // Left lane: early low rail, accessible kicker, then a long ledge.
@@ -170,6 +185,20 @@ const PLAYABLE_PARK_CORE_PIECES: readonly ParkPieceDescriptor[] = [
       rotation: { y: Math.PI / 2 },
       grind: { ledge: false },
     },
+    {
+      id: 'north-return-bank',
+      kind: 'ramp',
+      center: [0, RETURN_BANK_CENTER_Y, 39.5],
+      size: [4, RETURN_BANK_THICKNESS, RETURN_BANK_LENGTH],
+      rotation: { x: -RETURN_BANK_TILT },
+    },
+    {
+      id: 'west-return-bank',
+      kind: 'ramp',
+      center: [-11, RETURN_BANK_CENTER_Y, 36.5],
+      size: [3.2, RETURN_BANK_THICKNESS, RETURN_BANK_LENGTH],
+      rotation: { x: -RETURN_BANK_TILT },
+    },
 ];
 
 function railSupports(piece: ParkPieceDescriptor): ParkPieceDescriptor[] {
@@ -208,6 +237,10 @@ export const PLAYABLE_PARK_LAYOUT: PlayableParkLayout = {
   groundCollider: 'halfspace',
   bounds: { halfX: 20, halfZ: 46, safeMargin: 3 },
   featuredLine: ['funbox-entry', 'funbox-deck', 'funbox-exit', 'centre-flatbar'],
+  returnRoutes: [
+    ['cross-plaza-rail', 'north-return-bank', 'right-bank'],
+    ['left-long-ledge', 'west-return-bank', 'left-kicker'],
+  ],
   pieces: PLAYABLE_PARK_PIECES,
 };
 

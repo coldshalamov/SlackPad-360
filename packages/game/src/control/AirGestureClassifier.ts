@@ -75,6 +75,8 @@ export interface AirGesture {
   omegaTarget: number;
   /** Flick intensity s ∈ [0,1] (flip) or normalized sweep magnitude (shuv). */
   intensity: number;
+  /** Direction/path purity independent of speed, normalized to [0, 1]. */
+  accuracy: number;
   confidence: number;
   /** +1 / −1 (sign of omegaTarget). */
   sign: number;
@@ -236,6 +238,11 @@ export class AirGestureClassifier {
       // trick. Fine motor precision varies the upper third; it does not decide
       // whether the board responds at all.
       const s = 0.72 + 0.28 * raw;
+      const axisPurity = this.#peakLat / Math.max(1e-6, this.#peakLat + this.#peakLong);
+      const pathCompletion = clamp01(
+        Math.abs(this.#latDisp) / Math.max(1e-6, flip.flickPathMinLen * 2),
+      );
+      const accuracy = clamp01(0.65 * axisPurity + 0.35 * pathCompletion);
       const sign = this.#latDisp >= 0 ? 1 : -1;
       return {
         kind: 'flip',
@@ -243,6 +250,7 @@ export class AirGestureClassifier {
         axis: 'long',
         omegaTarget: s * sign * flip.omegaFlipMax,
         intensity: s,
+        accuracy,
         confidence: rec.cEnter + (1 - rec.cEnter) * raw,
         sign,
         openStep: step,
@@ -255,12 +263,16 @@ export class AirGestureClassifier {
     );
     // Stance folds into the shuv sign exactly once (mirror of the flip latAxis).
     const shuvSign = (this.regular ? this.#yawArc : -this.#yawArc) >= 0 ? 1 : -1;
+    const accuracy = clamp01(
+      Math.abs(this.#yawArc) / Math.max(1e-6, rec.sweepMinAngleRad * 2),
+    );
     return {
       kind: 'shuv',
       label: labelFor('shuv', shuvSign),
       axis: 'up',
       omegaTarget: shuvSign * flip.shuvOmegaMax,
       intensity: s,
+      accuracy,
       confidence: rec.cEnter + (1 - rec.cEnter) * s,
       sign: shuvSign,
       openStep: step,
@@ -290,6 +302,7 @@ export class AirGestureClassifier {
       // Grow the established envelope; keep the original openStep. Confidence is
       // the running peak so a later challenger must beat the peak, not the dip.
       this.#open.intensity = candidate.intensity;
+      this.#open.accuracy = candidate.accuracy;
       this.#open.omegaTarget = candidate.omegaTarget;
       if (candidate.confidence > this.#open.confidence) this.#open.confidence = candidate.confidence;
       return;

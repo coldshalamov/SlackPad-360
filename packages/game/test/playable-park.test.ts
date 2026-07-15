@@ -29,6 +29,7 @@ interface TestLayout {
   bounds: { halfX: number; halfZ: number; safeMargin: number };
   pieces: readonly TestPiece[];
   featuredLine: readonly string[];
+  returnRoutes: readonly (readonly string[])[];
 }
 
 function layout(): TestLayout {
@@ -67,6 +68,26 @@ describe('playable-park default level contract', () => {
     expect(z).toEqual([...z].sort((a, b) => a - b));
     expect(z[0]).toBeGreaterThanOrEqual(5);
     expect(park.bounds.halfZ - z.at(-1)!).toBeGreaterThanOrEqual(5);
+  });
+
+  it('provides a dense repeatable plaza loop with a manual pad and two return choices', () => {
+    const park = layout();
+    const byId = new Map(park.pieces.map((piece) => [piece.id, piece]));
+    const required = [
+      'manual-pad',
+      'right-ledge',
+      'stair-platform',
+      'stair-handrail',
+      'north-return-bank',
+      'west-return-bank',
+    ];
+    expect(required.every((id) => byId.has(id))).toBe(true);
+    expect(park.returnRoutes).toHaveLength(2);
+    for (const route of park.returnRoutes) {
+      expect(route.length).toBeGreaterThanOrEqual(3);
+      expect(route.every((id) => byId.has(id))).toBe(true);
+    }
+    expect(new Set(park.returnRoutes.flat()).size).toBeGreaterThanOrEqual(5);
   });
 
   it('keeps every obstacle and its runout well inside an effectively endless floor', () => {
@@ -159,27 +180,38 @@ describe('playable-park default level contract', () => {
     world.free();
   });
 
-  it('keeps a sustained default-level run grounded beyond 100 metres', async () => {
+  it('reaches and rides up the north return transition at the end of the line', async () => {
     const world = new SimWorld(structuredClone(DEFAULT_SIM_CONFIG));
     await world.reset(0x1a57, DEFAULT_LEVEL_ID);
     for (let i = 0; i < 90; i++) world.step();
-    let maxZ = world.boardPose().p.z;
-    for (let i = 0; i < 2400; i++) {
+    for (let i = 0; i < 1800 && world.boardPose().p.z < 38.3; i++) {
+      const pose = world.boardPose();
+      const targetX = pose.p.z < 28 ? -0.75 : 2;
+      const targetYawRate = Math.max(-0.45, Math.min(0.45, (targetX - pose.p.x) * 0.35));
       world.applyGroundForces({
         active: true,
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
+        targetYawRate,
         steerAngle: null,
         rollTorque: 0,
       });
       world.step();
-      maxZ = Math.max(maxZ, world.boardPose().p.z);
     }
-    expect(maxZ, 'no park blocker or floor edge stops the open run').toBeGreaterThan(100);
-    expect(world.boardPose().p.z).toBeGreaterThan(100);
-    expect(world.wheelObservations().filter((wheel) => wheel.inContact).length).toBeGreaterThanOrEqual(2);
+    expect(
+      world.boardPose().p.z,
+      `direct line stopped at ${JSON.stringify(world.boardPose())}`,
+    ).toBeGreaterThanOrEqual(38.3);
+    let maxZ = world.boardPose().p.z;
+    let maxY = world.boardPose().p.y;
+    for (let i = 0; i < 180; i++) {
+      world.step();
+      maxZ = Math.max(maxZ, world.boardPose().p.z);
+      maxY = Math.max(maxY, world.boardPose().p.y);
+    }
+    expect(maxZ).toBeGreaterThan(41);
+    expect(maxY, 'the bank visibly redirects line speed upward').toBeGreaterThan(0.45);
     world.free();
   });
 
@@ -187,7 +219,7 @@ describe('playable-park default level contract', () => {
     const d = await settledProfiled(0x5eed, {
       levelId: 'playable-park',
       assistLevel: 1,
-      kickAttribution: 'buttonSide',
+      kickAttribution: 'motionTap',
     });
     const h = d.harness;
 
@@ -196,7 +228,9 @@ describe('playable-park default level contract', () => {
     d.cruise(5);
     for (let i = 0; i < 600 && h.observe().board.p.z < 14.5; i++) {
       const errorX = 1.1 - h.observe().board.p.x;
-      const degrees = Math.max(-10, Math.min(10, -errorX * 8));
+      // Pad Y grows toward the player. A rightward world carve therefore uses
+      // the opposite signed pad angle at the physical input boundary.
+      const degrees = -Math.max(-10, Math.min(10, errorX * 8));
       d.drive({
         nose: rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, degrees),
         tail: rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, degrees),
@@ -224,7 +258,10 @@ describe('playable-park default level contract', () => {
     const centreLatch = eventsOf(h, 'grindLatched').find(
       (event) => event.railId === 'centre-flatbar' && event.family === 'fifty-fifty',
     );
-    expect(centreLatch).toBeDefined();
+    expect(
+      centreLatch,
+      `final=${JSON.stringify(h.observe().board)} pops=${JSON.stringify(eventsOf(h, 'pop'))} arbitration=${JSON.stringify(eventsOf(h, 'kickArbitrated'))} candidate=${JSON.stringify(eventsOf(h, 'grindCandidate'))} exits=${JSON.stringify(eventsOf(h, 'grindExit'))}`,
+    ).toBeDefined();
     expect(sawCentreGrind).toBe(true);
     expect(eventsOf(h, 'grindExit').length).toBeGreaterThan(0);
     expect(groundedAfter).toBe(true);

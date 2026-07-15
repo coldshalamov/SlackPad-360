@@ -119,6 +119,26 @@ describe('FootTracker rebind + lift', () => {
 });
 
 describe('FootTracker robustness', () => {
+  it('preserves every calibrated hardware sample drained in one physics step', () => {
+    const t = tracker();
+    t.update(
+      [
+        frame(0, [c(1, 0.4, 0.5), c(2, 0.6, 0.5)]),
+        frame(8, [c(1, 0.4, 0.5), c(2, 0.6, 0.54)]),
+        frame(16, [c(1, 0.4, 0.5), c(2, 0.6, 0.6)]),
+      ],
+      10,
+    );
+
+    const samples = t.drainSamples();
+    expect(samples).toHaveLength(3);
+    expect(samples.map((sample) => sample.tPerfMs)).toEqual([0, 8, 16]);
+    expect(samples[0]!.dtSeconds).toBe(0);
+    expect(samples[1]!.dtSeconds).toBeCloseTo(0.008, 6);
+    expect(samples[2]!.state.nose.pos.y).toBeCloseTo(0.6, 6);
+    expect(t.drainSamples()).toEqual([]);
+  });
+
   it('clamps to two gameplay feet when >2 contacts arrive (logs a drop)', () => {
     const tel = new Telemetry();
     const t = tracker({}, tel);

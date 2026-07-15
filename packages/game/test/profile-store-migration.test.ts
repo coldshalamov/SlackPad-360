@@ -10,7 +10,7 @@ class MemoryStorage {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('shipping profile migration', () => {
-  it('cannot resurrect the removed lift-first plantMask mapping from persisted data', () => {
+  it('cannot resurrect a click mapping from persisted data', () => {
     const storage = new MemoryStorage();
     storage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
       kickAttribution: 'plantMask',
@@ -21,18 +21,18 @@ describe('shipping profile migration', () => {
 
     const profile = new ProfileStore().get();
 
-    expect(profile.kickAttribution).toBe('buttonSide');
+    expect(profile.kickAttribution).toBe('motionTap');
     expect(profile.bothClickMeans).toBe('ollie');
   });
 
-  it('does not allow a runtime profile patch to restore the removed shipping mapping', () => {
+  it('does not allow a runtime profile patch to restore a click mapping', () => {
     const storage = new MemoryStorage();
     vi.stubGlobal('localStorage', storage);
     const store = new ProfileStore();
 
     store.update({ kickAttribution: 'plantMask', bothClickMeans: 'ignore' });
 
-    expect(store.get().kickAttribution).toBe('buttonSide');
+    expect(store.get().kickAttribution).toBe('motionTap');
     expect(store.get().bothClickMeans).toBe('ollie');
   });
 });

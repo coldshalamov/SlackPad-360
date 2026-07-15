@@ -1,6 +1,6 @@
 /**
- * Ollie feel (M4): a stable two-contact LMB pop uses the shipping binary
- * clickQuality. The click always maps to the same playable height/airtime band;
+ * Ollie feel (M4): a lift-and-retap pop uses the shipping binary pop quality.
+ * The retap always maps to the same playable height/airtime band;
  * post-pop swipes, rather than a hidden lift-timing ladder, shape the trick.
  * Targets (brief): height ∈ ~[0.25, 0.8] m, airtime ∈ [0.4, 1.0] s.
  *
@@ -48,9 +48,9 @@ async function measure(
 }
 
 describe('ollie feel (M4 defaults)', () => {
-  it('stable two-contact LMB uses clickQuality and lands in the playable pop band', async () => {
-    const { row } = await measure('binary-click', {}, null);
-    expect(row.q).toBe(DEFAULT_SIM_CONFIG.pop.clickQuality);
+  it('tail lift-retap uses the fixed pop quality and lands in the playable pop band', async () => {
+    const { row } = await measure('binary-retap', {}, null);
+    expect(row.q).toBe(DEFAULT_SIM_CONFIG.pop.baseQuality);
     expect(row.jY).toBeCloseTo(8.08, 6);
     expect(row.height).toBeGreaterThanOrEqual(0.35);
     expect(row.height).toBeLessThanOrEqual(0.7);
@@ -59,15 +59,19 @@ describe('ollie feel (M4 defaults)', () => {
     console.info('[ollie-feel]', JSON.stringify(row));
   });
 
-  it('legacy lift timing and prep motion cannot secretly change binary click strength', async () => {
+  it('setup timing and prep motion cannot secretly change binary retap strength', async () => {
     const plain = await measure('plain', {}, null);
     const delayed = await measure('delayed', { gapSteps: 4 }, null);
     const moving = await measure('moving', { prepMoveFrames: 4, prepSpeedPerFrame: 0.06 }, null);
     for (const run of [plain, delayed, moving]) {
-      expect(run.row.q).toBe(DEFAULT_SIM_CONFIG.pop.clickQuality);
+      expect(run.row.q).toBe(DEFAULT_SIM_CONFIG.pop.baseQuality);
       expect(run.row.jY).toBeCloseTo(plain.row.jY, 9);
-      expect(Math.abs(run.row.height - plain.row.height)).toBeLessThan(0.001);
-      expect(run.row.airtimeSec).toBeCloseTo(plain.row.airtimeSec, 5);
+      // Physical suspension/contact and a moved heading can shift the measured
+      // apex slightly even though the point impulse is identical.
+      expect(Math.abs(run.row.height - plain.row.height)).toBeLessThan(0.015);
+      expect(Math.abs(run.row.airtimeSec - plain.row.airtimeSec)).toBeLessThanOrEqual(
+        1 / DEFAULT_SIM_CONFIG.physics.hz + 1e-6,
+      );
     }
   });
 

@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from "@slackpad/shared";
-import type { ContactFrame } from "@slackpad/shared";
+import type { ContactFrame, SessionTrace } from "@slackpad/shared";
 import { InputHub } from "../src/input/InputHub";
 import { FootTracker } from "../src/input/FootTracker";
 import { Telemetry } from "../src/telemetry/Telemetry";
@@ -111,6 +111,35 @@ describe("HostInputSource attach + intake", () => {
     expect(wv.posted).toHaveLength(1);
   });
 
+  it("exports a labeled trace through the native bridge without a privileged gameplay command", () => {
+    const wv = fakeWebview();
+    installHost(wv.api);
+    const telemetry = new Telemetry();
+    const hub = new InputHub(telemetry);
+    const source = new HostInputSource(hub, telemetry);
+    const trace: SessionTrace = {
+      header: {
+        replayVersion: 1,
+        gameVersion: "0.1.0",
+        rapierVersion: "0.19.3",
+        hz: 60,
+        seed: 1,
+        levelId: "flat-dev",
+        createdAt: "2026-07-14T00:00:00Z",
+        contactFrameSchema: 1,
+        profile: DEFAULT_INPUT_PROFILE,
+      },
+      frames: [],
+      checkpoints: [],
+      controlTrace: { version: 2, profile: DEFAULT_INPUT_PROFILE, events: [] },
+    };
+
+    expect(source.exportControlTrace(trace, "kickflip-clean")).toBe(true);
+    expect(wv.posted).toEqual([
+      { v: 1, type: "exportControlTrace", payload: { trace, label: "kickflip-clean" } },
+    ]);
+  });
+
   it("pushes contactBatch frames into the InputHub", () => {
     const wv = fakeWebview();
     installHost(wv.api);
@@ -131,6 +160,36 @@ describe("HostInputSource attach + intake", () => {
     expect(drained.map((f) => f.source)).toEqual(["hardware", "hardware"]);
   });
 
+  it("exposes the latest confident two-contact line for native calibration", () => {
+    const wv = fakeWebview();
+    installHost(wv.api);
+    const source = new HostInputSource(new InputHub(new Telemetry()), new Telemetry());
+    source.attach();
+    wv.emit(contactBatch([hardwareFrame({
+      contacts: [
+        { id: 1, tip: true, x: 0.4, y: 0.4, confidence: true },
+        { id: 2, tip: true, x: 0.6, y: 0.6, confidence: true },
+      ],
+    })]));
+
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(45, 5);
+  });
+
+  it("treats the calibration line as undirected when hardware contact order reverses", () => {
+    const wv = fakeWebview();
+    installHost(wv.api);
+    const source = new HostInputSource(new InputHub(new Telemetry()), new Telemetry());
+    source.attach();
+    wv.emit(contactBatch([hardwareFrame({
+      contacts: [
+        { id: 2, tip: true, x: 0.6, y: 0.6, confidence: true },
+        { id: 1, tip: true, x: 0.4, y: 0.4, confidence: true },
+      ],
+    })]));
+
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(45, 5);
+  });
+
   it("preserves a press and release delivered in one host batch as one kick edge", () => {
     const wv = fakeWebview();
     installHost(wv.api);
@@ -140,7 +199,7 @@ describe("HostInputSource attach + intake", () => {
     const tracker = new FootTracker(
       DEFAULT_SIM_CONFIG.footTracker,
       DEFAULT_SIM_CONFIG.recognition.plantSpeedEps,
-      DEFAULT_INPUT_PROFILE,
+      { ...DEFAULT_INPUT_PROFILE, kickAttribution: "buttonSide" },
       telemetry,
     );
     const contacts = [

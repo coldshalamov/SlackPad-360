@@ -1,4 +1,6 @@
 import type { ContactFrame } from './contactFrame';
+import type { InputProfile } from './config';
+import type { ControlTraceV2 } from './controlTrace';
 
 /**
  * Replay format v1. Body is the ordered ContactFrame stream plus periodic
@@ -18,7 +20,7 @@ export interface ReplayHeader {
   createdAt: string;
   contactFrameSchema: 1;
   /** Input profile at record time — stance/padYawOffset affect interpretation. */
-  profile?: Record<string, unknown>;
+  profile?: InputProfile;
 }
 
 export interface ReplayCheckpoint {
@@ -32,6 +34,8 @@ export interface SessionTrace {
   /** Frames tagged with the sim step at which they were consumed. */
   frames: Array<{ step: number; frame: ContactFrame }>;
   checkpoints: ReplayCheckpoint[];
+  /** Rich input/intent/body timeline; replay authority remains `frames`. */
+  controlTrace?: ControlTraceV2;
 }
 
 /** Stable 32-bit FNV-1a over a string, hex-encoded. Deterministic across runs. */

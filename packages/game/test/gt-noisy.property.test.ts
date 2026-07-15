@@ -14,6 +14,7 @@ const OBSERVE_KEYS = [
   'board',
   'phase',
   'label',
+  'intent',
   'assistLevel',
   'feet',
   'grind',

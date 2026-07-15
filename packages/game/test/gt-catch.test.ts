@@ -29,7 +29,7 @@ async function runCatch(
   replantApexOffset: number | null = null,
   offset: FootInput = { x: 0, y: 0 },
 ): Promise<CatchRun> {
-  const d = await settledProfiled(seed, { assistLevel, kickAttribution: 'buttonSide' });
+  const d = await settledProfiled(seed, { assistLevel, kickAttribution: 'motionTap' });
   d.cruise(90);
   scriptOllie(d);
 
@@ -105,7 +105,7 @@ describe('GT-catch: assisted hold and optional L0 manual catch', () => {
   });
 
   it('assisted auto-catch applies the configured angular damping factor', async () => {
-    const d = await settledProfiled(0xca7c8, { assistLevel: 1, kickAttribution: 'buttonSide' });
+    const d = await settledProfiled(0xca7c8, { assistLevel: 1, kickAttribution: 'motionTap' });
     d.cruise(90);
     scriptOllie(d);
     let before: number | null = null;

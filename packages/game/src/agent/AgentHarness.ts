@@ -20,11 +20,13 @@
 
 import {
   CONTACT_FRAME_SCHEMA_VERSION,
+  CONTROL_TRACE_VERSION,
   DEFAULT_INPUT_PROFILE,
   DEFAULT_SIM_CONFIG,
   REPLAY_VERSION,
   deepFreezeConfig,
   fnv1a,
+  normalizeInputProfile,
 } from "@slackpad/shared";
 import type {
   ContactFrame,
@@ -35,6 +37,8 @@ import type {
   ReplayHeader,
   SessionTrace,
   SimConfig,
+  ControlTraceEventV2,
+  TrickIntentV1,
 } from "@slackpad/shared";
 import { SimWorld } from "../sim/SimWorld";
 import type { BoardPose, RenderPose } from "../sim/SimWorld";
@@ -118,6 +122,7 @@ export class AgentHarness {
   #recordHeader: ReplayHeader | null = null;
   #recordedFrames: Array<{ step: number; frame: ContactFrame }> = [];
   #recordedCheckpoints: ReplayCheckpoint[] = [];
+  #recordedControlEvents: ControlTraceEventV2[] = [];
 
   #screenshotProvider: ScreenshotProvider | null = null;
 
@@ -152,6 +157,36 @@ export class AgentHarness {
         const quality = 0.5 + 0.5 * cleanFraction;
         this.#score += Math.max(25, Math.round(durationSteps * 5 * quality));
       }
+      if (event.type === "trickIntent" && this.#recording) {
+        const intentEvent = event as {
+          step: number;
+          intent: TrickIntentV1;
+        };
+        this.#recordedControlEvents.push({
+          kind: "intent",
+          step: intentEvent.step,
+          intent: structuredClone(intentEvent.intent),
+        });
+      } else if (
+        this.#recording &&
+        (event.type === "trickCompleted" ||
+          event.type === "bail" ||
+          event.type === "grindCompleted" ||
+          event.type === "grindExit" ||
+          event.type === "respawn")
+      ) {
+        const { type, step, ...payload } = event as {
+          type: "trickCompleted" | "bail" | "grindCompleted" | "grindExit" | "respawn";
+          step: number;
+          [key: string]: unknown;
+        };
+        this.#recordedControlEvents.push({
+          kind: "outcome",
+          step,
+          type,
+          payload: structuredClone(payload),
+        });
+      }
     });
     this.#world = new SimWorld(config);
     this.#inputHub = new InputHub(this.#telemetry);
@@ -176,7 +211,22 @@ export class AgentHarness {
     const src = this.#profileProvider
       ? this.#profileProvider()
       : DEFAULT_INPUT_PROFILE;
-    return deepFreezeConfig(structuredClone(src));
+    return normalizeInputProfile(src);
+  }
+
+  #installProfile(profile: InputProfile): void {
+    this.#profile = normalizeInputProfile(profile);
+    this.#assistLevel = this.#profile.assistLevel;
+    this.#footTracker = this.#makeFootTracker();
+    this.#boardController = this.#makeBoardController();
+    this.#kickArbiter = this.#makeKickArbiter();
+    this.#fsm = this.#makeGestureFsm();
+    this.#assist = new ManeuverAssist(
+      this.#config,
+      this.#assistLevel,
+      this.#telemetry,
+    );
+    this.#feetState = null;
   }
 
   #makeFootTracker(): FootTracker {
@@ -225,23 +275,13 @@ export class AgentHarness {
     this.#recordHeader = null;
     this.#recordedFrames = [];
     this.#recordedCheckpoints = [];
+    this.#recordedControlEvents = [];
     this.#lastInputSource = null;
     this.#score = 0;
     this.#inputDigest = INPUT_DIGEST_SEED;
     // Re-read the profile immutably and rebuild the recognizer/controller so a
     // dev profile edit (stance/calibration/assist) applies from step 0.
-    this.#profile = this.#snapshotProfile();
-    this.#assistLevel = this.#profile.assistLevel;
-    this.#footTracker = this.#makeFootTracker();
-    this.#boardController = this.#makeBoardController();
-    this.#kickArbiter = this.#makeKickArbiter();
-    this.#fsm = this.#makeGestureFsm();
-    this.#assist = new ManeuverAssist(
-      this.#config,
-      this.#assistLevel,
-      this.#telemetry,
-    );
-    this.#feetState = null;
+    this.#installProfile(this.#snapshotProfile());
     this.#telemetry.log({ type: "reset", step: 0, seed, levelId });
   }
 
@@ -306,6 +346,7 @@ export class AgentHarness {
       },
       phase: this.#fsm.phase,
       label: this.#fsm.label?.label ?? null,
+      intent: this.#fsm.intent,
       assistLevel: this.#assistLevel,
       feet: {
         nose: this.#footObservation("nose"),
@@ -375,14 +416,11 @@ export class AgentHarness {
       // here does not affect determinism.
       createdAt: new Date().toISOString(),
       contactFrameSchema: CONTACT_FRAME_SCHEMA_VERSION,
-      profile: {
-        stance: DEFAULT_INPUT_PROFILE.stance,
-        padYawOffset: DEFAULT_INPUT_PROFILE.padYawOffset,
-        assistLevel: DEFAULT_INPUT_PROFILE.assistLevel,
-      },
+      profile: structuredClone(this.#profile),
     };
     this.#recordedFrames = [];
     this.#recordedCheckpoints = [];
+    this.#recordedControlEvents = [];
     this.#recording = true;
     this.#telemetry.log({
       type: "recordingStarted",
@@ -404,6 +442,11 @@ export class AgentHarness {
         frame: structuredClone(r.frame),
       })),
       checkpoints: this.#recordedCheckpoints.map((c) => ({ ...c })),
+      controlTrace: {
+        version: CONTROL_TRACE_VERSION,
+        profile: structuredClone(this.#profile),
+        events: structuredClone(this.#recordedControlEvents),
+      },
     };
     this.#recording = false;
     this.#telemetry.log({
@@ -430,6 +473,10 @@ export class AgentHarness {
     this.#validateReplayHeader(trace);
 
     await this.reset(trace.header.seed, trace.header.levelId);
+    // The recorded profile is part of replay authority. Rebuild every profile-
+    // dependent recognizer/controller after reset so receiver-local settings
+    // cannot alter contact interpretation or assist behavior.
+    this.#installProfile(trace.header.profile ?? DEFAULT_INPUT_PROFILE);
     const every = this.#config.runtime.replay.checkpointEverySteps;
 
     const framesByStep = new Map<number, ContactFrame[]>();
@@ -489,6 +536,25 @@ export class AgentHarness {
     this.#screenshotProvider = provider;
   }
 
+  /** Presentation-only timing sample for ControlTraceV2 diagnostics. */
+  recordRenderSample(
+    frameMs: number,
+    tPerfMs: number,
+    camera?: {
+      p: { x: number; y: number; z: number };
+      target: { x: number; y: number; z: number };
+    },
+  ): void {
+    if (!this.#recording || !Number.isFinite(frameMs) || !Number.isFinite(tPerfMs)) return;
+    this.#recordedControlEvents.push({
+      kind: "render",
+      step: this.#world.getStep(),
+      tPerfMs,
+      frameMs: Math.max(0, frameMs),
+      ...(camera ? { camera: structuredClone(camera) } : {}),
+    });
+  }
+
   // --- Accessors for the app layer (loop/renderer/tests) -----------------
   getStep(): number {
     return this.#world.getStep();
@@ -520,6 +586,13 @@ export class AgentHarness {
       );
       if (this.#recording)
         this.#recordedFrames.push({ step: consumeStep, frame });
+      if (this.#recording) {
+        this.#recordedControlEvents.push({
+          kind: "contact",
+          step: consumeStep,
+          frame: structuredClone(frame),
+        });
+      }
     }
 
     this.#runRecognizer(frames);
@@ -529,6 +602,21 @@ export class AgentHarness {
     }
 
     const newStep = this.#world.getStep();
+    if (this.#recording) {
+      const pose = this.#world.boardPose();
+      this.#recordedControlEvents.push({
+        kind: "sim",
+        step: newStep,
+        board: {
+          p: { ...pose.p },
+          q: { ...pose.q },
+          lv: { ...pose.lv },
+          av: { ...pose.av },
+        },
+        phase: this.#fsm.phase,
+        intent: this.#fsm.intent,
+      });
+    }
     if (
       this.#recording &&
       newStep % this.#config.runtime.replay.checkpointEverySteps === 0
@@ -558,7 +646,7 @@ export class AgentHarness {
    * The per-step recognizer/controller pipeline (M3 ground + M4 maneuvers),
    * run between drain and world.step() (single-step authority):
    *
-   *   FootTracker.update(frames)                 — feet + click attribution
+   *   FootTracker.update(frames)                 — feet + lift/retap recognition
    *   → KickArbiter                              — push-vs-ollie in ONE place
    *   → GestureFSM                               — phase machine + labels
    *   → ManeuverAssist                           — clamped maneuver commands
@@ -575,6 +663,7 @@ export class AgentHarness {
     }
     const step = this.#world.getStep();
     const feet = this.#footTracker.update(frames, step);
+    const footSamples = this.#footTracker.drainSamples();
     const kicks = this.#footTracker.drainKicks();
     const grounded = this.#world.isGrounded();
     const pose = this.#world.boardPose();
@@ -597,14 +686,14 @@ export class AgentHarness {
     // Arbitrate kicks against the PREVIOUS step's phase (the FSM gate): pop
     // paths open from riding-on-ground recognition OR mid-grind (the ollie-out
     // hop the KickArbiter explicitly reserves — "mid-maneuver kicks ... e.g.
-    // grind hop"). buttonSide attribution routes a mid-grind click straight to a
-    // pop with no locomotion leak.
+    // grind hop"). A valid retap can route a mid-grind pop with no locomotion leak.
     const popAllowed =
       this.#fsm.phase === "ground" || this.#fsm.phase === "grind";
     const arb = this.#kickArbiter.update(feet, kicks, popAllowed, step);
 
     const fsmResult = this.#fsm.update({
       feet,
+      footSamples,
       pops: arb.pops,
       grounded,
       pose,
@@ -613,6 +702,25 @@ export class AgentHarness {
       railProximity,
       step,
     });
+
+    if (this.#recording) {
+      this.#recordedControlEvents.push({
+        kind: "control",
+        step,
+        samples: structuredClone(footSamples),
+        feet: structuredClone(feet),
+        clickEdges: kicks.map((kick) => ({
+          button: kick.button,
+          mask: kick.mask,
+          ...(kick.source ? { source: kick.source } : {}),
+          ...(kick.tapRole ? { tapRole: kick.tapRole } : {}),
+          ...(kick.tapDurationMs !== undefined ? { tapDurationMs: kick.tapDurationMs } : {}),
+          ...(kick.tapDistance !== undefined ? { tapDistance: kick.tapDistance } : {}),
+        })),
+        recognizerPhase: fsmResult.phase,
+        intent: fsmResult.intent ? structuredClone(fsmResult.intent) : null,
+      });
+    }
 
     // A generic side-rest fallback must never preempt an active maneuver's
     // physical landing classification. It is eligible only after the FSM says

@@ -30,11 +30,15 @@ async function riding(seed: number): Promise<PadDriver> {
 }
 
 describe('GT-click: kick classification truth table', () => {
-  it('ship default: a stable both-planted LMB opens an immediate ollie', async () => {
+  it('ship default: physical LMB is ignored and tail lift-retap opens an ollie', async () => {
     const d = await settled(0xc1100);
     d.cruise(30);
     const kickStep = d.step;
     d.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
+    expect(eventsOf(d.harness, 'popRecognized')).toHaveLength(0);
+    d.drive({ nose: NOSE_POS, tail: null });
+    d.drive({ nose: NOSE_POS, tail: null });
+    d.drive({ nose: NOSE_POS, tail: TAIL_POS });
     const pops = eventsOf(d.harness, 'popRecognized');
     expect(pops).toHaveLength(1);
     expect(pops[0]!.label).toBe('ollie');

@@ -8,13 +8,18 @@
  * Persistence is dev convenience only (guarded for non-browser environments).
  */
 
-import { DEFAULT_INPUT_PROFILE } from '@slackpad/shared';
-import type { AssistLevel, InputProfile, Stance } from '@slackpad/shared';
+import {
+  ASSIST_LEVEL_BY_PRESET,
+  ASSIST_PRESET_BY_LEVEL,
+  DEFAULT_INPUT_PROFILE,
+  normalizeInputProfile,
+} from '@slackpad/shared';
+import type { AssistLevel, AssistPreset, InputProfile, Stance } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 
-// v4 installs the direct Skate-like click contract for existing local builds:
-// LMB pops the tail, RMB pops the nose, with both riding contacts planted.
-export const PROFILE_STORAGE_KEY = 'slackpad.profile.v4';
+// v5 installs the all-motion Tech Deck contract for existing local builds:
+// lift+retap tail = ollie, lift+retap nose = nollie; clicks are ignored.
+export const PROFILE_STORAGE_KEY = 'slackpad.profile.v5';
 
 type Listener = (profile: InputProfile) => void;
 
@@ -45,13 +50,20 @@ export class ProfileStore {
   }
 
   update(patch: Partial<InputProfile>): void {
-    this.profile = {
+    const assistLevel =
+      patch.assistPreset !== undefined
+        ? ASSIST_LEVEL_BY_PRESET[patch.assistPreset]
+        : (patch.assistLevel ?? this.profile.assistLevel);
+    const assistPreset = patch.assistPreset ?? ASSIST_PRESET_BY_LEVEL[assistLevel];
+    this.profile = normalizeInputProfile({
       ...this.profile,
       ...patch,
-      kickAttribution: 'buttonSide',
+      assistLevel,
+      assistPreset,
+      kickAttribution: 'motionTap',
       bothClickMeans: 'ollie',
       accessibility: { ...this.profile.accessibility },
-    };
+    });
     this.persist();
     this.telemetry?.log({ type: 'profileChanged', patch: { ...patch } });
     for (const l of this.listeners) l(this.get());
@@ -69,6 +81,10 @@ export class ProfileStore {
     this.update({ assistLevel });
   }
 
+  setAssistPreset(assistPreset: AssistPreset): void {
+    this.update({ assistPreset });
+  }
+
   setPadYawOffset(deg: number): void {
     this.update({ padYawOffset: deg });
   }
@@ -84,15 +100,16 @@ export class ProfileStore {
       const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
       if (!raw) return base;
       const saved = JSON.parse(raw) as Partial<InputProfile>;
-      return {
+      return normalizeInputProfile({
         ...base,
         ...saved,
-        // The lift-first mapping was the source of unreliable "click does
-        // nothing" behavior. It is no longer a shipping profile choice.
-        kickAttribution: 'buttonSide',
+        assistPreset:
+          saved.assistPreset ??
+          ASSIST_PRESET_BY_LEVEL[saved.assistLevel ?? base.assistLevel],
+        kickAttribution: 'motionTap',
         bothClickMeans: 'ollie',
         accessibility: { ...base.accessibility, ...saved.accessibility },
-      };
+      });
     } catch {
       return base;
     }

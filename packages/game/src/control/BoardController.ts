@@ -10,8 +10,7 @@
  * Ground vocabulary implemented here (final-input-and-trick-spec §5):
  *  - Ride:   Ctrl is the only source of forward drive; release applies brakes.
  *  - Push:   both-planted kick (bothClickMeans 'push') → forward impulse.
- *  - Steer:  common two-finger lateral displacement → sustained carve rate.
- *  - Lean:   the same common-mode input adds a small cosmetic roll.
+ *  - Steer:  the absolute two-finger segment angle is the board heading.
  * Air control (M4/M5) is out of scope: no ground forces unless grounded.
  */
 
@@ -25,8 +24,11 @@ import type { FeetState, KickEvent } from "../input/FootTracker";
 import type { GroundCommand } from "./GroundCommand";
 import { idleGroundCommand } from "./GroundCommand";
 
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
+function wrapPi(angle: number): number {
+  let out = angle;
+  while (out > Math.PI) out -= Math.PI * 2;
+  while (out <= -Math.PI) out += Math.PI * 2;
+  return out;
 }
 
 export class BoardController {
@@ -38,21 +40,6 @@ export class BoardController {
     private readonly profile: Pick<InputProfile, "stance" | "bothClickMeans">,
     private readonly telemetry?: Telemetry,
   ) {}
-
-  /** Regular/goofy mirror for the optional two-finger twist carve. */
-  private stanceSign(): number {
-    return this.profile.stance === 'regular' ? -1 : 1;
-  }
-
-  /** Deadzoned analog response for a held common-mode pad displacement. */
-  private steerInput(lateral: number): number {
-    const magnitude = Math.abs(lateral);
-    const deadzone = this.loco.steerInputDeadzone;
-    if (magnitude <= deadzone) return 0;
-    const span = Math.max(1e-6, this.loco.steerInputFullScale - deadzone);
-    const normalized = clamp((magnitude - deadzone) / span, 0, 1);
-    return Math.sign(lateral) * normalized;
-  }
 
   applyGroundControl(
     feet: FeetState,
@@ -85,23 +72,16 @@ export class BoardController {
       cmd.driveForce = driveAllowed ? this.loco.cruiseDriveForce : 0;
     }
 
-    // Steer + lean (need a valid board-contact segment).
+    // The directed tail→nose finger line is the requested board heading. Pad
+    // Y grows toward the player, the opposite sign of world yaw in the side-on
+    // view, so negate the calibrated pad angle exactly once at this boundary.
+    // Common translation and angular velocity have no separate authority.
     if (feet.bothPlanted && seg.valid) {
-      const lateral = seg.midpointOffsetFromRest.x;
-      const steer = this.steerInput(lateral);
-      // Common-mode movement is deliberately stance-independent, like Skate's
-      // left stick: sliding both fingers right always carves right. Individual
-      // relative foot motion remains reserved for Flick-It trick recognition.
-      const twistCarve =
-        this.stanceSign() *
-        (this.loco.steerYawGain * seg.angVel +
-          this.loco.steerHeadingBiasGain * seg.angleFromRest);
-      cmd.targetYawRate = clamp(
-        steer * this.loco.steerRateAtFull + twistCarve,
-        -this.physics.steerYawRateMax,
-        this.physics.steerYawRateMax,
+      cmd.targetYawRate = 0;
+      cmd.steerAngle = wrapPi(
+        -seg.angle + (this.profile.stance === "goofy" ? Math.PI : 0),
       );
-      cmd.rollTorque = this.loco.leanRollGain * steer;
+      cmd.rollTorque = 0;
     }
 
     // Push pulse: both-planted kick, respecting bothClickMeans + cooldown.

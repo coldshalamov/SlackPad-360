@@ -14,7 +14,7 @@
  * (pitchBias·pitchTorqueScale·jY — nose-up for ollie, mirrored nose-down for
  * nollie). Applied ONCE at the pop step.
  *
- * Catch (spec §3.2): omega *= (1 − catchGain·assistScale[assistLevel]).
+ * Catch (spec §3.2): request bounded torque damping scaled by the active preset.
  *
  * Interrupts (§3.3): a bail event clears omegaTarget/impulseQueued and emits
  * the bailStart command; physics continues (SimWorld only damps + later
@@ -48,6 +48,7 @@ function zero(): Vec3 {
 
 export class ManeuverAssist {
   private readonly state: AssistState;
+  private lastImpulseAttemptId: string | null = null;
 
   constructor(
     private readonly config: SimConfig,
@@ -100,16 +101,25 @@ export class ManeuverAssist {
           const jY = pop.jMin + q * (pop.jMax - pop.jMin);
           // Negative pitch about board-right = nose UP (see SimWorld sign
           // convention comment): ollie pops nose-up, nollie mirrors nose-down.
-          const sign = ev.label === 'ollie' ? -1 : 1;
-          const pitchTorqueImpulse = sign * pop.pitchBias * pop.pitchTorqueScale * jY;
-          cmds.push({ kind: 'pop', jY, pitchTorqueImpulse });
+          const pitchTorqueImpulse = pop.pitchBias * pop.pitchTorqueScale * jY;
+          const lever = Math.max(0.1, this.config.physics.boardLength * 0.42);
+          cmds.push({
+            kind: 'pop',
+            jY,
+            popSide: ev.label === 'ollie' ? 'tail' : 'nose',
+            kickImpulse: pitchTorqueImpulse / lever,
+          });
           s.impulseQueued = { x: 0, y: jY, z: 0 };
           break;
         }
         case 'catch': {
           const gain = cat.catchGain * cat.assistScale[s.assistLevel];
           s.catchGain = gain;
-          cmds.push({ kind: 'catch', angularFactor: 1 - gain });
+          cmds.push({
+            kind: 'catch',
+            angularFactor: 1 - gain,
+            maxTorqueImpulse: cat.angularImpulseMax[s.assistLevel],
+          });
           // Quantize (spec §3.4): EXTRA on-axis damping when the completed
           // rotation at catch sits inside this level's cone of a whole trick
           // (k·360° flip / k·shuvTargetDeg shuv). Emitted AFTER the base catch
@@ -145,9 +155,31 @@ export class ManeuverAssist {
     // recognition window. SimWorld does the PD math + torque clamp.
     const air = result.label?.air ?? null;
     if (result.phase === 'air' && air && result.label && step <= result.label.expireStep) {
+      const attemptId = result.intent?.attemptId ?? `${result.label.openStep}:${result.label.label}`;
+      if (this.lastImpulseAttemptId !== attemptId) {
+        this.lastImpulseAttemptId = attemptId;
+        cmds.push({
+          kind: 'flipImpulse',
+          axis: air.axis,
+          omegaTarget: air.omegaTarget,
+          maxTorqueImpulse:
+            air.axis === 'up'
+              ? flip.shuvImpulseMax[s.assistLevel]
+              : flip.impulseMax[s.assistLevel],
+        });
+      }
       // The shuv yaw axis has ~17× the roll inertia, so it uses its own clamp.
-      const tauMax = air.axis === 'up' ? flip.shuvTauMax[s.assistLevel] : flip.tauMax[s.assistLevel];
-      cmds.push({ kind: 'flipTorque', axis: air.axis, omegaTarget: air.omegaTarget, tauMax });
+      const baseTauMax = air.axis === 'up' ? flip.shuvTauMax[s.assistLevel] : flip.tauMax[s.assistLevel];
+      const guideAge = Math.max(0, step - air.openStep);
+      const guideScale = Math.max(0, 1 - guideAge / Math.max(1, flip.guideDecaySteps));
+      if (guideScale > 0) {
+        cmds.push({
+          kind: 'flipTorque',
+          axis: air.axis,
+          omegaTarget: air.omegaTarget,
+          tauMax: baseTauMax * guideScale,
+        });
+      }
       s.omegaTarget =
         air.axis === 'long' ? { x: 0, y: 0, z: air.omegaTarget } : { x: 0, y: air.omegaTarget, z: 0 };
     } else {
@@ -236,6 +268,11 @@ export class ManeuverAssist {
         : Math.abs(shuvDegrees - Math.round(shuvDegrees / rec.shuvTargetDeg) * rec.shuvTargetDeg);
     if (residualDeg > coneDeg) return null;
     this.telemetry?.log({ type: 'quantize', step, axis, damp, residualDeg });
-    return { kind: 'catchQuantize', axis, damp };
+    return {
+      kind: 'catchQuantize',
+      axis,
+      damp,
+      maxTorqueImpulse: this.config.catch.angularImpulseMax[L],
+    };
   }
 }

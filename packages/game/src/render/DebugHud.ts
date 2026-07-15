@@ -1,7 +1,7 @@
 /**
- * DebugHud (M7 polish) — a minimal top-left dev cluster. It only READS: an
- * ObserveState handed in each frame plus telemetry events. It never writes sim
- * state.
+ * DebugHud (M7 polish) — a top-left read-only status cluster. Native play uses
+ * the restrained player projection; browser development keeps the diagnostic
+ * projection. Neither mode writes simulation state.
  *
  * Layout rule (art rubric S7 / camera spec): NOTHING covers the board centre.
  * The cluster is anchored at the top-left with an edge margin; the M4 phase
@@ -10,7 +10,6 @@
  * transient overlays (bail vignette, respawn fade) ever touch the middle, and
  * the vignette is transparent through its centre by construction.
  *
- * These are STAGED visuals ("pending promotion") — the fine print says so.
  * Bail/respawn presentation honours `reducedMotion` (no vignette, instant cut).
  */
 
@@ -33,6 +32,22 @@ export interface DebugHudOptions {
   highContrast?: boolean;
   vignetteMs?: number;
   respawnFadeMs?: number;
+  mode?: HudMode;
+}
+
+export type HudMode = 'player' | 'debug';
+
+/** Pure HUD projection kept testable without a browser DOM. */
+export function hudStatsText(obs: ObserveState, mode: HudMode): string {
+  const speed = Math.hypot(obs.board.lv.x, obs.board.lv.z);
+  if (mode === 'player') return `score ${obs.score}   ${speed.toFixed(2)} m/s`;
+  const glyph = (planted: boolean): string => (planted ? '●' : '○');
+  return (
+    `score ${obs.score}   ${speed.toFixed(2)} m/s\n` +
+    `step ${obs.step}\n` +
+    `feet  nose ${glyph(obs.feet.nose.planted)}   tail ${glyph(obs.feet.tail.planted)}\n` +
+    `src ${obs.inputSource ?? 'none'}   L${obs.assistLevel}`
+  );
 }
 
 export class DebugHud {
@@ -60,6 +75,7 @@ export class DebugHud {
       highContrast: opts.highContrast ?? false,
       vignetteMs: opts.vignetteMs ?? 900,
       respawnFadeMs: opts.respawnFadeMs ?? 250,
+      mode: opts.mode ?? 'debug',
     };
     const bgAlpha = this.#opts.highContrast ? 0.9 : 0.62;
     const chipBg = `rgba(12,16,22,${bgAlpha})`;
@@ -122,6 +138,7 @@ export class DebugHud {
 
     const failChip = chip();
     failChip.textContent = 'fail —';
+    if (this.#opts.mode === 'player') failChip.style.display = 'none';
     this.#failChip = failChip;
 
     // --- Grind trust loop (M6 fairness mandate: VISIBLE snap + balance) ----
@@ -171,7 +188,8 @@ export class DebugHud {
     Object.assign(fine.style, { opacity: '0.72', fontSize: '10px' });
     fine.textContent = 'STAGED ART (pending promotion)';
 
-    root.append(phaseChip, stats, trickChip, failChip, grindChip, fine);
+    root.append(phaseChip, stats, trickChip, failChip, grindChip);
+    if (this.#opts.mode === 'debug') root.append(fine);
 
     // --- Bail banner (top edge band — never board centre) ------------------
     const bailBanner = document.createElement('div');
@@ -237,8 +255,6 @@ export class DebugHud {
   }
 
   update(obs: ObserveState): void {
-    const speed = Math.hypot(obs.board.lv.x, obs.board.lv.z);
-    const glyph = (planted: boolean): string => (planted ? '●' : '○');
     const color = PHASE_COLORS[obs.phase] ?? PHASE_COLORS['none']!;
 
     this.#pip.style.background = color;
@@ -246,13 +262,12 @@ export class DebugHud {
     this.#phaseText.style.color = color;
     this.#phaseText.textContent = `${obs.phase.toUpperCase()}${obs.label ? ` · ${obs.label}` : ''}`;
 
-    this.#stats.textContent =
-      `score ${obs.score}   ${speed.toFixed(2)} m/s\n` +
-      `step ${obs.step}\n` +
-      `feet  nose ${glyph(obs.feet.nose.planted)}   tail ${glyph(obs.feet.tail.planted)}\n` +
-      `src ${obs.inputSource ?? 'none'}   L${obs.assistLevel}`;
+    this.#stats.textContent = hudStatsText(obs, this.#opts.mode);
     this.#trickChip.textContent = `trick ${this.#lastTrick}`;
     this.#failChip.textContent = `fail ${obs.lastFailReason ?? '—'}`;
+    if (this.#opts.mode === 'player') {
+      this.#failChip.style.display = obs.lastFailReason ? 'block' : 'none';
+    }
 
     // Grind trust loop: candidate pip before latch, balance meter while riding.
     const grind = obs.grind;

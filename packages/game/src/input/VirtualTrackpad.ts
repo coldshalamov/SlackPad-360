@@ -8,10 +8,9 @@
  *
  * Interaction (bottom-left panel):
  *  - Hold LEFT mouse = foot A planted at the cursor.
- *  - Hold SHIFT (with LMB) = foot B. Dragging translates the pair as one
- *    steering stick; hold ALT to move A independently for manual trick input.
- *  - SPACE = primary click (kick) while held.
- *  - X = suspend foot A while held (optional advanced manual-foot control).
+ *  - Hold SHIFT (with LMB) = foot B. Dragging rotates the pair around its
+ *    midpoint; hold ALT to move A independently for manual trick input.
+ *  - X/Z = lift foot A/B; release to retap with a fresh contact id.
  *  - S toggle stance · C capture padYawOffset from the current segment ·
  *    F swap feet · 0/1/2 set assist level (via ProfileStore, persisted).
  *  - M5 air gestures (press AFTER a pop, while airborne): K = kickflip flick,
@@ -20,9 +19,9 @@
  *    arc for shuvs) over ~6 emitted frames through the SAME emitter, so it drives
  *    the real AirGestureClassifier. On the ground the flick is ignored (§3.1).
  *
- * Skate-like recipe: hold LMB + SHIFT for two feet, hold Ctrl to accelerate,
- * then SPACE for an ollie (N/RMB for nollie). Press K/H/J/L after the pop for
- * a forgiving trick; default assists catch while both contacts remain planted.
+ * Recipe: hold LMB + SHIFT for two feet, drag to rotate the board line, hold
+ * Ctrl to accelerate, and tap X or Z to synthesize one role's lift/retap. Press
+ * K/H/J/L after the pop for a forgiving trick.
  *
  * Frames emit at ~120 Hz on a UI-side wall clock — legitimate here because this
  * is an input DEVICE; those timestamps simply become tPerfMs downstream.
@@ -72,11 +71,10 @@ export class VirtualTrackpad {
   private altHeld = false;
   /** X held: optional advanced manual lift for foot A. */
   private aSuspended = false;
+  /** Z held: synthetic lift for foot B. */
+  private bSuspended = false;
   private bId = 0;
   private bPos: Vec2 = { x: 0.5, y: 0.5 };
-  private primary = false;
-  /** RMB / N key — front-foot kick (nollie) under 'buttonSide' attribution. */
-  private secondary = false;
 
   /** Active scripted air gesture (K/H/J/L), driving foot A along a path. */
   private gesture: { kind: GestureKind; i: number; base: Vec2 } | null = null;
@@ -146,9 +144,7 @@ export class VirtualTrackpad {
 
   private onMouseDown = (e: MouseEvent): void => {
     if (e.button === 2) {
-      // RMB on the pad = secondary click (front-foot kick under 'buttonSide').
       e.preventDefault();
-      this.secondary = true;
       return;
     }
     if (e.button !== 0) return;
@@ -157,45 +153,50 @@ export class VirtualTrackpad {
     this.aId = this.nextContactId++;
     this.aPos = this.toPad(e.clientX, e.clientY);
     if (this.shiftHeld) this.plantB();
+    this.emit();
   };
 
   private onContextMenu = (e: MouseEvent): void => {
-    e.preventDefault(); // RMB is a game input on the pad, not a context menu
+    // Keep the synthetic pad focused on the motion-only control contract. RMB
+    // is deliberately ignored instead of becoming a hidden alternate pop.
+    e.preventDefault();
   };
 
   private onMouseMove = (e: MouseEvent): void => {
     if (!this.aDown) return;
     const next = this.toPad(e.clientX, e.clientY);
     if (this.bId && !this.altHeld) {
-      // Preserve the pair geometry while translating its centroid. This makes
-      // ordinary two-finger travel a stable steering axis instead of also
-      // looking like a relative-foot trick gesture.
-      const wantedX = next.x - this.aPos.x;
-      const wantedY = next.y - this.aPos.y;
-      const dx = Math.max(
-        -Math.min(this.aPos.x, this.bPos.x),
-        Math.min(1 - Math.max(this.aPos.x, this.bPos.x), wantedX),
+      // One pointer stands in for a rotating two-finger hand: move A and mirror
+      // B around the pair's fixed midpoint. Common translation is deliberately
+      // not a steering input in the product contract.
+      const mid = {
+        x: (this.aPos.x + this.bPos.x) * 0.5,
+        y: (this.aPos.y + this.bPos.y) * 0.5,
+      };
+      const dx = next.x - mid.x;
+      const dy = next.y - mid.y;
+      const scale = Math.min(
+        1,
+        Math.abs(dx) > 1e-6 ? Math.min(mid.x / Math.abs(dx), (1 - mid.x) / Math.abs(dx)) : 1,
+        Math.abs(dy) > 1e-6 ? Math.min(mid.y / Math.abs(dy), (1 - mid.y) / Math.abs(dy)) : 1,
       );
-      const dy = Math.max(
-        -Math.min(this.aPos.y, this.bPos.y),
-        Math.min(1 - Math.max(this.aPos.y, this.bPos.y), wantedY),
-      );
-      this.aPos = { x: this.aPos.x + dx, y: this.aPos.y + dy };
-      this.bPos = { x: this.bPos.x + dx, y: this.bPos.y + dy };
+      this.aPos = { x: mid.x + dx * scale, y: mid.y + dy * scale };
+      this.bPos = { x: mid.x - dx * scale, y: mid.y - dy * scale };
     } else {
       this.aPos = next;
     }
+    this.emit();
   };
 
   private onMouseUp = (e: MouseEvent): void => {
     if (e.button === 2) {
-      this.secondary = false;
       return;
     }
     if (e.button !== 0) return;
     this.aDown = false;
     this.aId = 0;
     this.bId = 0; // B needs LMB held too
+    this.emit();
   };
 
   private plantB(): void {
@@ -208,10 +209,12 @@ export class VirtualTrackpad {
     if (e.key === "Shift") {
       this.shiftHeld = true;
       if (this.aDown) this.plantB();
+      this.emit();
       return;
     }
     if (e.key === "Control") {
       this.ctrlHeld = true;
+      this.emit();
       return;
     }
     if (e.key === "Alt") {
@@ -219,17 +222,22 @@ export class VirtualTrackpad {
       e.preventDefault();
       return;
     }
-    if (e.code === "Space") {
-      this.primary = true;
-      e.preventDefault();
-      return;
-    }
     switch (e.key.toLowerCase()) {
-      case "n":
-        this.secondary = true; // keyboard alternative to RMB (nollie kick)
-        break;
       case "x":
-        this.aSuspended = true; // optional manual foot lift
+        if (!this.aSuspended) {
+          this.aSuspended = true;
+          // Device edges are samples in their own right. Emitting here keeps a
+          // short tap observable even when a background browser throttles the
+          // synthetic pad's periodic timer; the native host already reports
+          // the corresponding contact disappearance immediately.
+          this.emit();
+        }
+        break;
+      case "z":
+        if (!this.bSuspended) {
+          this.bSuspended = true;
+          this.emit();
+        }
         break;
       case "s":
         this.profile.toggleStance();
@@ -306,18 +314,25 @@ export class VirtualTrackpad {
     if (e.key === "Shift") {
       this.shiftHeld = false;
       this.bId = 0; // releasing SHIFT lifts foot B
+      this.emit();
     } else if (e.key === "Control") {
       this.ctrlHeld = false;
+      this.emit();
     } else if (e.key === "Alt") {
       this.altHeld = false;
-    } else if (e.code === "Space") {
-      this.primary = false;
-    } else if (e.key.toLowerCase() === "n") {
-      this.secondary = false;
     } else if (e.key.toLowerCase() === "x") {
-      this.aSuspended = false;
-      // Re-plant is a fresh hardware contact: new id (real pads never reuse).
-      if (this.aDown) this.aId = this.nextContactId++;
+      if (this.aSuspended) {
+        this.aSuspended = false;
+        // Re-plant is a fresh hardware contact: new id (real pads never reuse).
+        if (this.aDown) this.aId = this.nextContactId++;
+        this.emit();
+      }
+    } else if (e.key.toLowerCase() === "z") {
+      if (this.bSuspended) {
+        this.bSuspended = false;
+        if (this.bId) this.bId = this.nextContactId++;
+        this.emit();
+      }
     }
   };
 
@@ -346,7 +361,7 @@ export class VirtualTrackpad {
         y: this.aPos.y,
         confidence: true,
       });
-    if (this.bId)
+    if (this.bId && !this.bSuspended)
       contacts.push({
         id: this.bId,
         tip: true,
@@ -361,8 +376,8 @@ export class VirtualTrackpad {
       source: "synthetic",
       contacts,
       buttons: {
-        primary: this.primary,
-        secondary: this.secondary,
+        primary: false,
+        secondary: false,
         auxiliary: this.ctrlHeld,
       },
     };
@@ -409,7 +424,7 @@ export class VirtualTrackpad {
     );
     ctx.fillStyle = "rgba(120,145,170,0.7)";
     ctx.fillText(
-      "drag=steer · Alt=solo A · Ctrl=go · Space=ollie",
+      "drag=rotate line · Ctrl=go · X/Z=lift-retap A/B",
       8,
       PANEL_H - 8,
     );
@@ -424,9 +439,7 @@ export class VirtualTrackpad {
 
     // Segment line between the two feet.
     if (this.aDown && this.bId) {
-      ctx.strokeStyle = this.primary
-        ? "rgba(255,120,90,0.9)"
-        : "rgba(120,200,160,0.8)";
+      ctx.strokeStyle = "rgba(120,200,160,0.8)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(this.aPos.x * PANEL_W, this.aPos.y * PANEL_H);
@@ -447,8 +460,7 @@ export class VirtualTrackpad {
     this.ctrlHeld = false;
     this.altHeld = false;
     this.aSuspended = false;
-    this.primary = false;
-    this.secondary = false;
+    this.bSuspended = false;
     this.gesture = null;
   };
 
@@ -457,7 +469,7 @@ export class VirtualTrackpad {
     const x = p.x * PANEL_W;
     const y = p.y * PANEL_H;
     ctx.beginPath();
-    ctx.fillStyle = this.primary ? "#ff785a" : color;
+    ctx.fillStyle = color;
     ctx.arc(x, y, 9, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#0b0d10";

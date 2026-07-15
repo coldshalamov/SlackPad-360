@@ -29,6 +29,7 @@ import { VirtualTrackpad } from './input/VirtualTrackpad';
 import { HostInputSource } from './input/HostInputSource';
 import { PauseMenu } from './ui/PauseMenu';
 import { ControlGuide } from './ui/ControlGuide';
+import { FlickItLab, FlickItLabController } from './ui/FlickItLab';
 import { DEFAULT_LEVEL_ID } from './sim/levels/index';
 
 const BOOT_SEED = 0x5eed;
@@ -54,12 +55,14 @@ async function boot(): Promise<void> {
     levelId: DEFAULT_LEVEL_ID,
   });
   harness.setScreenshotProvider(renderer.captureScreenshot);
+  const underHost = HostInputSource.isHostEnvironment();
 
   const hud = new DebugHud(app, harness.getTelemetry(), {
     reducedMotion: bootProfile.accessibility.reducedMotion,
     highContrast: bootProfile.accessibility.highContrastHud,
     vignetteMs: config.presentation.bailVignetteMs,
     respawnFadeMs: config.presentation.respawnFadeMs,
+    mode: underHost ? 'player' : 'debug',
   });
 
   // Native host bridge: when running inside the WebView2 GameForm, REAL trackpad
@@ -72,7 +75,6 @@ async function boot(): Promise<void> {
       if (!focused) harness.releaseInputs('host-focus-lost');
     },
   );
-  const underHost = hostSource.active;
   if (underHost) hostSource.attach();
   const controlGuide = underHost ? new ControlGuide(app, bootProfile) : undefined;
 
@@ -110,11 +112,12 @@ async function boot(): Promise<void> {
       onStep: () => {
         harness.step(1);
       },
-      onRender: (alpha, frameDeltaSeconds) => {
+      onRender: (alpha, frameDeltaSeconds, rawFrameMs) => {
         const obs = harness.observe();
         renderer.render(harness.interpolatedRenderPose(alpha), obs, frameDeltaSeconds);
         hud.update(obs);
         controlGuide?.update(obs);
+        harness.recordRenderSample(rawFrameMs, performance.now(), renderer.cameraState());
         if (!firstRenderDone) {
           firstRenderDone = true;
           // Run the visual self-check once a real frame is on screen.
@@ -124,6 +127,46 @@ async function boot(): Promise<void> {
     },
     config,
   );
+
+  const labController = underHost
+    ? new FlickItLabController({
+        beginCapture: async () => {
+          harness.getInputHub().setPaused(true);
+          loop.stop();
+          try {
+            await resetWorld();
+            harness.startRecording();
+          } finally {
+            harness.getInputHub().setPaused(false);
+            loop.start();
+          }
+        },
+        endCapture: () => harness.stopRecording(),
+        replay: async (trace) => {
+          harness.getInputHub().setPaused(true);
+          loop.stop();
+          try {
+            return await harness.replay(trace);
+          } finally {
+            harness.getInputHub().setPaused(false);
+            loop.start();
+          }
+        },
+        exportTrace: (trace, label) => hostSource.exportControlTrace(trace, label),
+      })
+    : undefined;
+  const flickItLab = labController
+    ? new FlickItLab(app, labController, {
+        getPreset: () => profileStore.get().assistPreset ?? 'classic',
+        setPreset: (preset) => profileStore.setAssistPreset(preset),
+        calibrate: () => {
+          const angle = hostSource.currentSegmentAngleDeg();
+          if (angle === null) return false;
+          profileStore.setPadYawOffset(angle);
+          return true;
+        },
+      })
+    : undefined;
 
   const pauseMenu = new PauseMenu(app, {
     onPause: () => {
@@ -138,6 +181,11 @@ async function boot(): Promise<void> {
     onQuit: () => {
       if (!hostSource.quit()) window.close();
     },
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.repeat || event.key.toLowerCase() !== 'v') return;
+    renderer.cameraRig.toggleViewMode();
   });
 
   loop.start();
@@ -155,6 +203,7 @@ async function boot(): Promise<void> {
       profile: profileStore,
       pauseMenu,
       controlGuide,
+      flickItLab,
       renderNow: (alpha = 1) => renderer.render(harness.interpolatedRenderPose(alpha), harness.observe()),
       selfCheck: () => runSelfCheck(renderer, hud, harness.getTelemetry()),
       visualCheck: () => visualCheck(renderer, hud, harness.getTelemetry(), () => harness.observe()),
@@ -164,7 +213,7 @@ async function boot(): Promise<void> {
   console.info(
     `[slackpad m7] boot ok — contactFrame v${CONTACT_FRAME_SCHEMA_VERSION}, ` +
       `sim @${config.physics.hz}Hz, level=${DEFAULT_LEVEL_ID}, seed=${BOOT_SEED}. ` +
-      `STAGED ART (pending promotion). DEV PAD: LMB=footA, Shift=footB, Space=kick, ` +
+      `STAGED ART (pending promotion). DEV PAD: LMB=footA, Shift=footB, X/Z=lift-retap A/B, ` +
       `S/C/0-1-2 = stance/calibrate/assist. window.__slackpad.visualCheck() saves rubric shots.`,
   );
 }

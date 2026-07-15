@@ -1,10 +1,17 @@
 /**
- * KickArbiter — click-centered pop recognition + the push-vs-ollie conflict
- * table, in ONE place (M4; final-input-and-trick-spec §3.1 / §4.1).
+ * KickArbiter — lift/retap pop recognition plus explicit legacy click modes.
  *
- * TWO ATTRIBUTION MODES (profile.kickAttribution, IMPL-007):
+ * MOTION TAP IS THE PRODUCT CONTRACT. Two older attribution modes remain only
+ * so historical replays and their explicit compatibility tests can be read;
+ * ProfileStore always migrates normal players to `motionTap`.
  *
- * 'buttonSide' (shipping Skate-like profile): both feet stay
+ * THREE ATTRIBUTION MODES (profile.kickAttribution):
+ *
+ * 'motionTap' (shipping): tail lift+retap = ollie, nose lift+retap =
+ * nollie. The physical buttons are ignored and the other role must remain
+ * planted. The tracker owns timing and spatial validation.
+ *
+ * 'buttonSide' (legacy explicit profile): both feet stay
  * planted like a real ollie stance and the BUTTON picks the kicking end —
  * LMB/primary = back-foot kick → ollie, RMB/secondary = front-foot kick →
  * nollie, resolved INSTANTLY (no lookahead latency or lift choreography).
@@ -39,8 +46,8 @@
  *   crisp  = liftSpeed ≥ prepLiftSpeedMin ? min(liftSpeed / prepLiftSpeedForMaxQ, 1) : 0
  *   q      = qTimingWeight·timing + qCrispWeight·crisp
  * No prep lift found in the lookback → unarmed click, ignored in the shipping
- * plant-mask profile. Shipping button-side clicks use the fixed configured
- * clickQuality instead; no lift timing is involved.
+ * plant-mask profile. Binary retaps and legacy button-side clicks use the fixed
+ * configured baseQuality instead; no hidden pressure is inferred.
  *
  * Determinism: step-count arithmetic only (ms → steps via hz); no wall clock.
  *
@@ -180,7 +187,29 @@ export class KickArbiter {
         continue;
       }
 
-      // --- 'buttonSide' attribution (IMPL-007, the Tech Deck model) ---------
+      // --- Shipping lift-and-retap attribution ------------------------------
+      if (this.profile.kickAttribution === 'motionTap') {
+        if (kick.source !== 'motionTap' || !kick.tapRole || !feet.bothPlanted) {
+          this.telemetry?.log({
+            type: 'kickArbitrated',
+            step,
+            decision: 'ignored-non-motion-tap',
+            mask: kick.mask,
+          });
+          continue;
+        }
+        const label: 'ollie' | 'nollie' = kick.tapRole === 'tail' ? 'ollie' : 'nollie';
+        out.pops.push({ step, label, q: clamp01(this.pop.baseQuality) });
+        this.telemetry?.log({
+          type: 'kickArbitrated',
+          step,
+          decision: `${label}-retap`,
+          mask: kick.mask,
+        });
+        break;
+      }
+
+      // --- 'buttonSide' attribution (legacy explicit profile) ---------------
       // Both feet stay planted like a real ollie stance; the BUTTON picks the
       // kicking end: LMB/primary = back foot (ollie), RMB/secondary = front
       // foot (nollie) — instantly, no lookahead. With only one foot planted
@@ -198,7 +227,7 @@ export class KickArbiter {
           continue;
         }
         const label: 'ollie' | 'nollie' = kick.button === 'secondary' ? 'nollie' : 'ollie';
-        out.pops.push({ step, label, q: clamp01(this.pop.clickQuality) });
+        out.pops.push({ step, label, q: clamp01(this.pop.baseQuality) });
         this.telemetry?.log({
           type: 'kickArbitrated',
           step,

@@ -1,4 +1,5 @@
 import type { ContactFrameSource } from './contactFrame';
+import type { TrickIntentV1 } from './controlTrace';
 
 /** Minimal vector/quaternion value shapes (plain data, engine-agnostic). */
 export interface Vec3 {
@@ -41,6 +42,7 @@ export interface ObserveState {
   };
   phase: ManeuverPhase;
   label: string | null;
+  intent: TrickIntentV1 | null;
   assistLevel: 0 | 1 | 2;
   feet: {
     nose: FootObservation;

@@ -2,11 +2,9 @@
 REM ============================================================
 REM  SlackPad 360 - Play (NATIVE TRACKPAD build)
 REM  Double-click to play with your REAL trackpad. This builds
-REM  the game and the native WebView2 host if needed, then
+REM  the game and incrementally builds the WebView2 host, then
 REM  launches the host, which streams your individual trackpad
 REM  contacts straight into the game. Plant two fingers to ride.
-REM
-REM  Flags:  --rebuild   force a fresh native-host build
 REM
 REM  (For the old mouse / on-screen DEV-PAD browser build, run
 REM   play-browser.bat instead.)
@@ -16,9 +14,6 @@ title SlackPad 360
 cd /d "%~dp0"
 
 set "EXE=host\SlackPad.Host\bin\Release\net10.0-windows\SlackPad.Host.exe"
-
-set "REBUILD=0"
-if /I "%~1"=="--rebuild" set "REBUILD=1"
 
 REM --- Node present? ---
 where node >nul 2>nul
@@ -62,30 +57,23 @@ if not exist "node_modules" (
   )
 )
 
-REM --- Build the optimized game bundle if missing ---
-REM     (delete packages\game\dist to force a rebuild)
-if not exist "packages\game\dist\index.html" (
-  echo [SlackPad] Building the game...
-  call npm run build
-  if errorlevel 1 (
-    echo [SlackPad] Game build failed. See output above.
-    pause
-    exit /b 1
-  )
+REM --- Always refresh the optimized game bundle. Vite is incremental and this
+REM     prevents play.bat from silently launching a stale source build. ---
+echo [SlackPad] Building the game...
+call npm run build
+if errorlevel 1 (
+  echo [SlackPad] Game build failed. See output above.
+  pause
+  exit /b 1
 )
 
-REM --- Build the native host if missing or --rebuild ---
-set "NEEDHOST=0"
-if "%REBUILD%"=="1" set "NEEDHOST=1"
-if not exist "%EXE%" set "NEEDHOST=1"
-if "%NEEDHOST%"=="1" (
-  echo [SlackPad] Building the native WebView2 host...
-  call dotnet build host\SlackPad.sln -c Release
-  if errorlevel 1 (
-    echo [SlackPad] Host build failed. See output above.
-    pause
-    exit /b 1
-  )
+REM --- Always run the incremental host build for the same reason. ---
+echo [SlackPad] Building the native WebView2 host...
+call dotnet build host\SlackPad.sln -c Release
+if errorlevel 1 (
+  echo [SlackPad] Host build failed. See output above.
+  pause
+  exit /b 1
 )
 
 if not exist "%EXE%" (
@@ -95,7 +83,8 @@ if not exist "%EXE%" (
   exit /b 1
 )
 
-echo [SlackPad] Launching. Plant TWO fingers on the trackpad to ride; F11 = fullscreen.
+echo [SlackPad] Launching. TWO fingers steer; lift+retap rear/front = ollie/nollie.
+echo [SlackPad] Ctrl = accelerate; V = route camera; F8 = lab; F11 = fullscreen.
 echo [SlackPad] Close the game window when you're done.
 start "" "%EXE%"
 

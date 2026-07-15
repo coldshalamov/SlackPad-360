@@ -14,6 +14,7 @@ const OBS: ObserveState = {
   },
   phase: "ground",
   label: null,
+  intent: null,
   assistLevel: 1,
   feet: {
     nose: { planted: true, offset: { x: 0, y: 0.012, z: 0.215 } },
@@ -86,7 +87,7 @@ describe("CameraRig riding composition", () => {
     expect(board.z).toBeLessThan(1);
   });
 
-  it("sits 1-2 feet farther from the board while remaining lateral-dominant", () => {
+  it("defaults to a side-on fingerboard view at riding speed", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     rig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
 
@@ -94,15 +95,12 @@ describe("CameraRig riding composition", () => {
       .clone()
       .sub(new THREE.Vector3(0, 0.05, 0));
     const horizontalDistance = Math.hypot(offset.x, offset.z);
-    expect(horizontalDistance).toBeGreaterThanOrEqual(2.35);
-    expect(
-      offset.z,
-      "camera is visibly behind the +Z-moving board",
-    ).toBeLessThanOrEqual(-0.55);
+    expect(rig.viewMode).toBe("fingerboard");
+    expect(horizontalDistance).toBeGreaterThanOrEqual(0.8);
     expect(
       Math.abs(offset.x),
-      "broadside remains stronger than trailing bias",
-    ).toBeGreaterThan(Math.abs(offset.z) * 2.5);
+      "camera sits beside the +Z-facing board",
+    ).toBeGreaterThan(Math.abs(offset.z) * 3);
   });
 
   it("regular/right-handed forward travel reads toward screen-right", () => {
@@ -115,7 +113,7 @@ describe("CameraRig riding composition", () => {
     expect(forward.x).toBeGreaterThan(board.x);
   });
 
-  it("shows the broad side of the board so the two-foot stance remains readable", () => {
+  it("looks across the deck rather than primarily down the route", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const pose = { p: OBS.board.p, q: OBS.board.q };
     rig.update(pose, OBS, 1 / 60);
@@ -126,12 +124,11 @@ describe("CameraRig riding composition", () => {
       .normalize();
     const boardForward = new THREE.Vector3(0, 0, 1);
 
-    // A trailing camera has |dot| ~= 1 and visually stacks both feet down the
-    // deck. The footboard metaphor needs a side-on/three-quarter view instead.
-    expect(Math.abs(cameraToBoard.dot(boardForward))).toBeLessThan(0.5);
+    const routeAlignment = Math.abs(cameraToBoard.dot(boardForward));
+    expect(routeAlignment).toBeLessThan(0.35);
   });
 
-  it("keeps the board broadside in the air so pop, foot drag, and catch are visible", () => {
+  it("keeps the tactile side-on frame in the air", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const airObs: ObserveState = {
       ...OBS,
@@ -149,8 +146,31 @@ describe("CameraRig riding composition", () => {
       .sub(new THREE.Vector3(0, 0.8, 0))
       .multiplyScalar(-1)
       .normalize();
-    expect(
-      Math.abs(cameraToBoard.dot(new THREE.Vector3(0, 0, 1))),
-    ).toBeLessThan(0.65);
+    expect(Math.abs(cameraToBoard.dot(new THREE.Vector3(0, 0, 1)))).toBeLessThan(0.35);
+  });
+
+  it("does not turn the default view into a chase camera as speed rises", () => {
+    const slowRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    const fastRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    const slow = { ...OBS, board: { ...OBS.board, lv: { x: 0, y: 0, z: 0.5 } } };
+    const fast = { ...OBS, board: { ...OBS.board, lv: { x: 0, y: 0, z: 7 } } };
+    slowRig.update({ p: slow.board.p, q: slow.board.q }, slow, 1 / 60);
+    fastRig.update({ p: fast.board.p, q: fast.board.q }, fast, 1 / 60);
+    expect(Math.abs(fastRig.camera.position.x)).toBeGreaterThan(Math.abs(fastRig.camera.position.z) * 3);
+    expect(Math.abs(slowRig.camera.position.x)).toBeGreaterThan(Math.abs(slowRig.camera.position.z) * 3);
+  });
+
+  it("offers the route camera only as an explicit alternate view", () => {
+    const routeRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    const closeRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    routeRig.setViewMode("route");
+    routeRig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
+    closeRig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
+
+    const routeOffset = routeRig.camera.position.clone().sub(new THREE.Vector3(0, 0.05, 0));
+    const closeOffset = closeRig.camera.position.clone().sub(new THREE.Vector3(0, 0.05, 0));
+    expect(closeOffset.length()).toBeLessThan(routeOffset.length());
+    expect(Math.abs(closeOffset.x)).toBeGreaterThan(Math.abs(closeOffset.z));
+    expect(closeRig.viewMode).toBe("fingerboard");
   });
 });

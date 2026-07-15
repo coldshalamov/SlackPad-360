@@ -76,7 +76,7 @@ describe("GT-click 'buttonSide': the Tech Deck kick table", () => {
     const flat = await riding(0xb5006);
     flat.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
     const qFlat = eventsOf(flat.harness, 'popRecognized')[0]!.q as number;
-    expect(qFlat).toBe(DEFAULT_SIM_CONFIG.pop.clickQuality);
+    expect(qFlat).toBe(DEFAULT_SIM_CONFIG.pop.baseQuality);
   });
 
   it('replay determinism: a buttonSide session with RMB nollies reproduces its checkpoints', async () => {

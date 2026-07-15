@@ -54,17 +54,14 @@ function scriptFifty(step: number, frameId: number): InjectableFrame | null {
   if (step < 60) return null; // settle drop
 
   let contacts: Contact[];
-  let primary = false;
-  if (step < FIFTY_POP_STEP) {
+  if (step < FIFTY_POP_STEP - 2) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // cruise up to speed
-  } else if (step === FIFTY_POP_STEP) {
-    // Shipping LMB pop: both contacts stay planted; the button selects tail.
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
-    primary = true;
+  } else if (step < FIFTY_POP_STEP) {
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y)]; // tail lifted
   } else {
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(3, TAIL_POS.x, TAIL_POS.y)];
   }
-  return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary, secondary: false, auxiliary: step < FIFTY_POP_STEP } };
+  return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary: false, secondary: false, auxiliary: step < FIFTY_POP_STEP - 2 } };
 }
 
 /** Fixed BOARDSLIDE script: a held common-mode carve (steer off the rail)
@@ -73,28 +70,26 @@ function scriptBoardslide(step: number, frameId: number): InjectableFrame | null
   if (step < 60) return null; // settle drop
 
   let contacts: Contact[];
-  let primary = false;
-  if (step < BOARDSLIDE_POP_STEP - 5) {
+  const nose50 = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, -50);
+  const tail50 = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, -50);
+  if (step < BOARDSLIDE_POP_STEP - 22) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // cruise
+  } else if (step < BOARDSLIDE_POP_STEP - 2) {
+    const i = step - (BOARDSLIDE_POP_STEP - 22) + 1;
+    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, -i * 2.5);
+    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, -i * 2.5);
+    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
   } else if (step < BOARDSLIDE_POP_STEP) {
-    const i = step - (BOARDSLIDE_POP_STEP - 6);
-    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, i * 10);
-    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, i * 10);
-    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
-  } else if (step === BOARDSLIDE_POP_STEP) {
-    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, 50);
-    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, 50);
-    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
-    primary = true;
+    contacts = [c(1, nose50.x, nose50.y)]; // hold heading, lift tail
   } else {
-    contacts = [c(3, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // re-plant + ride
+    contacts = [c(1, nose50.x, nose50.y), c(3, tail50.x, tail50.y)]; // retap + hold boardslide heading
   }
   return {
     schemaVersion: 1,
     frameId,
     tPerfMs: step * DT_MS,
     contacts,
-    buttons: { primary, secondary: false, auxiliary: step < BOARDSLIDE_POP_STEP - 5 },
+    buttons: { primary: false, secondary: false, auxiliary: step < BOARDSLIDE_POP_STEP - 22 },
   };
 }
 

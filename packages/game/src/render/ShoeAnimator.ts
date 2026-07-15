@@ -228,86 +228,19 @@ export class ShoeAnimator {
   }
 
   #updateAttached(obs: ObserveState, dt: number): void {
-    const cfg = this.#cfg;
-    const phase = obs.phase;
-    const air = phase === 'air';
-    const pop = phase === 'pop';
-    const isCatch = phase === 'catch';
-    const basicPop = obs.label === 'ollie' || obs.label === 'nollie';
-    const popDirection = obs.label === 'nollie' ? -1 : 1;
-    const guideRole: Role = obs.label === 'nollie' ? 'tail' : 'nose';
-    const popRole: Role = guideRole === 'nose' ? 'tail' : 'nose';
-    const rising = pop || obs.board.lv.y > 0.05;
-
-    // Board-local roll rate for the air lean (cosmetic).
-    this.#av.set(obs.board.av.x, obs.board.av.y, obs.board.av.z).applyQuaternion(this.#invQuat);
-    const rollRate = this.#av.z;
-    const maxLean = THREE.MathUtils.degToRad(cfg.shoeAirLeanMaxDeg);
-    const targetLeanAir = THREE.MathUtils.clamp(-cfg.shoeAirLeanGain * rollRate, -maxLean, maxLean);
-
+    // Shoes are a control diagram, not a second physics system. While attached
+    // they stay exactly at their authored deck sockets; the real rigid board
+    // supplies every pop, flip and landing motion. Only bail detaches them.
+    void obs;
+    void dt;
     for (const s of this.#shoes) {
-      const foot = this.#foot(obs, s.role);
-      let rate: number;
-      let targetX = 0;
-      let targetY = 0;
-      let targetZ = 0;
-      let targetScaleY = 1;
-      let targetLean = 0;
-
-      if (air || pop) {
-        // A basic pop has readable fingerboard choreography: the kicking foot
-        // snaps up from the tail/nose while the guide foot slides toward the
-        // opposite end, then both settle toward the deck on descent. The
-        // objects remain board children, so this is presentation layered over
-        // the real rigid-body pitch rather than a second board animation.
-        rate = cfg.shoeGroundBlendRate;
-        targetScaleY = 1;
-        targetLean = foot.planted ? 0 : targetLeanAir;
-        if (basicPop) {
-          const isGuide = s.role === guideRole;
-          const isPopFoot = s.role === popRole;
-          targetY = rising ? (isPopFoot ? POP_FOOT_LIFT : GUIDE_FOOT_LIFT) : 0.012;
-          targetZ += popDirection * (isGuide ? (rising ? GUIDE_SLIDE : GUIDE_SLIDE * 0.45) : -0.012);
-        } else {
-          targetY = foot.planted ? 0.012 : FREE_FOOT_LIFT;
-        }
-      } else if (isCatch) {
-        // Ease back to the sockets over the catch rate.
-        rate = cfg.shoeCatchBlendRate;
-        targetScaleY = 1;
-      } else {
-        // Ground / none / grind: both shoes are a stable readable stance.
-        // Contact loss and HID position spikes still matter to controls, but
-        // they do not make the presentation rig jump off or through the deck.
-        rate = cfg.shoeGroundBlendRate;
-        targetScaleY = cfg.shoeSquashY;
-      }
-
-      // Replant/catch establishes sole contact immediately. Carrying a
-      // smoothed residual lean into that frame makes one end of the shoe pass
-      // through the deck before the easing catches up.
-      if (!air && !pop) {
-        s.lean = 0;
-      } else {
-        const leanRate = cfg.shoeGroundBlendRate;
-        const aLean = 1 - Math.exp(-leanRate * dt);
-        s.lean += (targetLean - s.lean) * aLean;
-      }
-
-      if (rate > 0) {
-        const a = 1 - Math.exp(-rate * dt);
-        s.delta.x += (targetX - s.delta.x) * a;
-        s.delta.y += (targetY - s.delta.y) * a;
-        s.delta.z += (targetZ - s.delta.z) * a;
-        s.scaleY += (targetScaleY - s.scaleY) * a;
-      }
-
-      // Apply: authored socket + delta, lean about board-local long axis, squash.
-      s.obj.position.copy(s.authoredPos).add(s.delta);
-      this.#leanQuat.setFromAxisAngle(this.#zAxis, s.lean);
-      s.obj.quaternion.copy(this.#leanQuat).multiply(s.authoredQuat);
-      s.obj.scale.set(s.authoredScale.x, s.authoredScale.y * s.scaleY, s.authoredScale.z);
-      this.#raiseSoleToDeck(s);
+      s.delta.set(0, 0, 0);
+      s.scaleY = 1;
+      s.lean = 0;
+      s.obj.position.copy(s.authoredPos);
+      s.obj.quaternion.copy(s.authoredQuat);
+      s.obj.scale.copy(s.authoredScale);
+      this.#setOpacity(s, 1);
     }
   }
 

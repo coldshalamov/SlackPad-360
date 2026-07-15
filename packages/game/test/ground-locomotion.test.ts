@@ -3,7 +3,7 @@
  * through the AgentHarness (inject-only — no pose/impulse shortcuts):
  *   (a) dual-plant cruise → forward speed rises and saturates ≤ maxGroundSpeed
  *   (b) push pulses add speed, capped at maxGroundSpeed
- *   (c) common-mode lateral travel → board yaw in the same direction for both stances
+ *   (c) absolute two-finger segment angle → absolute board heading
  *   (d) no ground forces while airborne (spawn drop)
  *   (e) mutated steering-sign regression guard (BoardController command sign)
  */
@@ -166,39 +166,57 @@ describe("ground locomotion (b) push pulses", () => {
   });
 });
 
-describe("ground locomotion (c) analog steering", () => {
-  async function yawAfterLateralTravel(
-    stance: InputProfile["stance"],
-    dir: 1 | -1,
-  ): Promise<number> {
+describe("ground locomotion (c) finger-line heading", () => {
+  async function headingAfterContacts(
+    contacts: Contact[],
+    stance: InputProfile["stance"] = "regular",
+    steps = 120,
+  ): Promise<{ yaw: number; yawRate: number }> {
     const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
       ...DEFAULT_SIM_CONFIG_PROFILE,
       stance,
     }));
     await h.reset(0x5411, "flat-dev");
     h.step(60);
-    // Build forward speed.
-    for (let i = 0; i < 90; i++) {
-      h.injectContactFrame(plantFrame(60 + i, REST));
+    // The very first confident two-finger placement establishes the requested
+    // board heading. There is no hidden re-anchor to the board's old yaw.
+    for (let i = 0; i < steps; i++) {
+      h.injectContactFrame(plantFrame(60 + i, contacts, false, false));
       h.step(1);
     }
-    // Translate both contacts together and hold the offset like an analog stick.
-    const contacts = REST.map((c) => ({ ...c, x: c.x + dir * 0.1 }));
-    for (let j = 0; j < 30; j++) {
-      h.injectContactFrame(plantFrame(150 + j, contacts));
-      h.step(1);
-    }
-    return h.observe().board.av.y;
+    const { q, av } = h.observe().board;
+    const forwardX = 2 * (q.x * q.z + q.w * q.y);
+    const forwardZ = 1 - 2 * (q.x * q.x + q.y * q.y);
+    return { yaw: Math.atan2(forwardX, forwardZ), yawRate: av.y };
   }
 
-  it("sliding both fingers right yaws right and left yaws left", async () => {
-    expect(await yawAfterLateralTravel("regular", 1)).toBeGreaterThan(0.05);
-    expect(await yawAfterLateralTravel("regular", -1)).toBeLessThan(-0.05);
+  it("a clockwise 90-degree finger line turns the board clockwise 90 degrees and holds it", async () => {
+    // Native pad Y grows toward the player. Moving the nose contact downward
+    // is a physical clockwise hand rotation, which is world -yaw in the
+    // side-on camera frame (world +Z reads screen-right, world -X toward us).
+    const vertical: Contact[] = [
+      { ...REST[0]!, x: 0.5, y: 0.4 },
+      { ...REST[1]!, x: 0.5, y: 0.6 },
+    ];
+    const result = await headingAfterContacts(vertical);
+    expect(result.yaw).toBeCloseTo(-Math.PI / 2, 1);
+    expect(Math.abs(result.yawRate)).toBeLessThan(0.08);
   });
 
-  it("keeps the steering direction stance-independent", async () => {
-    expect(await yawAfterLateralTravel("goofy", 1)).toBeGreaterThan(0.05);
-    expect(await yawAfterLateralTravel("goofy", -1)).toBeLessThan(-0.05);
+  it("tracks a 90-degree hand rotation within 15 degrees in 300 ms", async () => {
+    const vertical: Contact[] = [
+      { ...REST[0]!, x: 0.5, y: 0.4 },
+      { ...REST[1]!, x: 0.5, y: 0.6 },
+    ];
+    const result = await headingAfterContacts(vertical, "regular", 18);
+    expect(Math.abs(-Math.PI / 2 - result.yaw)).toBeLessThan(Math.PI / 12);
+  });
+
+  it("sliding both fingers together without rotating them does not steer", async () => {
+    const translated = REST.map((contact) => ({ ...contact, x: contact.x + 0.1 }));
+    const result = await headingAfterContacts(translated);
+    expect(Math.abs(result.yaw)).toBeLessThan(0.08);
+    expect(Math.abs(result.yawRate)).toBeLessThan(0.08);
   });
 });
 
@@ -243,6 +261,14 @@ function segment(lateral: number): SegmentState {
   };
 }
 
+function headingFeet(angle: number, angularVelocity = 0): FeetState {
+  const state = feet(0);
+  state.segment.angle = angle;
+  state.segment.angleFromRest = angle;
+  state.segment.angVel = angularVelocity;
+  return state;
+}
+
 function feet(lateral: number): FeetState {
   const foot = (role: "nose" | "tail") => ({
     role,
@@ -261,7 +287,7 @@ function feet(lateral: number): FeetState {
   };
 }
 
-describe("ground locomotion (e) analog steering guard", () => {
+describe("ground locomotion (e) direct heading guard", () => {
   const make = (stance: InputProfile["stance"]) =>
     new BoardController(
       DEFAULT_SIM_CONFIG.locomotion,
@@ -272,28 +298,43 @@ describe("ground locomotion (e) analog steering guard", () => {
       },
     );
 
-  it("positive lateral offset turns right and negative turns left", () => {
-    expect(
-      make("regular").applyGroundControl(feet(0.1), [], true, 0).targetYawRate,
-    ).toBeGreaterThan(0);
-    expect(
-      make("regular").applyGroundControl(feet(-0.1), [], true, 0).targetYawRate,
-    ).toBeLessThan(0);
+  it("common-mode finger translation has no steering or cosmetic lean authority", () => {
+    const cmd = make("regular").applyGroundControl(feet(0.1), [], true, 0);
+    expect(cmd.targetYawRate).toBe(0);
+    expect(cmd.rollTorque).toBe(0);
+    expect(cmd.steerAngle).toBe(0);
   });
 
-  it("goofy uses the same screen-space steering direction", () => {
-    expect(
-      make("goofy").applyGroundControl(feet(0.1), [], true, 0).targetYawRate,
-    ).toBeGreaterThan(0);
-    expect(
-      make("goofy").applyGroundControl(feet(-0.1), [], true, 0).targetYawRate,
-    ).toBeLessThan(0);
+  it("converts pad-clockwise angle to the matching world-clockwise heading", () => {
+    const cmd = make("regular").applyGroundControl(
+      headingFeet(0.35),
+      [],
+      true,
+      0,
+    );
+    expect(cmd.steerAngle).toBeCloseTo(-0.35, 6);
   });
 
-  it("ignores pad noise inside the deadzone", () => {
-    expect(
-      make("regular").applyGroundControl(feet(0.01), [], true, 0).targetYawRate,
-    ).toBe(0);
+  it("keeps the same physical finger-line heading in goofy stance", () => {
+    // Goofy reverses tail→nose role ordering, so its directed segment is π
+    // for the same horizontal hand placement. Heading must remain zero.
+    const cmd = make("goofy").applyGroundControl(
+      headingFeet(Math.PI),
+      [],
+      true,
+      0,
+    );
+    expect(cmd.steerAngle).toBeCloseTo(0, 6);
+  });
+
+  it("does not turn finger rotation speed into a separate yaw-rate command", () => {
+    const cmd = make("regular").applyGroundControl(
+      headingFeet(0.35, 8),
+      [],
+      true,
+      0,
+    );
+    expect(cmd.targetYawRate).toBe(0);
   });
 
   it("airborne → no command (targetYawRate 0, inactive)", () => {

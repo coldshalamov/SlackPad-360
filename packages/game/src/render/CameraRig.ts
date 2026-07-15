@@ -6,16 +6,14 @@
  * frame however reads best.
  *
  * Shot modes are keyed off `ObserveState.phase`:
- *   ground/none/pop → low broadside 3/4 (mostly beside the board, with a small
- *                     trailing bias so both feet and deck motion stay legible)
- *   air             → pull-back (more distance + wider FOV so a full rotation
- *                     reads; the heading is FROZEN at take-off so flips don't
- *                     swing the camera)
+ *   ground/none/pop → side-on fingerboard view by default
+ *   air             → side-on pull-back; heading freezes at take-off
  *   catch           → air pose tightening back toward chase
  *   bail            → wide slow-orbit hold (failure readable)
  *   grind           → overhead blend (implemented; only triggers once M6 emits
  *                     phase 'grind')
  *   replay/tutorial → mode enum placeholders (fall through to chase for now)
+ * `V` toggles the optional route camera without changing controls.
  *
  * Transitions: a critically damped spring (Unity-style SmoothDamp — the analytic
  * critically damped solution) on position, and a slerp with a max angular-rate
@@ -32,6 +30,7 @@ import type { RenderPose } from "../sim/SimWorld";
 /** Camera shot modes (spec §6). Replay/tutorial are enum placeholders. */
 export type ShotMode =
   "chase" | "air" | "catch" | "bail" | "grind" | "tutorial" | "replay";
+export type CameraViewMode = "route" | "fingerboard";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
@@ -89,6 +88,7 @@ export class CameraRig {
   readonly #heading = new THREE.Vector3(0, 0, 1);
   #bailOrbit = 0;
   #lastMode: ShotMode = "chase";
+  #viewMode: CameraViewMode = "fingerboard";
 
   #occluders: THREE.Object3D[] = [];
   readonly #ray = new THREE.Raycaster();
@@ -128,6 +128,26 @@ export class CameraRig {
 
   setReducedMotion(flag: boolean): void {
     this.#reducedMotion = flag;
+  }
+
+  setViewMode(mode: CameraViewMode): void {
+    this.#viewMode = mode;
+  }
+
+  toggleViewMode(): CameraViewMode {
+    this.#viewMode = this.#viewMode === "route" ? "fingerboard" : "route";
+    return this.#viewMode;
+  }
+
+  /** Read-only state projected into ControlTraceV2 render events. */
+  telemetryState(): {
+    p: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+  } {
+    return {
+      p: { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z },
+      target: { x: this.#lookTarget.x, y: this.#lookTarget.y, z: this.#lookTarget.z },
+    };
   }
 
   /** Static meshes the occlusion spring-arm may sphere-cast against. */
@@ -175,27 +195,55 @@ export class CameraRig {
     );
     const lookAhead =
       cfg.lookAheadMin + (cfg.lookAheadMax - cfg.lookAheadMin) * laT;
+    const chaseT = Math.min(
+      1,
+      Math.max(0, speed / Math.max(1e-3, cfg.chaseSpeedRef)),
+    );
+    let chaseDistance =
+      cfg.chaseDistance + (cfg.chaseDistanceFast - cfg.chaseDistance) * chaseT;
+    let chaseSide = cfg.chaseSide + (cfg.chaseSideFast - cfg.chaseSide) * chaseT;
+    let chaseHeight = cfg.chaseHeight;
+    let routeLookAhead = lookAhead;
+    if (this.#viewMode === "fingerboard") {
+      chaseDistance = cfg.fingerboardDistance;
+      chaseSide = cfg.fingerboardSide;
+      chaseHeight = cfg.fingerboardHeight;
+      routeLookAhead = cfg.fingerboardLookAhead;
+    }
 
     // --- Chase low 3/4 (reused as the catch tighten target) ----------------
     this.#chasePos
       .copy(this.#boardPos)
-      .addScaledVector(heading, -cfg.chaseDistance)
-      .addScaledVector(WORLD_UP, cfg.chaseHeight)
-      .addScaledVector(this.#right, cfg.chaseSide);
+      .addScaledVector(heading, -chaseDistance)
+      .addScaledVector(WORLD_UP, chaseHeight)
+      .addScaledVector(this.#right, chaseSide);
     this.#chaseLook
       .copy(this.#boardPos)
-      .addScaledVector(heading, lookAhead)
+      .addScaledVector(heading, routeLookAhead)
       .addScaledVector(WORLD_UP, cfg.aimHeight);
 
-    // --- Air pull-back ------------------------------------------------------
-    this.#airPos
-      .copy(this.#boardPos)
-      .addScaledVector(heading, -cfg.airDistance)
-      .addScaledVector(WORLD_UP, cfg.airHeight)
-      .addScaledVector(this.#right, cfg.chaseSide * 1.15);
-    this.#airLook
-      .copy(this.#boardPos)
-      .addScaledVector(WORLD_UP, cfg.aimHeight * 0.5);
+    // The default tactile camera stays beside the deck through a pop. The
+    // optional route view keeps the farther pull-back behavior.
+    if (this.#viewMode === "fingerboard") {
+      this.#airPos
+        .copy(this.#boardPos)
+        .addScaledVector(heading, -cfg.fingerboardDistance)
+        .addScaledVector(WORLD_UP, Math.max(cfg.fingerboardHeight, cfg.airHeight * 0.7))
+        .addScaledVector(this.#right, cfg.fingerboardSide * 1.25);
+      this.#airLook
+        .copy(this.#boardPos)
+        .addScaledVector(heading, cfg.fingerboardLookAhead)
+        .addScaledVector(WORLD_UP, cfg.aimHeight * 0.5);
+    } else {
+      this.#airPos
+        .copy(this.#boardPos)
+        .addScaledVector(heading, -cfg.airDistance)
+        .addScaledVector(WORLD_UP, cfg.airHeight)
+        .addScaledVector(this.#right, chaseSide * 0.9);
+      this.#airLook
+        .copy(this.#boardPos)
+        .addScaledVector(WORLD_UP, cfg.aimHeight * 0.5);
+    }
 
     let desiredFov = cfg.fovBase;
     if (mode === "chase") {
@@ -333,5 +381,9 @@ export class CameraRig {
   /** Current shot mode (diagnostics / self-check). */
   get mode(): ShotMode {
     return this.#lastMode;
+  }
+
+  get viewMode(): CameraViewMode {
+    return this.#viewMode;
   }
 }

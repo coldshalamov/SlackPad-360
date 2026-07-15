@@ -98,23 +98,26 @@ describe('grind integration (grind-lab 50-50)', () => {
   it('cruise + steer-ollie → latched BOARDSLIDE ride (yaw ~perpendicular, deck slides)', async () => {
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
-    d.cruise(70);
-    // Hold a common-mode offset like an analog stick. Relative one-foot motion
-    // is reserved for Flick-It trick setup and deliberately does not steer.
+    d.cruise(55);
+    // Rotate the physical finger line toward the ledge. Pad Y grows toward the
+    // player, so the negative pad angle below produces the intended +yaw line.
     let tail = TAIL_POS;
-    for (let i = 1; i <= 5; i++) {
-      const deg = i * 10;
-      const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, deg);
+    let nose = NOSE_POS;
+    for (let i = 1; i <= 20; i++) {
+      const deg = -i * 2.5;
+      nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, deg);
       tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, deg);
       d.drive({ nose, tail });
     }
-    d.drive({ nose: rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, 50), tail, primary: true });
+    d.drive({ nose, tail: null });
+    d.drive({ nose, tail: null });
+    d.drive({ nose, tail });
 
     let boardslideSteps = 0;
     let balanceInBand = true;
     let rodeOnLedge = false;
     for (let i = 0; i < 110; i++) {
-      d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+      d.drive({ nose, tail });
       const o = h.observe();
       if (o.phase === 'grind' && o.grind?.family === 'boardslide') {
         boardslideSteps += 1;

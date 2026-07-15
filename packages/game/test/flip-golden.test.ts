@@ -139,7 +139,10 @@ describe('flip golden (M5)', () => {
     // …the bs-shuv landed CLEAN near the 180 target with positive yaw…
     const shuv = tricks.find((t) => t.label === 'bs-shuv');
     expect(shuv, 'a clean bs-shuv completed').toBeDefined();
-    expect(shuv!.cleanliness).toBe('clean');
+    expect(
+      shuv!.cleanliness,
+      `bs-shuv outcome=${JSON.stringify(shuv)}`,
+    ).toBe('clean');
     expect(shuv!.shuvDegrees as number).toBeGreaterThan(120);
     // …and the mirrored heelflip also completes under the same forgiving
     // held-stance contract. None of the three scripted tricks silently bails.

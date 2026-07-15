@@ -8,12 +8,25 @@
 
 export type Stance = "regular" | "goofy";
 export type AssistLevel = 0 | 1 | 2;
+export type AssistPreset = "experienced" | "classic" | "streamlined";
+export const ASSIST_LEVEL_BY_PRESET: Readonly<Record<AssistPreset, AssistLevel>> = {
+  experienced: 0,
+  classic: 1,
+  streamlined: 2,
+};
+export const ASSIST_PRESET_BY_LEVEL: Readonly<Record<AssistLevel, AssistPreset>> = {
+  0: "experienced",
+  1: "classic",
+  2: "streamlined",
+};
 export type BothClickMeans = "ignore" | "push" | "ollie";
 /**
- * How a click chooses which end of the board kicks (product-owner directive,
- * IMPL-007):
+ * How the player's kick gesture chooses which end of the board pops:
  *
- * - 'buttonSide' (default Skate-like mapping): with BOTH feet planted the
+ * - 'motionTap' (shipping): lift one planted role and quickly replant it near
+ *   its prior position. Tail retap = ollie, nose retap = nollie. Mouse-button
+ *   state is ignored.
+ * - 'buttonSide' (legacy Skate-like mapping): with BOTH feet planted the
  *   BUTTON decides — LMB/primary = back-foot kick (ollie family), RMB/secondary
  *   = front-foot kick (nollie family) — instantly, both fingers staying on the
  *   board like a real ollie stance. A short stable-contact debounce rejects a
@@ -24,7 +37,7 @@ export type BothClickMeans = "ignore" | "push" | "ollie";
  *   Both-planted click follows `bothClickMeans`. This does not pretend that a
  *   report-level Windows click identifies an individual contact.
  */
-export type KickAttribution = "buttonSide" | "plantMask";
+export type KickAttribution = "motionTap" | "buttonSide" | "plantMask";
 
 export interface InputProfile {
   stance: Stance;
@@ -32,8 +45,10 @@ export interface InputProfile {
   padYawOffset: number;
   swapFeet: boolean;
   assistLevel: AssistLevel;
+  /** Named player-facing bundle; assistLevel remains the deterministic index. */
+  assistPreset?: AssistPreset;
   bothClickMeans: BothClickMeans;
-  /** Click→kick-side policy (see KickAttribution). */
+  /** Motion/click→kick-side policy (see KickAttribution). */
   kickAttribution: KickAttribution;
   /** Treat OS tap-to-click primary edges as kicks. */
   tapToClickIsKick: boolean;
@@ -48,14 +63,76 @@ export const DEFAULT_INPUT_PROFILE: InputProfile = deepFreezeConfig({
   padYawOffset: 0,
   swapFeet: false,
   assistLevel: 1,
+  assistPreset: "classic",
   bothClickMeans: "ollie",
-  kickAttribution: "buttonSide",
+  kickAttribution: "motionTap",
   tapToClickIsKick: false,
   accessibility: {
     reducedMotion: false,
     highContrastHud: false,
   },
 } as InputProfile);
+
+/**
+ * Convert persisted or recorded profile data into a complete, safe runtime
+ * profile. Profiles cross a storage/trace boundary, so callers must not trust
+ * enum values, booleans, or finite calibration angles merely because the data
+ * was once produced by this application.
+ */
+export function normalizeInputProfile(value: unknown): InputProfile {
+  const raw = value !== null && typeof value === "object"
+    ? value as Partial<InputProfile>
+    : {};
+  const base = DEFAULT_INPUT_PROFILE;
+  const preset: AssistPreset | undefined =
+    raw.assistPreset === "experienced" ||
+    raw.assistPreset === "classic" ||
+    raw.assistPreset === "streamlined"
+      ? raw.assistPreset
+      : undefined;
+  const level: AssistLevel = preset !== undefined
+    ? ASSIST_LEVEL_BY_PRESET[preset]
+    : raw.assistLevel === 0 || raw.assistLevel === 1 || raw.assistLevel === 2
+      ? raw.assistLevel
+      : base.assistLevel;
+  const padYawOffset = typeof raw.padYawOffset === "number" && Number.isFinite(raw.padYawOffset)
+    ? Math.max(-180, Math.min(180, raw.padYawOffset))
+    : base.padYawOffset;
+  const accessibility: Partial<InputProfile["accessibility"]> =
+    raw.accessibility !== null && typeof raw.accessibility === "object"
+      ? raw.accessibility
+      : {};
+
+  return deepFreezeConfig({
+    stance: raw.stance === "goofy" || raw.stance === "regular" ? raw.stance : base.stance,
+    padYawOffset,
+    swapFeet: typeof raw.swapFeet === "boolean" ? raw.swapFeet : base.swapFeet,
+    assistLevel: level,
+    assistPreset: ASSIST_PRESET_BY_LEVEL[level],
+    bothClickMeans:
+      raw.bothClickMeans === "ignore" || raw.bothClickMeans === "push" || raw.bothClickMeans === "ollie"
+        ? raw.bothClickMeans
+        : base.bothClickMeans,
+    kickAttribution:
+      raw.kickAttribution === "motionTap" ||
+      raw.kickAttribution === "buttonSide" ||
+      raw.kickAttribution === "plantMask"
+        ? raw.kickAttribution
+        : base.kickAttribution,
+    tapToClickIsKick:
+      typeof raw.tapToClickIsKick === "boolean" ? raw.tapToClickIsKick : base.tapToClickIsKick,
+    accessibility: {
+      reducedMotion:
+        typeof accessibility.reducedMotion === "boolean"
+          ? accessibility.reducedMotion
+          : base.accessibility.reducedMotion,
+      highContrastHud:
+        typeof accessibility.highContrastHud === "boolean"
+          ? accessibility.highContrastHud
+          : base.accessibility.highContrastHud,
+    },
+  });
+}
 
 export interface RecognitionConfig {
   /** Confidence to open a label (hypothesis 0.55). */
@@ -119,6 +196,12 @@ export interface FootTrackerConfig {
    * rest) * clamp(recenterRateHz * dt, 0, 1)`.
    */
   recenterRateHz: number;
+  /** Minimum lifted duration for a deliberate physical retap, rejecting one-report dropout. */
+  motionTapMinLiftMs: number;
+  /** Maximum lift-to-replant duration that still reads as a tap. */
+  motionTapMaxLiftMs: number;
+  /** Maximum calibrated distance from the role's pre-lift position. */
+  motionTapReplantRadius: number;
 }
 
 export interface PopConfig {
@@ -130,8 +213,8 @@ export interface PopConfig {
    */
   jMin: number;
   jMax: number;
-  /** Consistent binary LMB/RMB pop strength; post-pop swipes shape the trick. */
-  clickQuality: number;
+  /** Consistent binary base-pop strength; post-pop swipes shape the trick. */
+  baseQuality: number;
   /** Pitch bias factor applied to the pop pitch torque impulse (spec §3.2). */
   pitchBias: number;
   /**
@@ -180,6 +263,12 @@ export interface FlipConfig {
   kd: number;
   /** Torque clamp per assist level, N·m. */
   tauMax: [number, number, number];
+  /** One-shot roll impulse budget when a flip intent first opens, N·m·s. */
+  impulseMax: [number, number, number];
+  /** One-shot yaw impulse budget when a shuv intent first opens, N·m·s. */
+  shuvImpulseMax: [number, number, number];
+  /** Steps over which the bounded target guide decays to zero after recognition. */
+  guideDecaySteps: number;
   // --- M5 flick/sweep classification + envelopes (hypothesis) -----------
   /**
    * Axis-dominance ratio for the shuv-vs-flip conflict (final-input-and-trick
@@ -242,6 +331,8 @@ export interface CatchConfig {
   assistScale: [number, number, number];
   /** Base catch gain multiplied by assistScale. */
   catchGain: number;
+  /** Hard torque-impulse budget for catch damping by assist preset, N·m·s. */
+  angularImpulseMax: [number, number, number];
   /**
    * When true (M4 default, hypothesis) the catch window opens only after the
    * vertical apex (lv.y ≤ 0); a replant during the ascent does not catch.
@@ -253,8 +344,12 @@ export interface CatchConfig {
 export interface LandConfig {
   /** Board-up vs world-up angle for a clean landing, deg (~25). */
   thetaCleanDeg: number;
+  /** Extra clean cone by assist preset (Experienced, Classic, Streamlined). */
+  cleanAssistBonusDeg: [number, number, number];
   /** Dirty landing limit, deg (~45); beyond is bail. */
   thetaDirtyDeg: number;
+  /** Extra recoverable cone by assist preset. */
+  dirtyAssistBonusDeg: [number, number, number];
   /**
    * Fraction of horizontal speed scrubbed on a DIRTY landing (M4, hypothesis).
    * Applied by SimWorld as an opposing impulse (−mass·scrub·v_horizontal),
@@ -470,7 +565,7 @@ export interface PhysicsConfig {
   wheelSuspensionRelaxation: number;
   /** Per-wheel suspension force clamp, N. */
   wheelMaxSuspensionForce: number;
-  /** Longitudinal tire grip used by Rapier's ray vehicle solver. */
+  /** Longitudinal wheel grip used by the skateboard contact solver. */
   wheelFrictionSlip: number;
   /** Lateral tire grip multiplier; resists ice-like side slip. */
   wheelSideFrictionStiffness: number;
@@ -537,7 +632,7 @@ export interface LocomotionConfig {
    * target — force-based saturation, never a hard velocity write.
    */
   cruiseDriveForce: number;
-  /** Per-wheel Rapier brake force while grounded and Ctrl is released. */
+  /** Per-wheel physical brake force, N, while grounded and Ctrl is released. */
   coastBrakeForce: number;
   /** Two-finger centroid speed toward the screen below which no drive occurs. */
   rideMotionMinSpeed: number;
@@ -571,6 +666,12 @@ export interface LocomotionConfig {
   steerServoGain: number;
   /** Steering torque clamp, N·m. */
   steerMaxTorque: number;
+  /** Actual deck lean → opposing front/rear truck steering gain. */
+  truckLeanToSteer: number;
+  /** Physical truck steering clamp, degrees. */
+  truckSteerMaxDeg: number;
+  /** Speed-dependent truck steering attenuation per m/s. */
+  truckSteerSpeedFade: number;
   /**
    * Midpoint lateral offset-from-rest (calibrated pad units) → mild carve yaw
    * rate contribution, 1/s. Lets a lateral lean add a gentle turn.
@@ -634,6 +735,12 @@ export interface CameraConfig {
   chaseHeight: number;
   /** Lateral 3/4 offset of the chase cam, m (the "3/4" in low 3/4). */
   chaseSide: number;
+  /** Faster riding pulls farther behind for route visibility. */
+  chaseDistanceFast: number;
+  /** Faster riding reduces the three-quarter offset without becoming dead-centre. */
+  chaseSideFast: number;
+  /** Speed where the fast chase offsets are fully applied, m/s. */
+  chaseSpeedRef: number;
   /** Aim point height above the board centre for the look target, m. */
   aimHeight: number;
   /** Minimum look-ahead distance in front of the board, m. */
@@ -642,6 +749,16 @@ export interface CameraConfig {
   lookAheadMax: number;
   /** Ground speed (m/s) at which look-ahead saturates to `lookAheadMax`. */
   lookAheadSpeedRef: number;
+
+  // --- Optional close fingerboard view ---------------------------------
+  /** Close-view distance behind the board, m. */
+  fingerboardDistance: number;
+  /** Close-view height above the deck, m. */
+  fingerboardHeight: number;
+  /** Close-view lateral offset, m; larger than distance for a tactile side view. */
+  fingerboardSide: number;
+  /** Close-view route look-ahead, m. */
+  fingerboardLookAhead: number;
 
   // --- Air pull-back / catch --------------------------------------------
   /** Chase distance while airborne, m (pulled back for readability). */
@@ -768,11 +885,14 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     velEmaAlpha: 0.4,
     rebindRadius: 0.18,
     recenterRateHz: 1.5,
+    motionTapMinLiftMs: 12,
+    motionTapMaxLiftMs: 280,
+    motionTapReplantRadius: 0.24,
   },
   pop: {
     jMin: 5.8,
     jMax: 9.6,
-    clickQuality: 0.6,
+    baseQuality: 0.6,
     pitchBias: 0.35,
     pitchTorqueScale: 0.064,
     pitchTorqueImpulseMax: 0.5,
@@ -792,6 +912,9 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     kp: 8,
     kd: 0.6,
     tauMax: [1.2, 2.0, 3.0],
+    impulseMax: [0.08, 0.14, 0.2],
+    shuvImpulseMax: [0.4, 0.8, 1.2],
+    guideDecaySteps: 20,
     axisDominanceRatio: 1.15,
     flickPathMinLen: 0.02,
     flickSpeedForMaxS: 5.0,
@@ -806,11 +929,14 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     windowMs: 420,
     assistScale: [0.35, 0.55, 0.75],
     catchGain: 1.0,
+    angularImpulseMax: [0.75, 1.5, 2.5],
     apexOnly: true,
   },
   land: {
     thetaCleanDeg: 25,
+    cleanAssistBonusDeg: [0, 5, 10],
     thetaDirtyDeg: 70,
+    dirtyAssistBonusDeg: [0, 0, 5],
     dirtySpeedScrub: 0.35,
   },
   air: {
@@ -827,7 +953,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     boardslideEnvelopeDeg: 40,
     // L1 is the default hardware experience: a centreline hit within roughly
     // half a deck-width should lock instead of producing an inert bounce.
-    rSnap: [0.03, 0.14, 0.22],
+    rSnap: [0.03, 0.24, 0.32],
     balanceLimit: 1.0,
     balanceGain: 1.6,
     interruptImpulse: 6.0,
@@ -906,7 +1032,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
   locomotion: {
     cruiseTargetSpeed: 5.5,
     cruiseDriveForce: 20,
-    coastBrakeForce: 0.03,
+    coastBrakeForce: 1.2,
     rideMotionMinSpeed: 0.04,
     rideMotionFullSpeed: 0.35,
     pushCooldownSteps: 12,
@@ -915,9 +1041,12 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     steerInputDeadzone: 0.018,
     steerInputFullScale: 0.13,
     steerRateAtFull: 2.6,
-    steerHeadingBiasGain: 2.5,
-    steerServoGain: 12.0,
-    steerMaxTorque: 14.0,
+    steerHeadingBiasGain: 9.0,
+    steerServoGain: 16.0,
+    steerMaxTorque: 28.0,
+    truckLeanToSteer: 1.4,
+    truckSteerMaxDeg: 18,
+    truckSteerSpeedFade: 0.08,
     leanCarveGain: 1.4,
     leanRollGain: 0.6,
     leanMaxRollTorque: 0.25,
@@ -934,14 +1063,21 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     far: 400,
     fovBase: 46,
     fovAir: 52,
-    chaseDistance: 0.65,
-    chaseHeight: 0.62,
-    chaseSide: -2.35,
+    chaseDistance: 1.2,
+    chaseHeight: 0.72,
+    chaseSide: -1.25,
+    chaseDistanceFast: 2.4,
+    chaseSideFast: -0.65,
+    chaseSpeedRef: 6.0,
     aimHeight: 0.18,
     lookAheadMin: 0.35,
     lookAheadMax: 0.9,
     lookAheadSpeedRef: 6.0,
-    airDistance: 0.9,
+    fingerboardDistance: 0.12,
+    fingerboardHeight: 0.62,
+    fingerboardSide: -1.35,
+    fingerboardLookAhead: 0.12,
+    airDistance: 2.2,
     airHeight: 1.15,
     catchTighten: 0.55,
     bailDistance: 7.0,

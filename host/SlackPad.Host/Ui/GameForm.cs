@@ -254,6 +254,37 @@ internal sealed class GameForm : Form
             case "requestCalib":
                 Trace.WriteLine($"[GameForm] page->host: {msg.Type}");
                 break;
+            case "exportControlTrace":
+                ExportControlTrace(msg);
+                break;
+        }
+    }
+
+    private void ExportControlTrace(PageToHostMessage msg)
+    {
+        try
+        {
+            if (msg.Payload is null ||
+                !msg.Payload.TryGetValue("trace", out object? rawTrace) ||
+                rawTrace is not System.Text.Json.JsonElement trace)
+            {
+                throw new InvalidDataException("Missing trace payload.");
+            }
+            string? label = null;
+            if (msg.Payload.TryGetValue("label", out object? rawLabel) &&
+                rawLabel is System.Text.Json.JsonElement labelElement &&
+                labelElement.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                label = labelElement.GetString();
+            }
+            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string root = Path.Combine(documents, "SlackPad 360", "traces");
+            string path = ControlTraceExporter.Export(root, trace, label, DateTimeOffset.Now);
+            Trace.WriteLine($"[GameForm] saved control trace: {path}");
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            Trace.WriteLine($"[GameForm] control trace export failed: {ex.Message}");
         }
     }
 

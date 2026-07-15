@@ -18,6 +18,7 @@ import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import type { ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
 import { DEFAULT_INPUT_PROFILE, DEFAULT_SIM_CONFIG } from '@slackpad/shared';
+import { rotateAboutCenter } from '../src/input/FootTracker';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'baselines.json');
 const UPDATE_GOLDENS = process.env.UPDATE_GOLDENS === '1';
@@ -49,10 +50,15 @@ function scriptFrame(step: number, frameId: number): InjectableFrame | null {
     { id: 1, x: 0.4, y: 0.5, tip: true, confidence: true },
     { id: 2, x: 0.6, y: 0.5, tip: true, confidence: true },
   ];
-  // Carve: hold a common-mode two-finger lateral offset like an analog stick.
+  // Carve: rotate the actual two-finger board line and hold that heading.
   if (step >= 200) {
-    const lateral = Math.min(0.1, (step - 199) * 0.01);
-    contacts = contacts.map((c) => ({ ...c, x: c.x + lateral }));
+    // Pad-clockwise is world-clockwise (-yaw). This scripted line needs the
+    // opposite physical hand rotation to preserve its original +yaw carve.
+    const angle = -Math.min(35, (step - 199) * 5);
+    contacts = contacts.map((c) => {
+      const p = rotateAboutCenter(c.x, c.y, angle);
+      return { ...c, x: p.x, y: p.y };
+    });
   }
   return {
     schemaVersion: 1,

@@ -1,8 +1,8 @@
 /// <reference types="node" />
 /**
  * Air golden (M4). A fixed scripted session (~400 steps):
- *   settle → Ctrl-cruise → stable-contact LMB ollie → assisted catch/clean →
- *   Ctrl-cruise → stable-contact RMB nollie → assisted catch/clean → cruise.
+ *   settle → Ctrl-cruise → tail lift-retap ollie → assisted catch/clean →
+ *   Ctrl-cruise → nose lift-retap nollie → assisted catch/clean → cruise.
  * Record/replay must agree AND the checkpoint sequence is pinned in
  * goldens/baselines.json (UPDATE_GOLDENS=1 regenerates; run with
  * --no-file-parallelism because three golden files share the baseline file).
@@ -47,26 +47,23 @@ function c(id: number, x: number, y: number): Contact {
 /**
  * The fixed script. Contact ids are hardware-faithful: each nose replant uses
  * a fresh id. Step landmarks (from the deterministic default-config physics):
- * Both clicks keep the stable two-contact stance used by the shipping control
- * model; L1 catches that held stance automatically on descent.
+ * Each retap uses a fresh hardware id, then L1 catches the held two-contact
+ * stance automatically on descent.
  */
 function scriptFrame(step: number, frameId: number): InjectableFrame | null {
   if (step < 60) return null; // settle
 
   let contacts: Contact[];
-  let primary = false;
-  let secondary = false;
-
   if (step < 124) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // Ctrl cruise
-  } else if (step === 124) {
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
-    primary = true;
-  } else if (step === 250) {
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
-    secondary = true;
+  } else if (step < 126) {
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y)]; // lift tail
+  } else if (step < 250) {
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(3, TAIL_POS.x, TAIL_POS.y)];
+  } else if (step < 252) {
+    contacts = [c(3, TAIL_POS.x, TAIL_POS.y)]; // lift nose
   } else {
-    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)];
+    contacts = [c(4, NOSE_POS.x, NOSE_POS.y), c(3, TAIL_POS.x, TAIL_POS.y)];
   }
 
   return {
@@ -74,7 +71,7 @@ function scriptFrame(step: number, frameId: number): InjectableFrame | null {
     frameId,
     tPerfMs: step * DT_MS,
     contacts,
-    buttons: { primary, secondary, auxiliary: true },
+    buttons: { primary: false, secondary: false, auxiliary: true },
   };
 }
 
@@ -96,7 +93,7 @@ async function recordSession(harness: AgentHarness, seed: number): Promise<Sessi
 const joinHashes = (cps: ReplayCheckpoint[]): string => cps.map((cp) => `${cp.step}:${cp.hash}`).join('|');
 
 describe('air golden (M4)', () => {
-  it('Ctrl cruise→LMB ollie→RMB nollie both complete and replay identically', async () => {
+  it('Ctrl cruise→tail-retap ollie→nose-retap nollie both complete and replay identically', async () => {
     const harness = new AgentHarness();
     const trace = await recordSession(harness, 0xa14d);
     expect(trace.checkpoints.length).toBeGreaterThan(0);

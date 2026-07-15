@@ -7,7 +7,7 @@
  * never grows the working set without bound (observability spec §3).
  */
 
-import type { ContactFrameSource } from '@slackpad/shared';
+import type { ContactFrameSource, TrickIntentV1 } from '@slackpad/shared';
 
 /** Discriminated telemetry events. `log()` accepts any of these. */
 export type TelemetryEvent =
@@ -27,6 +27,7 @@ export type TelemetryEvent =
   | { type: 'recenter'; reason: string }
   | { type: 'groundControl'; step: number; drive: number; yaw: number; bothPlanted: boolean }
   | { type: 'profileChanged'; patch: Record<string, unknown> }
+  | { type: 'trickIntent'; step: number; intent: TrickIntentV1 }
   // --- M4 maneuver (pop/air/catch/land/bail) events -----------------------
   | { type: 'phaseChanged'; step: number; from: string; to: string }
   | { type: 'popRecognized'; step: number; label: 'ollie' | 'nollie'; q: number; confidence: number }

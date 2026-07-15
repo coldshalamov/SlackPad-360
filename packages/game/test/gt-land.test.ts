@@ -134,7 +134,7 @@ describe('GT-land: landing cones', () => {
     fsm.update(input(0, { grounded: true }));
     fsm.update(input(1, {
       grounded: true,
-      pops: [{ step: 1, label: 'ollie', q: DEFAULT_SIM_CONFIG.pop.clickQuality }],
+      pops: [{ step: 1, label: 'ollie', q: DEFAULT_SIM_CONFIG.pop.baseQuality }],
     }));
     fsm.update(input(2, {
       pose: { ...upright, p: { x: 0, y: 0.5, z: 0 }, lv: { x: 0, y: 1, z: 2 } },

@@ -135,7 +135,7 @@ internal sealed class WebViewBridge : IDisposable
             string json = e.WebMessageAsJson;
             var msg = JsonSerializer.Deserialize<PageToHostMessage>(json, ContactFrameJson.Options);
             if (msg is { V: 1, Type: not null } &&
-                msg.Type is "ready" or "quit" or "settings" or "requestCalib")
+                msg.Type is "ready" or "quit" or "settings" or "requestCalib" or "exportControlTrace")
             {
                 PageMessage?.Invoke(msg);
             }

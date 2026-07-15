@@ -14,7 +14,7 @@
  * here directly.
  */
 
-import type { ContactFrame } from "@slackpad/shared";
+import type { ContactFrame, SessionTrace } from "@slackpad/shared";
 import { isHostToPageEnvelope } from "@slackpad/shared";
 import type { InputHub } from "./InputHub";
 import type { Telemetry } from "../telemetry/Telemetry";
@@ -43,6 +43,7 @@ export class HostInputSource {
   private readonly host: WebViewHostApi | null;
   private attached = false;
   private chip: HTMLDivElement | null = null;
+  private latestHardwareFrame: ContactFrame | null = null;
 
   constructor(
     private readonly inputHub: InputHub,
@@ -106,6 +107,53 @@ export class HostInputSource {
     }
   }
 
+  /** Persist a labeled native control-lab trace through the trusted host. */
+  exportControlTrace(trace: SessionTrace, label: string): boolean {
+    if (!this.host) return false;
+    try {
+      this.host.postMessage({
+        v: 1,
+        type: "exportControlTrace",
+        payload: { trace, label },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Angle of the farthest confident live contact pair, used by calibration. */
+  currentSegmentAngleDeg(): number | null {
+    const contacts = this.latestHardwareFrame?.contacts.filter(
+      (contact) => contact.tip && contact.confidence,
+    ) ?? [];
+    if (contacts.length < 2) return null;
+    let a = contacts[0]!;
+    let b = contacts[1]!;
+    let maxDistance2 = -1;
+    for (let i = 0; i < contacts.length - 1; i++) {
+      for (let j = i + 1; j < contacts.length; j++) {
+        const left = contacts[i]!;
+        const right = contacts[j]!;
+        const dx = right.x - left.x;
+        const dy = right.y - left.y;
+        const distance2 = dx * dx + dy * dy;
+        if (distance2 > maxDistance2) {
+          maxDistance2 = distance2;
+          a = left;
+          b = right;
+        }
+      }
+    }
+    // Calibration records the orientation of the physical finger line, not a
+    // directed tail-to-nose vector. Hardware contact enumeration may reverse
+    // between frames, so canonicalize equivalent angles into [-90, 90).
+    let angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    if (angle >= 90) angle -= 180;
+    if (angle < -90) angle += 180;
+    return angle;
+  }
+
   // Arrow fn so `this` is bound when used as an event listener.
   private onMessage = (event: { data: unknown }): void => {
     // e.data from PostWebMessageAsJson is an already-parsed object, not a string.
@@ -120,7 +168,7 @@ export class HostInputSource {
         // message handler and stall the hardware stream.
         if (!Array.isArray(data.frames)) return;
         for (const frame of data.frames as ContactFrame[]) {
-          this.inputHub.push(frame);
+          if (this.inputHub.push(frame)) this.latestHardwareFrame = frame;
         }
         return;
       }

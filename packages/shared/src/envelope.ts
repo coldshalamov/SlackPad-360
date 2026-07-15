@@ -45,7 +45,7 @@ export type HostToPageEnvelope =
 /** Page → host messages (chrome.webview.postMessage). */
 export interface PageToHostMessage {
   v: 1;
-  type: 'ready' | 'quit' | 'settings' | 'requestCalib';
+  type: 'ready' | 'quit' | 'settings' | 'requestCalib' | 'exportControlTrace';
   payload: Record<string, unknown>;
 }
 

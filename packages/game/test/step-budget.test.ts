@@ -1,18 +1,17 @@
 /**
  * Step-budget smoke — time 600 sim steps and log avg/max step ms. The physics
- * budget is ≤4 ms @ 60 Hz (observability §3); this asserts a generous ×3
- * headroom to avoid CI flake. Real perf lands at G5 on target hardware — this
- * only guards against gross regressions.
+ * budget is ≤4 ms @ 60 Hz (observability §3). Packaged target-hardware proof
+ * remains a release gate, while this catches local regressions at the actual
+ * physics budget instead of hiding them behind a multiplier.
  */
 import { describe, expect, it } from 'vitest';
 import { AgentHarness } from '../src/agent/AgentHarness';
 
 const STEPS = 600;
 const BUDGET_MS = 4;
-const HEADROOM = 3;
 
 describe('step-budget (perf smoke)', () => {
-  it(`averages under ${BUDGET_MS * HEADROOM} ms/step over ${STEPS} steps`, async () => {
+  it(`keeps average and p95 under ${BUDGET_MS} ms/step over ${STEPS} steps`, async () => {
     const harness = new AgentHarness();
     await harness.reset(0xc0ffee, 'flat-dev');
 
@@ -33,11 +32,11 @@ describe('step-budget (perf smoke)', () => {
     // eslint-disable-next-line no-console
     console.log(
       `[step-budget] steps=${STEPS} avg=${avg.toFixed(3)}ms p95=${p95.toFixed(3)}ms ` +
-        `max=${max.toFixed(3)}ms budget=${BUDGET_MS}ms (assert avg+p95 <${BUDGET_MS * HEADROOM}ms)`,
+        `max=${max.toFixed(3)}ms budget=${BUDGET_MS}ms`,
     );
 
     expect(harness.getStep()).toBe(STEPS + 30);
-    expect(avg).toBeLessThan(BUDGET_MS * HEADROOM);
-    expect(p95).toBeLessThan(BUDGET_MS * HEADROOM);
+    expect(avg).toBeLessThan(BUDGET_MS);
+    expect(p95).toBeLessThan(BUDGET_MS);
   });
 });

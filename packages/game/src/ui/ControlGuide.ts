@@ -66,10 +66,11 @@ export class ControlGuide {
 
     const copy = document.createElement('div');
     copy.innerHTML =
-      '<b>Slide both left / right</b> — analog carve, like a steering stick<br>' +
+      '<b>Rotate the two-finger line</b> — set board heading; hold the angle to hold heading<br>' +
       '<b>Hold CTRL</b> — accelerate &nbsp;·&nbsp; release to brake<br>' +
-      '<b>LMB</b> — kick tail / ollie &nbsp;·&nbsp; <b>RMB</b> — kick nose / nollie<br>' +
-      '<b>Swipe one finger after the pop</b> — Flick-It flip or shuv';
+      '<b>Lift + retap rear finger</b> — ollie &nbsp;·&nbsp; <b>front</b> — nollie<br>' +
+      '<b>Swipe one finger after the pop</b> — Flick-It flip or shuv<br>' +
+      '<b>V</b> — side-on / route camera';
     Object.assign(copy.style, { lineHeight: '1.48', color: 'rgba(215,228,236,.9)' });
 
     root.append(close, title, hand, copy);

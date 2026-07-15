@@ -48,7 +48,7 @@ describe('shoe socket placement', () => {
     expect(new THREE.Vector3(0, 0, 1).applyQuaternion(tail.quaternion).x).toBeLessThan(-0.99);
   });
 
-  it('keeps every planted shoe sole above its live deck contact through ground, pop, air, and catch', () => {
+  it('keeps both feet planted at their deck sockets through ground, pop, air, and catch', () => {
     const deckTop = 0.027;
     const noseSocket = new THREE.Vector3(0, deckTop, 0.25);
     const tailSocket = new THREE.Vector3(0, deckTop, -0.25);
@@ -79,6 +79,7 @@ describe('shoe socket placement', () => {
       },
       phase,
       label: 'ollie',
+      intent: null,
       assistLevel: 1,
       feet: {
         nose: { planted: true, offset: { x: 0, y: 0.025, z: 0.25 } },
@@ -109,6 +110,9 @@ describe('shoe socket placement', () => {
         shoe.updateMatrixWorld(true);
         const soleY = new THREE.Box3().setFromObject(shoe).min.y;
         expect(soleY, `${phase} ${role} sole`).toBeGreaterThanOrEqual(socket.y - 1e-6);
+        expect(shoe.position.x, `${phase} ${role} x`).toBeCloseTo(socket.x, 6);
+        expect(shoe.position.y, `${phase} ${role} y`).toBeCloseTo(socket.y, 6);
+        expect(shoe.position.z, `${phase} ${role} z`).toBeCloseTo(socket.z, 6);
       }
 
       // Both shoes remain a readable fore/aft, cross-deck stance.
@@ -168,6 +172,7 @@ describe('shoe socket placement', () => {
         },
         phase: 'ground',
         label: null,
+        intent: null,
         assistLevel: 1,
         feet,
         grind: null,
@@ -218,6 +223,7 @@ describe('shoe socket placement', () => {
       board: { p: pose.p, q: pose.q, lv: { x: 0, y: 1, z: 2 }, av: { x: 0, y: 0, z: 100 } },
       phase: 'air',
       label: 'ollie',
+      intent: null,
       assistLevel: 1,
       feet: {
         nose: { planted: false, offset: { x: 0, y: deckTop, z: 0.215 } },

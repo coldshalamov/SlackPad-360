@@ -45,7 +45,11 @@ export class PadDriver {
   private noseId: number | null = null;
   private tailId: number | null = null;
 
-  constructor(readonly harness: AgentHarness) {}
+  constructor(
+    readonly harness: AgentHarness,
+    readonly stance: 'regular' | 'goofy' = 'regular',
+    readonly kickAttribution: 'motionTap' | 'buttonSide' | 'plantMask' = 'motionTap',
+  ) {}
 
   get step(): number {
     return this.harness.getStep();
@@ -81,6 +85,29 @@ export class PadDriver {
     this.harness.step(1);
   }
 
+  /** Drive logical board roles while preserving regular/goofy pad binding. */
+  driveLogical(opts: DriveOptions): void {
+    if (this.stance === 'regular') {
+      this.drive(opts);
+      return;
+    }
+    this.drive({
+      ...opts,
+      // On goofy, pad-left is nose and pad-right is tail. PadDriver's original
+      // fields own those physical contact lifetimes in the opposite order.
+      nose: opts.tail,
+      tail: opts.nose,
+    });
+  }
+
+  logicalNoseBase(): FootInput {
+    return this.stance === 'regular' ? NOSE_POS : TAIL_POS;
+  }
+
+  logicalTailBase(): FootInput {
+    return this.stance === 'regular' ? TAIL_POS : NOSE_POS;
+  }
+
   /** Advance n steps with NO input frames at all. */
   idle(n: number): void {
     this.harness.step(n);
@@ -88,7 +115,13 @@ export class PadDriver {
 
   /** Both feet planted with explicit acceleration for n steps (cruise). */
   cruise(n: number): void {
-    for (let i = 0; i < n; i++) this.drive({ nose: NOSE_POS, tail: TAIL_POS, auxiliary: true });
+    for (let i = 0; i < n; i++) {
+      this.driveLogical({
+        nose: this.logicalNoseBase(),
+        tail: this.logicalTailBase(),
+        auxiliary: true,
+      });
+    }
   }
 }
 
@@ -97,7 +130,7 @@ export async function settled(seed: number, levelId = 'flat-dev', harness?: Agen
   const h = harness ?? new AgentHarness();
   await h.reset(seed, levelId);
   h.step(60); // drop from spawnHeight and settle
-  return new PadDriver(h);
+  return new PadDriver(h, 'regular', 'motionTap');
 }
 
 /**
@@ -112,7 +145,7 @@ export async function settledProfiled(
     stance?: 'regular' | 'goofy';
     assistLevel?: 0 | 1 | 2;
     levelId?: string;
-    kickAttribution?: 'buttonSide' | 'plantMask';
+    kickAttribution?: 'motionTap' | 'buttonSide' | 'plantMask';
   } = {},
 ): Promise<PadDriver> {
   const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
@@ -121,13 +154,17 @@ export async function settledProfiled(
     swapFeet: false,
     assistLevel: opts.assistLevel ?? 1,
     bothClickMeans: 'push',
-    kickAttribution: opts.kickAttribution ?? 'buttonSide',
+    kickAttribution: opts.kickAttribution ?? 'motionTap',
     tapToClickIsKick: true,
     accessibility: { reducedMotion: false, highContrastHud: false },
   }));
   await h.reset(seed, opts.levelId ?? 'flat-dev');
   h.step(60);
-  return new PadDriver(h);
+  return new PadDriver(
+    h,
+    opts.stance ?? 'regular',
+    opts.kickAttribution ?? 'motionTap',
+  );
 }
 
 /** All telemetry events of one type (typed as loose records for assertions). */
@@ -144,9 +181,8 @@ export function lastEventOf(h: AgentHarness, type: string): Record<string, unkno
 }
 
 /**
- * Scripted shipping ollie: two stable contacts + LMB. Legacy timing options
- * remain accepted so older scenario callers do not need custom setup, but no
- * lift is required and the click uses the binary configured pop quality.
+ * Scripted shipping ollie: lift and quickly retap the tail role. Legacy timing
+ * options remain accepted for scenario setup, but no button is involved.
  */
 export function scriptOllie(
   d: PadDriver,
@@ -155,15 +191,29 @@ export function scriptOllie(
   const prepFrames = opts.prepMoveFrames ?? 0;
   const speed = opts.prepSpeedPerFrame ?? 0;
   const gap = opts.gapSteps ?? 0;
+  const noseBase = d.logicalNoseBase();
+  const tailBase = d.logicalTailBase();
 
   // Crisp prep: move the nose fast for a few frames (raises the vel EMA).
   for (let i = 1; i <= prepFrames; i++) {
-    d.drive({ nose: { x: NOSE_POS.x, y: NOSE_POS.y - speed * i }, tail: TAIL_POS });
+    d.driveLogical({ nose: { x: noseBase.x, y: noseBase.y - speed * i }, tail: tailBase });
   }
-  // Restore the stable stance, optionally wait, then click with both planted.
-  d.drive({ nose: NOSE_POS, tail: TAIL_POS });
-  for (let i = 0; i < gap; i++) d.drive({ nose: NOSE_POS, tail: TAIL_POS });
-  d.drive({ nose: NOSE_POS, tail: TAIL_POS, primary: true });
+  d.driveLogical({ nose: noseBase, tail: tailBase });
+  for (let i = 0; i < gap; i++) d.driveLogical({ nose: noseBase, tail: tailBase });
+
+  if (d.kickAttribution === 'motionTap') {
+    // Lift the logical tail for two reports, then retap its socket.
+    d.driveLogical({ nose: noseBase, tail: null });
+    d.driveLogical({ nose: noseBase, tail: null });
+    d.driveLogical({ nose: noseBase, tail: tailBase });
+  } else if (d.kickAttribution === 'buttonSide') {
+    d.driveLogical({ nose: noseBase, tail: tailBase, primary: true });
+  } else {
+    // Explicit legacy plant-mask path: lift the prep/nose role, then click with
+    // only the logical tail planted.
+    d.driveLogical({ nose: null, tail: tailBase });
+    d.driveLogical({ nose: null, tail: tailBase, primary: true });
+  }
   return d.step - 1; // the sim step at which the kick was consumed
 }
 
@@ -195,7 +245,7 @@ export function flyOut(
   const h = d.harness;
   const maxSteps = opts.maxSteps ?? 240;
   const catchAfter = opts.catchAfterApexSteps ?? null;
-  const catchPos = opts.catchPos ?? NOSE_POS;
+  const catchPos = opts.catchPos ?? d.logicalNoseBase();
   const holdTail = opts.holdTail ?? true;
 
   const y0 = h.observe().board.p.y;
@@ -223,9 +273,9 @@ export function flyOut(
     ) {
       nosePlanted = true;
     }
-    d.drive({
+    d.driveLogical({
       nose: nosePlanted ? catchPos : null,
-      tail: holdTail ? TAIL_POS : null,
+      tail: holdTail ? d.logicalTailBase() : null,
     });
   }
 
@@ -318,7 +368,7 @@ export function flyWithGesture(d: PadDriver, opts: GestureOptions): FlipFlightRe
   const frames = opts.frames ?? 6;
   const startAfterAir = opts.startAfterAir ?? 2;
   const catchAfter = opts.catchAfterApexSteps ?? null;
-  const catchPos = opts.catchPos ?? NOSE_POS;
+  const catchPos = opts.catchPos ?? d.logicalNoseBase();
   const maxSteps = opts.maxSteps ?? 240;
 
   const y0 = h.observe().board.p.y;
@@ -341,16 +391,21 @@ export function flyWithGesture(d: PadDriver, opts: GestureOptions): FlipFlightRe
     const done = lastEventOf(h, 'trickCompleted') ?? lastEventOf(h, 'bail');
     if (done && (phase === 'ground' || phase === 'bail')) break;
 
-    let tail: FootInput = TAIL_POS;
+    const tailBase = d.logicalTailBase();
+    let tail: FootInput = tailBase;
     if (airStart != null && obs.step >= airStart + startAfterAir) {
       if (gi < frames) gi += 1;
-      tail = gesturePos(opts.gesture, gi, perFrame, frames); // holds at final after `frames`
+      const scripted = gesturePos(opts.gesture, gi, perFrame, frames);
+      tail = {
+        x: clampPad(tailBase.x + scripted.x - TAIL_POS.x),
+        y: clampPad(tailBase.y + scripted.y - TAIL_POS.y),
+      }; // holds at final after `frames`
     }
 
     if (!nosePlanted && catchAfter != null && apexStep != null && obs.step >= apexStep + catchAfter) {
       nosePlanted = true;
     }
-    d.drive({ nose: nosePlanted ? catchPos : null, tail });
+    d.driveLogical({ nose: nosePlanted ? catchPos : null, tail });
   }
 
   const trick = lastEventOf(h, 'trickCompleted');

@@ -22,7 +22,7 @@ export interface GameLoopHooks {
   /** Advance the sim exactly one fixed step (drain-all-then-step-once lives here). */
   onStep: () => void;
   /** Render with interpolation alpha and the rAF-derived presentation delta. */
-  onRender: (alpha: number, frameDeltaSeconds: number) => void;
+  onRender: (alpha: number, frameDeltaSeconds: number, rawFrameMs: number) => void;
   /** Optional: called when backlog beyond the step cap was discarded (ms dropped). */
   onSaturated?: (droppedMs: number) => void;
 }
@@ -101,7 +101,11 @@ export class GameLoop {
       this.accumulatorMs = remainder;
     }
 
-    this.hooks.onRender(this.accumulatorMs / this.dtMs, presentationElapsed / 1000);
+    this.hooks.onRender(
+      this.accumulatorMs / this.dtMs,
+      presentationElapsed / 1000,
+      rawElapsed,
+    );
   }
 
   private readonly frame = (nowMs: number): void => {
