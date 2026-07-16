@@ -167,60 +167,90 @@ describe("ground locomotion (b) push pulses", () => {
   });
 });
 
-describe("ground locomotion (c) finger-line heading", () => {
-  async function headingAfterContacts(
-    contacts: Contact[],
+describe("ground locomotion (c) finger-line steering (RELATIVE, reviews/03)", () => {
+  // Sprint 02 S2 superseded the absolute finger-angle heading: steering now
+  // follows the CHANGE in segment angle since dual-plant (ratchet steering),
+  // with no speed gate. These tests replace the absolute-semantics originals.
+  async function pipeline(
     stance: InputProfile["stance"] = "regular",
-    steps = 120,
-    accelerating = false,
-  ): Promise<{ yaw: number; yawRate: number }> {
+  ): Promise<AgentHarness> {
     const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
       ...DEFAULT_SIM_CONFIG_PROFILE,
       stance,
     }));
     await h.reset(0x5411, "flat-dev");
     h.step(60);
-    // The very first confident two-finger placement establishes the requested
-    // board heading. There is no hidden re-anchor to the board's old yaw.
-    for (let i = 0; i < steps; i++) {
-      h.injectContactFrame(plantFrame(60 + i, contacts, false, accelerating));
-      h.step(1);
-    }
+    return h;
+  }
+
+  function yawOf(h: AgentHarness): { yaw: number; yawRate: number } {
     const { q, av } = h.observe().board;
     const forwardX = 2 * (q.x * q.z + q.w * q.y);
     const forwardZ = 1 - 2 * (q.x * q.x + q.y * q.y);
     return { yaw: Math.atan2(forwardX, forwardZ), yawRate: av.y };
   }
 
-  it("a clockwise 90-degree finger line does not rotate a stationary board", async () => {
-    // Native pad Y grows toward the player. Moving the nose contact downward
-    // is a physical clockwise hand rotation, which is world -yaw in the
-    // side-on camera frame (world +Z reads screen-right, world -X toward us).
+  /** Contact pair rotated `a` rad about the rest midpoint (0.5, 0.5). */
+  function rotated(a: number): Contact[] {
+    const c = 0.1 * Math.cos(a);
+    const s = 0.1 * Math.sin(a);
+    return [
+      { ...REST[0]!, x: 0.5 - c, y: 0.5 - s },
+      { ...REST[1]!, x: 0.5 + c, y: 0.5 + s },
+    ];
+  }
+
+  it("planting an already-rotated finger line never snaps the board (no absolute authority)", async () => {
+    const h = await pipeline();
     const vertical: Contact[] = [
       { ...REST[0]!, x: 0.5, y: 0.4 },
       { ...REST[1]!, x: 0.5, y: 0.6 },
     ];
-    const result = await headingAfterContacts(vertical);
+    for (let i = 0; i < 120; i++) {
+      h.injectContactFrame(plantFrame(60 + i, vertical, false, false));
+      h.step(1);
+    }
+    const result = yawOf(h);
     expect(Math.abs(result.yaw)).toBeLessThan(0.12);
     expect(Math.abs(result.yawRate)).toBeLessThan(0.08);
   });
 
-  it("turns toward the requested heading while rolling without snapping in 300 ms", async () => {
-    const vertical: Contact[] = [
-      { ...REST[0]!, x: 0.5, y: 0.4 },
-      { ...REST[1]!, x: 0.5, y: 0.6 },
-    ];
-    const early = await headingAfterContacts(vertical, "regular", 18, true);
-    expect(Math.abs(early.yaw)).toBeGreaterThan(0.02);
-    expect(Math.abs(early.yaw)).toBeLessThan(Math.PI / 3);
-
-    const settled = await headingAfterContacts(vertical, "regular", 180, true);
-    expect(Math.abs(-Math.PI / 2 - settled.yaw)).toBeLessThan(Math.PI / 5);
+  it("rotating the planted line turns the board by the delta — standstill pivot included", async () => {
+    const h = await pipeline();
+    // Anchor at rest angle, THEN rotate +90° at ~200°/s, hold. No drive at all:
+    // the rideMotionFullSpeed dead zone is gone by design.
+    for (let i = 0; i < 20; i++) {
+      h.injectContactFrame(plantFrame(60 + i, rotated(0), false, false));
+      h.step(1);
+    }
+    const rotSteps = 27;
+    for (let k = 1; k <= rotSteps; k++) {
+      const a = (Math.PI / 2) * (k / rotSteps);
+      h.injectContactFrame(plantFrame(80 + k, rotated(a), false, false));
+      h.step(1);
+    }
+    for (let i = 0; i < 60; i++) {
+      h.injectContactFrame(plantFrame(140 + i, rotated(Math.PI / 2), false, false));
+      h.step(1);
+    }
+    const settled = yawOf(h);
+    // Pad +rotation → world −yaw, scaled by steerDirectGain (1.1): ≈ −99°.
+    const expected = -(Math.PI / 2) * DEFAULT_SIM_CONFIG.locomotion.steerDirectGain;
+    expect(Math.abs(settled.yaw - expected)).toBeLessThan(0.25);
   });
 
   it("sliding both fingers together without rotating them does not steer", async () => {
+    const h = await pipeline();
+    for (let i = 0; i < 20; i++) {
+      h.injectContactFrame(plantFrame(60 + i, REST, false, false));
+      h.step(1);
+    }
     const translated = REST.map((contact) => ({ ...contact, x: contact.x + 0.1 }));
-    const result = await headingAfterContacts(translated);
+    for (let i = 0; i < 100; i++) {
+      h.injectContactFrame(plantFrame(80 + i, translated, false, false));
+      h.step(1);
+    }
+    const result = yawOf(h);
     expect(Math.abs(result.yaw)).toBeLessThan(0.08);
     expect(Math.abs(result.yawRate)).toBeLessThan(0.08);
   });
@@ -293,7 +323,8 @@ function feet(lateral: number): FeetState {
   };
 }
 
-describe("ground locomotion (e) direct heading guard", () => {
+describe("ground locomotion (e) relative steering-sign guard", () => {
+  const GAIN = DEFAULT_SIM_CONFIG.locomotion.steerDirectGain;
   const make = (stance: InputProfile["stance"]) =>
     new BoardController(
       DEFAULT_SIM_CONFIG.locomotion,
@@ -305,47 +336,55 @@ describe("ground locomotion (e) direct heading guard", () => {
     );
 
   it("common-mode finger translation has no steering or cosmetic lean authority", () => {
-    const cmd = make("regular").applyGroundControl(feet(0.1), [], true, 0);
-    expect(cmd.targetYawRate).toBe(0);
+    const c = make("regular");
+    expect(c.applyGroundControl(feet(0), [], true, 0).headingDelta).toBe(0); // anchor
+    const cmd = c.applyGroundControl(feet(0.1), [], true, 1);
+    expect(cmd.headingDelta).toBeCloseTo(0, 12);
     expect(cmd.rollTorque).toBe(0);
-    expect(cmd.steerAngle).toBe(0);
   });
 
-  it("converts pad-clockwise angle to the matching world-clockwise heading", () => {
-    const cmd = make("regular").applyGroundControl(
-      headingFeet(0.35),
-      [],
-      true,
-      0,
-    );
-    expect(cmd.steerAngle).toBeCloseTo(-0.35, 6);
+  it("emits the negated wrapPi segment delta × steerDirectGain (pad CW = world CW)", () => {
+    const c = make("regular");
+    c.applyGroundControl(headingFeet(0), [], true, 0); // anchor
+    const cmd = c.applyGroundControl(headingFeet(0.35), [], true, 1);
+    expect(cmd.headingDelta).toBeCloseTo(-0.35 * GAIN, 6);
   });
 
-  it("keeps the same physical finger-line heading in goofy stance", () => {
-    // Goofy reverses tail→nose role ordering, so its directed segment is π
-    // for the same horizontal hand placement. Heading must remain zero.
-    const cmd = make("goofy").applyGroundControl(
-      headingFeet(Math.PI),
-      [],
-      true,
-      0,
-    );
-    expect(cmd.steerAngle).toBeCloseTo(0, 6);
+  it("goofy stance emits identical deltas — the π role offset cancels", () => {
+    // Goofy reverses tail→nose ordering (segment reads π for the same hands),
+    // but RELATIVE steering only sees the change, so direction is preserved
+    // with no stance term at all.
+    const c = make("goofy");
+    c.applyGroundControl(headingFeet(Math.PI), [], true, 0); // anchor
+    const cmd = c.applyGroundControl(headingFeet(Math.PI + 0.35), [], true, 1);
+    expect(cmd.headingDelta).toBeCloseTo(-0.35 * GAIN, 6);
   });
 
-  it("does not turn finger rotation speed into a separate yaw-rate command", () => {
-    const cmd = make("regular").applyGroundControl(
-      headingFeet(0.35, 8),
-      [],
-      true,
-      0,
-    );
-    expect(cmd.targetYawRate).toBe(0);
+  it("re-planting at ANY absolute angle re-anchors with a zero delta (no snap)", () => {
+    const c = make("regular");
+    c.applyGroundControl(headingFeet(0), [], true, 0);
+    c.applyGroundControl(headingFeet(0.35), [], true, 1);
+    const lifted = feet(0);
+    lifted.bothPlanted = false;
+    lifted.segment.valid = false;
+    expect(c.applyGroundControl(lifted, [], true, 2).headingDelta).toBeNull();
+    const cmd = c.applyGroundControl(headingFeet(-1.2), [], true, 3);
+    expect(cmd.headingDelta).toBe(0);
   });
 
-  it("airborne → no command (targetYawRate 0, inactive)", () => {
+  it("finger rotation SPEED adds no second command channel (delta only)", () => {
+    const slow = make("regular");
+    slow.applyGroundControl(headingFeet(0, 0), [], true, 0);
+    const a = slow.applyGroundControl(headingFeet(0.35, 0), [], true, 1);
+    const fast = make("regular");
+    fast.applyGroundControl(headingFeet(0, 8), [], true, 0);
+    const b = fast.applyGroundControl(headingFeet(0.35, 8), [], true, 1);
+    expect(b.headingDelta).toBeCloseTo(a.headingDelta!, 12);
+  });
+
+  it("airborne → inactive command with steering disengaged", () => {
     const cmd = make("regular").applyGroundControl(feet(1), [], false, 0);
     expect(cmd.active).toBe(false);
-    expect(cmd.targetYawRate).toBe(0);
+    expect(cmd.headingDelta).toBeNull();
   });
 });

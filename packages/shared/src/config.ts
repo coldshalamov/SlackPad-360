@@ -584,7 +584,11 @@ export interface PhysicsConfig {
   /** Ground locomotion. */
   pushImpulse: number;
   maxGroundSpeed: number;
-  /** Steering yaw rate at full segment rotation, rad/s. */
+  /**
+   * Hard ceiling on commanded/servoed yaw rate, rad/s. Sized ABOVE any human
+   * finger rotation (~12 rad/s ≈ 690°/s) so the clamp is an anti-cheat/NaN
+   * boundary, never the thing that makes steering feel slow (reviews/03 §3.1).
+   */
   steerYawRateMax: number;
   rollingFriction: number;
   /** Collision impulse above which maneuvers interrupt (T_col). */
@@ -716,35 +720,52 @@ export interface LocomotionConfig {
   accelerationCadenceSteps: number;
   /** Clamp for an explicit physical brake command, N. Shipping Ctrl release coasts. */
   coastBrakeForce: number;
-  /** Two-finger centroid speed toward the screen below which no drive occurs. */
-  rideMotionMinSpeed: number;
-  /** Minimum board speed at which truck steering/heading authority is enabled. */
-  rideMotionFullSpeed: number;
   /** Minimum sim steps between push pulses (cooldown) so a held click is one push. */
   pushCooldownSteps: number;
   /**
-   * Segment angular velocity (rad/s) → target board yaw rate scale. The primary
-   * steering signal. Result is clamped to `physics.steerYawRateMax`.
+   * Finger-line rotation → board yaw ratio (board rad per finger rad), applied
+   * to the wrapPi segment-angle DELTA since dual-plant (reviews/03 design law:
+   * relative ratchet steering, never the absolute pad angle). ~1.0–1.2 feels
+   * 1:1; taste key, exposed for the tuning HUD.
    */
-  steerYawGain: number;
-  /** Minimum speed required from EACH foot before a dual-contact turn engages. */
-  steerEngageFootSpeed: number;
-  /** Common-mode two-finger lateral displacement ignored as neutral pad noise. */
-  steerInputDeadzone: number;
-  /** Common-mode lateral displacement that produces the full steering rate. */
-  steerInputFullScale: number;
-  /** Sustained yaw rate requested at full common-mode steering input, rad/s. */
-  steerRateAtFull: number;
-  /** Board-heading error → desired physical yaw-rate gain, 1/s. */
-  steerHeadingBiasGain: number;
+  steerDirectGain: number;
   /**
-   * Yaw servo gain, N·m per (rad/s) of yaw-rate error. SimWorld drives angular
-   * velocity toward the (clamped) target yaw rate with a torque limited by
-   * `steerMaxTorque` — no direct angular-velocity writes.
+   * Heading-error → desired yaw-rate gain, 1/s (position loop of the direct
+   * yaw servo). Sized so the board trails the fingers by a 30–50 ms time
+   * constant; the feel-report steer gates (lagMs < 50, trackErrDeg < 5) are
+   * the acceptance instrument for this value.
+   */
+  steerTrackGain: number;
+  /**
+   * Yaw servo gain, N·m per (rad/s) of yaw-rate error, executed as direct
+   * clamped torque about deck-up (fingers planted = direct authority). Sized
+   * against the loaded body's yaw inertia (~4.2 kg·m²) for a 1–2 step rate
+   * response; torque limited by `steerMaxTorque` — no angular-velocity writes.
    */
   steerServoGain: number;
-  /** Steering torque clamp, N·m. */
+  /**
+   * Steering torque clamp, N·m. Anti-cheat/NaN boundary, not realism: sized
+   * so the servo OVERPOWERS the wheel-grip yaw moment at command rates
+   * (fingers are an effectively infinite-stiffness constraint — grip never
+   * gets a vote on heading, reviews/03 §2.1). Too low re-creates the audited
+   * mush: the rate loop saturates against wheel side friction and the board
+   * trails a fast rotation by >5°.
+   */
   steerMaxTorque: number;
+  /**
+   * Grip model (heading ≠ travel): the slip angle between horizontal travel
+   * and board-forward decays exponentially at this rate, 1/s (~125 ms time
+   * constant) — momentum is ROTATED toward the deck, never deleted. Slow
+   * rotation carves; fast rotation at speed out-runs the redirect and slides.
+   */
+  gripRate: number;
+  /**
+   * Redirect saturation: the grip can convert at most
+   * gripRate × gripSlipSpeed (m/s of lateral velocity) per second, so at high
+   * slip speeds the remainder keeps sliding (powerslide) instead of being
+   * instantly re-aimed.
+   */
+  gripSlipSpeed: number;
   /** Actual deck lean → opposing front/rear truck steering gain. */
   truckLeanToSteer: number;
   /** Neutral rider lean below this angle is treated as truck/bearing noise. */
@@ -759,13 +780,6 @@ export interface LocomotionConfig {
   groundBalanceKd: number;
   /** Maximum neutral rider balance torque while wheel-supported, N·m. */
   groundBalanceTorqueMax: number;
-  /**
-   * Midpoint lateral offset-from-rest (calibrated pad units) → mild carve yaw
-   * rate contribution, 1/s. Lets a lateral lean add a gentle turn.
-   */
-  leanCarveGain: number;
-  /** Midpoint lateral offset → cosmetic roll torque, N·m per unit offset. */
-  leanRollGain: number;
   /** Roll torque clamp, N·m (kept small so lean can never flip the board). */
   leanMaxRollTorque: number;
   /**
@@ -1114,7 +1128,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     ccdSubsteps: 2,
     pushImpulse: 44,
     maxGroundSpeed: 6.5,
-    steerYawRateMax: 2.6,
+    steerYawRateMax: 12,
     rollingFriction: 0.18,
     interruptCollisionImpulse: 8,
     contactReportImpulse: 1,
@@ -1159,17 +1173,13 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     accelerationStrokeSteps: 20,
     accelerationCadenceSteps: 34,
     coastBrakeForce: 0,
-    rideMotionMinSpeed: 0.04,
-    rideMotionFullSpeed: 0.35,
     pushCooldownSteps: 12,
-    steerYawGain: 1.2,
-    steerEngageFootSpeed: 0.02,
-    steerInputDeadzone: 0.018,
-    steerInputFullScale: 0.13,
-    steerRateAtFull: 2.6,
-    steerHeadingBiasGain: 1.2,
-    steerServoGain: 16.0,
-    steerMaxTorque: 8.0,
+    steerDirectGain: 1.1,
+    steerTrackGain: 24,
+    steerServoGain: 180,
+    steerMaxTorque: 900,
+    gripRate: 8,
+    gripSlipSpeed: 1.2,
     truckLeanToSteer: 1.0,
     truckLeanDeadzoneDeg: 1.5,
     truckSteerMaxDeg: 18,
@@ -1177,8 +1187,6 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     groundBalanceKp: 85,
     groundBalanceKd: 12,
     groundBalanceTorqueMax: 65,
-    leanCarveGain: 1.4,
-    leanRollGain: 0.6,
     leanMaxRollTorque: 8.0,
     padToBoardScale: 0.6,
     groundControlLogEvery: 15,

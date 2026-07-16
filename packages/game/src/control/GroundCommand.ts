@@ -20,18 +20,20 @@ export interface GroundCommand {
   brakeForce: number;
   /** One-shot forward push impulse this step, N·s. SimWorld caps it at maxGroundSpeed. */
   pushImpulse: number;
-  /** Desired board yaw rate about world +Y, rad/s. SimWorld clamps + servos toward it. */
-  targetYawRate: number;
   /**
-   * Signed calibrated two-finger segment angle, rad. While this is present,
-   * SimWorld anchors the board heading to the segment at first plant and then
-   * tracks subsequent segment rotation one-for-one. null releases the anchor.
+   * RELATIVE steering (reviews/03 design law): the wrapPi delta of the
+   * calibrated two-finger segment angle since the previous step, scaled by
+   * `locomotion.steerDirectGain` and sign-mapped to world yaw, rad. SimWorld
+   * accumulates it into a servoed heading target (per-step clamp
+   * `steerYawRateMax × dt`); null means steering is disengaged this step
+   * (fingers not dual-planted) and releases the heading anchor. Ratcheting is
+   * free: each fresh dual-plant re-anchors and subsequent deltas accumulate.
    */
-  steerAngle: number | null;
+  headingDelta: number | null;
   /** Cosmetic lean roll torque about board-forward, N·m. SimWorld clamps it small. */
   rollTorque: number;
 }
 
 export function idleGroundCommand(): GroundCommand {
-  return { active: false, driveForce: 0, brakeForce: 0, pushImpulse: 0, targetYawRate: 0, steerAngle: null, rollTorque: 0 };
+  return { active: false, driveForce: 0, brakeForce: 0, pushImpulse: 0, headingDelta: null, rollTorque: 0 };
 }

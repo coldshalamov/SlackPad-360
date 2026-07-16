@@ -102,15 +102,19 @@ export interface SteerSample {
   /** Scripted pad segment rotation from rest, deg (input-side ground truth). */
   padAngleDeg: number;
   /**
-   * Scripted rotation mapped through the design boundary sign (BoardController
-   * negates the calibrated pad angle exactly once), deg — i.e. the WORLD yaw
-   * delta the fingers are asking for.
+   * Scripted rotation mapped through the DESIGN input→output map: negated
+   * exactly once at the BoardController boundary and scaled by
+   * locomotion.steerDirectGain — i.e. the world yaw delta the design says the
+   * board should perform for these fingers. Tracking error measured against
+   * anything else would count the intended gain as servo error.
    */
   commandedYawDeg: number;
   /** Unwrapped world yaw delta since the first sample, deg. */
   yawDeg: number;
   speedMps: number;
 }
+
+const STEER_GAIN = DEFAULT_SIM_CONFIG.locomotion.steerDirectGain;
 
 export interface SteerScenarioResult {
   samples: SteerSample[];
@@ -155,7 +159,7 @@ async function steerScript(seed: number, opts: SteerScriptOptions): Promise<Stee
     samples.push({
       step: obs.step,
       padAngleDeg,
-      commandedYawDeg: -padAngleDeg,
+      commandedYawDeg: -padAngleDeg * STEER_GAIN,
       yawDeg: (unwrap.next(yawRad(obs.board.q)) * 180) / Math.PI,
       speedMps: Math.hypot(obs.board.lv.x, obs.board.lv.z),
     });
@@ -181,7 +185,13 @@ async function steerScript(seed: number, opts: SteerScriptOptions): Promise<Stee
   const window = samples.slice(opts.preRollSteps);
   const meanSpeedMps =
     window.reduce((acc, s) => acc + s.speedMps, 0) / Math.max(1, window.length);
-  return { samples, rotationStartIndex: opts.preRollSteps, meanSpeedMps };
+  // rotationStartIndex points at the LAST NEUTRAL sample (delta zero point);
+  // the first rotated sample is the one after it.
+  return {
+    samples,
+    rotationStartIndex: Math.max(0, opts.preRollSteps - 1),
+    meanSpeedMps,
+  };
 }
 
 /** 45° segment rotation at ~200°/s while coasting at cruise speed. */
@@ -258,12 +268,15 @@ export async function steerRatchet(seed: number): Promise<RatchetResult> {
       step: obs.step,
       padAngleDeg,
       // While lifted the fingers ask nothing; carry the accumulated total so
-      // the plot reads as a staircase toward 90°.
-      commandedYawDeg: -(scriptedTotalDeg + (planted ? padAngleDeg : 0)),
+      // the plot reads as a staircase toward 90° (design map: × gain).
+      commandedYawDeg: -(scriptedTotalDeg + (planted ? padAngleDeg : 0)) * STEER_GAIN,
       yawDeg: (unwrap.next(yawRad(obs.board.q)) * 180) / Math.PI,
       speedMps: Math.hypot(obs.board.lv.x, obs.board.lv.z),
     });
   };
+  // Neutral zero-point sample before the first grip rotation.
+  d.drive({ ...pairAt(0), auxiliary: true });
+  sample(0, true);
 
   const rotSteps = Math.ceil(45 / (200 / HZ));
   for (let grip = 0; grip < 2; grip++) {
@@ -298,7 +311,8 @@ export async function steerRatchet(seed: number): Promise<RatchetResult> {
   const last = samples[samples.length - 1]!;
   return {
     samples,
-    commandedDeg: scriptedTotalDeg,
+    // Through the design map: scripted finger degrees × steerDirectGain.
+    commandedDeg: scriptedTotalDeg * STEER_GAIN,
     achievedDeg: Math.abs(last.yawDeg - first.yawDeg),
   };
 }

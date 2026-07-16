@@ -5,6 +5,7 @@ import { DEFAULT_LEVEL_ID, getLevelBuilder } from '../src/sim/levels/index';
 import * as parkModule from '../src/sim/levels/playable-park';
 import { buildLevelStatics } from '../src/render/LevelStatics';
 import { SimWorld } from '../src/sim/SimWorld';
+import { headingDeltaToward } from './helpers/steer';
 import { rotateAboutCenter } from '../src/input/FootTracker';
 import {
   NOSE_POS,
@@ -150,8 +151,7 @@ describe('playable-park default level contract', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: null,
+        headingDelta: null,
         rollTorque: 0,
       });
       world.step();
@@ -196,8 +196,7 @@ describe('playable-park default level contract', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: targetHeading,
+        headingDelta: headingDeltaToward(world, targetHeading),
         rollTorque: 0,
       });
       world.step();

@@ -40,11 +40,13 @@ function checkBaseline(key: string, actual: string): void {
 
 const SEED = 12345;
 const SESSION_STEPS = 420;
-// The 50-50 retains its longer authored approach. The boardslide uses 130
-// Ctrl-stroke steps to reach z≈5.43 m, matching the live integration line;
-// two lift reports follow, then the retap opens the pop on this step.
+// The 50-50 retains its longer authored approach. The boardslide pop step was
+// recalibrated 192 → 196 for the S2 steering/grip physics (the approach line
+// changed, shifting the entry pose the shuv+catch produces); catch timing
+// stays +12. See grind-integration.test.ts for the pre-existing boardslide
+// entry-envelope fragility that Sprint 03's grind instruments own.
 const FIFTY_POP_STEP = 207;
-const BOARDSLIDE_POP_STEP = 192;
+const BOARDSLIDE_POP_STEP = 196;
 
 function c(id: number, x: number, y: number): Contact {
   return { id, tip: true, x, y, confidence: true };

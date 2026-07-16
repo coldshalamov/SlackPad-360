@@ -1,5 +1,6 @@
 /**
- * BoardController — ground locomotion only (M3).
+ * BoardController — ground locomotion only (M3; steering reworked in Sprint 02
+ * S2 per reviews/03).
  *
  * Consumes FeetState + KickEvents and produces a plain-data GroundCommand each
  * step. It is deliberately BODY-STATE-FREE: it never reads the board's linear or
@@ -7,10 +8,13 @@
  * does every velocity-dependent scaling and every clamp (module-ownership:
  * "Impulses/torques clamps" applied by SimWorld, "Skipping Rapier" forbidden).
  *
- * Ground vocabulary implemented here (final-input-and-trick-spec §5):
+ * Ground vocabulary (reviews/03 design law):
  *  - Ride:   Ctrl authors eased push strokes; release coasts physically.
  *  - Push:   both-planted kick (bothClickMeans 'push') → forward impulse.
- *  - Steer:  the absolute two-finger segment angle is the board heading.
+ *  - Steer:  RELATIVE — board yaw follows the CHANGE in the two-finger segment
+ *            angle since dual-plant, 1:1 × steerDirectGain. Lift, re-plant,
+ *            keep turning (ratchet) accumulates by construction. The absolute
+ *            pad angle has no authority; stance offsets cancel out of deltas.
  * Air control (M4/M5) is out of scope: no ground forces unless grounded.
  */
 
@@ -35,6 +39,8 @@ export class BoardController {
   private lastPushStep = -1_000_000;
   private accelerationWasHeld = false;
   private accelerationStrokeEpoch = 0;
+  /** Segment angle at the previous steering step; null = anchor released. */
+  private steerRefAngle: number | null = null;
 
   constructor(
     private readonly loco: LocomotionConfig,
@@ -51,6 +57,7 @@ export class BoardController {
   ): GroundCommand {
     if (!grounded) {
       this.accelerationWasHeld = false;
+      this.steerRefAngle = null;
       return idleGroundCommand();
     }
 
@@ -59,8 +66,7 @@ export class BoardController {
       driveForce: 0,
       brakeForce: 0,
       pushImpulse: 0,
-      targetYawRate: 0,
-      steerAngle: null,
+      headingDelta: null,
       rollTorque: 0,
     };
 
@@ -90,16 +96,23 @@ export class BoardController {
     }
     this.accelerationWasHeld = driveAllowed;
 
-    // The directed tail→nose finger line is the requested board heading. Pad
-    // Y grows toward the player, the opposite sign of world yaw in the side-on
-    // view, so negate the calibrated pad angle exactly once at this boundary.
-    // Common translation and angular velocity have no separate authority.
+    // RELATIVE steering: emit the wrapPi delta of the calibrated segment angle
+    // since the previous steering step, negated exactly once at this boundary
+    // (pad +rotation = world −yaw, the repo-wide sign convention) and scaled by
+    // steerDirectGain. A fresh dual-plant re-anchors with delta 0, so planting
+    // at ANY absolute angle never snaps the board — only turning turns it.
+    // Stance needs no term here: goofy's π offset cancels out of deltas.
     if (feet.bothPlanted && seg.valid) {
-      cmd.targetYawRate = 0;
-      cmd.steerAngle = wrapPi(
-        -seg.angle + (this.profile.stance === "goofy" ? Math.PI : 0),
-      );
+      if (this.steerRefAngle == null) {
+        cmd.headingDelta = 0;
+      } else {
+        cmd.headingDelta =
+          -wrapPi(seg.angle - this.steerRefAngle) * this.loco.steerDirectGain;
+      }
+      this.steerRefAngle = seg.angle;
       cmd.rollTorque = 0;
+    } else {
+      this.steerRefAngle = null;
     }
 
     // Push pulse: both-planted kick, respecting bothClickMeans + cooldown.
@@ -122,7 +135,7 @@ export class BoardController {
         type: "groundControl",
         step,
         drive: cmd.driveForce,
-        yaw: cmd.targetYawRate,
+        headingDelta: cmd.headingDelta,
         bothPlanted: feet.bothPlanted,
       });
     }

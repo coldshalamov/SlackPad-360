@@ -4,6 +4,7 @@ import type { Contact } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import { SimWorld } from '../src/sim/SimWorld';
+import { headingDeltaToward } from './helpers/steer';
 
 const REST: Contact[] = [
   { id: 1, x: 0.4, y: 0.5, tip: true, confidence: true },
@@ -128,8 +129,7 @@ describe('professional skate physics foundation', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: 0,
+        headingDelta: 0,
         rollTorque: 0,
       });
       world.step();
@@ -154,8 +154,7 @@ describe('professional skate physics foundation', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.accelerationStrokePeakForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: Math.PI / 2,
+        headingDelta: headingDeltaToward(world, Math.PI / 2),
         rollTorque: 0,
       });
       world.step();
@@ -171,7 +170,12 @@ describe('professional skate physics foundation', () => {
     world.free();
   });
 
-  it('turns at full cruise progressively without toy-like snap or immediate scrub', async () => {
+  it('tracks a finger-rate 90° carve at cruise: tight, no overshoot, no total scrub', async () => {
+    // Sprint 02 S2 superseded the "progressive carve" semantics: fingers
+    // planted = direct authority (reviews/03 design law #1). The bot now asks
+    // at a human finger rate (~200°/s) and the board must FOLLOW — close
+    // tracking replaces the old deliberate lag — while the grip model
+    // redirects momentum instead of scrubbing it all.
     const world = new SimWorld(structuredClone(DEFAULT_SIM_CONFIG));
     await world.reset(0x7a12, 'flat-dev');
     for (let i = 0; i < 90; i++) world.step();
@@ -181,29 +185,28 @@ describe('professional skate physics foundation', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: 0,
+        headingDelta: 0,
         rollTorque: 0,
       });
       world.step();
     }
     const entrySpeed = Math.hypot(world.boardPose().lv.x, world.boardPose().lv.z);
     const target = Math.PI / 2;
-    let yawAt300ms = 0;
-    let speedAt300ms = entrySpeed;
+    const ratePerStep = (200 * Math.PI) / 180 / 60; // 200°/s finger rotation
+    let commanded = 0;
     let peakYawRate = 0;
     let peakYaw = 0;
-    // Judge the progressive carve before its trajectory reaches flat-dev's
-    // +X grind ledge. A longer horizon measures an obstacle collision rather
-    // than truck steering or speed scrub.
+    let maxTrackErr = 0;
+    let endSpeed = entrySpeed;
     for (let i = 0; i < 78; i++) {
+      const step = Math.min(ratePerStep, target - commanded);
+      commanded += step;
       world.applyGroundForces({
         active: true,
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: target,
+        headingDelta: step,
         rollTorque: 0,
       });
       world.step();
@@ -211,17 +214,75 @@ describe('professional skate physics foundation', () => {
       const currentYaw = worldYaw(world);
       peakYaw = Math.max(peakYaw, currentYaw);
       peakYawRate = Math.max(peakYawRate, Math.abs(pose.av.y));
-      if (i === 17) {
-        yawAt300ms = currentYaw;
-        speedAt300ms = Math.hypot(pose.lv.x, pose.lv.z);
+      maxTrackErr = Math.max(maxTrackErr, Math.abs(commanded - currentYaw));
+      endSpeed = Math.hypot(pose.lv.x, pose.lv.z);
+    }
+    // Direct authority: the board trails the rotating fingers by only a few
+    // degrees, never overshoots past the ask, and yaw rate stays inside the
+    // configured ceiling. A 200°/s snap to 90° is a POWERSLIDE: the wheels
+    // skid sideways and physically scrub speed — that is the speed-control
+    // move, not a defect — so no speed floor is asserted here.
+    expect(maxTrackErr).toBeLessThan(0.15);
+    expect(peakYaw).toBeLessThan(target + 0.15);
+    expect(peakYawRate).toBeLessThanOrEqual(DEFAULT_SIM_CONFIG.physics.steerYawRateMax * 1.2);
+    expect(Math.abs(target - worldYaw(world))).toBeLessThan(0.1);
+    expect(endSpeed).toBeGreaterThanOrEqual(0);
+    expect(world.isGrounded()).toBe(true);
+    world.free();
+  });
+
+  it('a progressive S-carve (small slip angle) redirects line speed instead of scrubbing it', async () => {
+    // Slow rotation = carve (reviews/03 grip law): at ~37°/s the slip angle
+    // stays a few degrees, the grip redirect keeps up, and the roll survives
+    // 90° of total heading change. Shaped as +45° then −45° so the arc stays
+    // inside flat-dev's corridor (wide ledge at +X, thin rail at −X).
+    const world = new SimWorld(structuredClone(DEFAULT_SIM_CONFIG));
+    await world.reset(0x7a13, 'flat-dev');
+    for (let i = 0; i < 90; i++) world.step();
+    for (let i = 0; i < 240; i++) {
+      world.applyGroundForces({
+        active: true,
+        driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
+        brakeForce: 0,
+        pushImpulse: 0,
+        headingDelta: 0,
+        rollTorque: 0,
+      });
+      world.step();
+    }
+    const entrySpeed = Math.hypot(world.boardPose().lv.x, world.boardPose().lv.z);
+    const quarter = Math.PI / 4;
+    const legSteps = 72; // 45° over 1.2 s ≈ 37.5°/s per leg
+    for (const dir of [1, -1] as const) {
+      let commanded = 0;
+      for (let i = 0; i < legSteps; i++) {
+        const step = Math.min(quarter / legSteps, quarter - commanded);
+        commanded += step;
+        world.applyGroundForces({
+          active: true,
+          driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
+          brakeForce: 0,
+          pushImpulse: 0,
+          headingDelta: dir * step,
+          rollTorque: 0,
+        });
+        world.step();
       }
     }
-    expect(yawAt300ms).toBeGreaterThan(0.08);
-    expect(yawAt300ms).toBeLessThan(Math.PI / 4);
-    expect(speedAt300ms).toBeGreaterThan(entrySpeed * 0.85);
-    expect(peakYawRate).toBeLessThanOrEqual(DEFAULT_SIM_CONFIG.physics.steerYawRateMax * 1.2);
-    expect(peakYaw).toBeLessThan(target + 0.25);
-    expect(Math.abs(target - worldYaw(world))).toBeLessThan(0.3);
+    for (let i = 0; i < 30; i++) {
+      world.applyGroundForces({
+        active: true,
+        driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
+        brakeForce: 0,
+        pushImpulse: 0,
+        headingDelta: 0,
+        rollTorque: 0,
+      });
+      world.step();
+    }
+    const endSpeed = Math.hypot(world.boardPose().lv.x, world.boardPose().lv.z);
+    expect(Math.abs(worldYaw(world))).toBeLessThan(0.12);
+    expect(endSpeed).toBeGreaterThan(entrySpeed * 0.6);
     expect(world.isGrounded()).toBe(true);
     world.free();
   });

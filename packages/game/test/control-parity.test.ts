@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { NOSE_POS, scriptOllie, settled, TAIL_POS } from './helpers/maneuver';
 
 interface ParityReadback {
@@ -31,7 +32,10 @@ describe('live control parity diagnostics', () => {
     expect(parity.contacts.tail.pad.y).toBeCloseTo(TAIL_POS.y, 4);
     expect(parity.contacts.nose.pad.x).toBeCloseTo(NOSE_POS.x, 4);
     expect(parity.contacts.nose.pad.y).toBeCloseTo(NOSE_POS.y, 4);
-    expect(parity.requestedHeadingRad).toBeCloseTo(0, 6);
+    // Relative steering (S2): a fresh dual-plant ANCHORS the servo target to
+    // the board's live heading — it never snaps to the pad's absolute angle.
+    expect(parity.requestedHeadingRad).not.toBeNull();
+    expect(parity.requestedHeadingRad!).toBeCloseTo(parity.actualHeadingRad, 3);
     expect(parity.headingErrorRad).not.toBeNull();
   });
 
@@ -51,20 +55,31 @@ describe('live control parity diagnostics', () => {
     expect(parity.popPolarityOk).toBe(true);
   });
 
-  it('shows a clockwise pad heading producing the same signed board turn', async () => {
+  it('shows a clockwise pad rotation producing the same signed board turn', async () => {
     const d = await settled(0xc0de3);
-    const tail = { x: 0.5, y: 0.4 };
-    const nose = { x: 0.5, y: 0.6 };
-    // Establish physical index-left/middle-right identity before rotating the
-    // sticky contact pair through 90 degrees.
-    d.drive({ tail: TAIL_POS, nose: NOSE_POS });
-    for (let i = 0; i < 120; i++) {
-      d.drive({ tail, nose, auxiliary: true });
+    // Establish identity, then ROTATE the pair through +90° at a finger rate
+    // (~200°/s) — relative steering follows the change, not the absolute pose.
+    for (let i = 0; i < 10; i++) d.drive({ tail: TAIL_POS, nose: NOSE_POS });
+    const steps = 27;
+    for (let k = 1; k <= steps; k++) {
+      const a = (Math.PI / 2) * (k / steps);
+      const c = 0.1 * Math.cos(a);
+      const s = 0.1 * Math.sin(a);
+      d.drive({
+        tail: { x: 0.5 - c, y: 0.5 - s },
+        nose: { x: 0.5 + c, y: 0.5 + s },
+        auxiliary: true,
+      });
+    }
+    for (let i = 0; i < 90; i++) {
+      d.drive({ tail: { x: 0.5, y: 0.4 }, nose: { x: 0.5, y: 0.6 }, auxiliary: true });
     }
 
     const parity = parityOf(d);
-    expect(parity.requestedHeadingRad).toBeCloseTo(-Math.PI / 2, 3);
-    expect(parity.actualHeadingRad).toBeLessThan(-0.2);
-    expect(Math.abs(parity.headingErrorRad ?? Math.PI)).toBeLessThan(Math.PI / 2);
+    const expected = -(Math.PI / 2) * DEFAULT_SIM_CONFIG.locomotion.steerDirectGain;
+    expect(parity.requestedHeadingRad).not.toBeNull();
+    expect(parity.requestedHeadingRad!).toBeCloseTo(expected, 1);
+    expect(parity.actualHeadingRad).toBeLessThan(-1.2);
+    expect(Math.abs(parity.headingErrorRad ?? Math.PI)).toBeLessThan(0.2);
   });
 });

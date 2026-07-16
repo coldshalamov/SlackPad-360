@@ -83,8 +83,7 @@ describe('four-wheel swept contact physics', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: 0,
+        headingDelta: 0,
         rollTorque: 0,
       });
       world.step();
@@ -144,13 +143,14 @@ describe('four-wheel swept contact physics', () => {
     const world = await settledWorld(0x1a7e);
 
     for (let i = 0; i < 180; i++) {
+      // Gentle sustained turn via the relative channel: 0.45 rad/s as
+      // per-step heading deltas after half the run.
       world.applyGroundForces({
         active: true,
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: i < 90 ? 0 : 0.45,
-        steerAngle: null,
+        headingDelta: i < 90 ? 0 : 0.45 / DEFAULT_SIM_CONFIG.physics.hz,
         rollTorque: 0,
       });
       world.step();
@@ -191,8 +191,7 @@ describe('four-wheel swept contact physics', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: null,
+        headingDelta: null,
         rollTorque: 0,
       });
       world.step();

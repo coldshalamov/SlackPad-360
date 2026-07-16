@@ -63,7 +63,8 @@ export type ProfileProvider = () => InputProfile;
 // Replay compatibility version, not the npm package version. Any deterministic
 // control/physics change must move this so an older recording fails loudly
 // instead of producing a plausible-looking divergent run.
-export const GAME_VERSION = "0.2.0";
+// 0.3.0: Sprint 02 S2 — relative direct-drive steering + grip model.
+export const GAME_VERSION = "0.3.0";
 export const RAPIER_VERSION = "0.19.3";
 
 /** Pose hashing precision: round to 1e-6 before hashing (micrometer / µquat). */
@@ -947,8 +948,10 @@ export class AgentHarness {
       groundControlActive,
       step,
     );
-    this.#lastRequestedHeadingRad = cmd.steerAngle;
     this.#world.applyGroundForces(cmd);
+    // Relative steering: the requested heading is the servo's accumulated
+    // target inside SimWorld (null while steering is disengaged).
+    this.#lastRequestedHeadingRad = this.#world.steerHeadingTarget();
     for (const mc of maneuverCmds) this.#world.applyManeuver(mc);
 
     this.#feetState = feet;

@@ -8,6 +8,7 @@ import {
   type TransitionAssistSample,
 } from '../src/sim/TransitionAssist';
 import { SimWorld } from '../src/sim/SimWorld';
+import { headingDeltaToward } from './helpers/steer';
 import { DEFAULT_LEVEL_ID } from '../src/sim/levels';
 
 const DT = 1 / 120;
@@ -228,8 +229,7 @@ describe('TransitionAssist', () => {
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate: 0,
-        steerAngle: targetHeading,
+        headingDelta: headingDeltaToward(world, targetHeading),
         rollTorque: 0,
       });
       world.step();

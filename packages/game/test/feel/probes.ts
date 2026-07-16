@@ -178,7 +178,11 @@ export async function probePivot90(seed: number): Promise<ProbeResult> {
   return {
     success: successStep != null,
     timeSec: successStep != null ? Math.round((successStep / HZ) * 1000) / 1000 : null,
-    detail: { achievedDeg, commandedDeg: 90 },
+    detail: {
+      achievedDeg,
+      commandedDeg:
+        Math.round(90 * DEFAULT_SIM_CONFIG.locomotion.steerDirectGain * 1000) / 1000,
+    },
   };
 }
 

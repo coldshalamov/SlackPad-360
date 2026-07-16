@@ -237,6 +237,13 @@ export class SimWorld {
   /** Stability torque queued by applyGroundForces for the next integration step. */
   #pendingGroundBalanceTorque: Vec3 = zero();
   #lastGroundBalanceTorque: Vec3 = zero();
+  /**
+   * Servoed world-yaw heading target of the direct steering authority, rad.
+   * Accumulates clamped GroundCommand.headingDelta while steering is engaged;
+   * null when disengaged (fingers off → physics owns yaw). State lives here so
+   * the target survives per-step command plumbing but is validated per step.
+   */
+  #steerHeadingTarget: number | null = null;
   #lastPopLinearImpulse: Vec3 = zero();
   #lastPopAngularImpulse: Vec3 = zero();
   #lastTransitionLinearImpulse: Vec3 = zero();
@@ -295,6 +302,7 @@ export class SimWorld {
     this.#lastTransitionAngularImpulse = zero();
     this.#transitionAssist.reset();
     this.#lastTransitionAssist = null;
+    this.#steerHeadingTarget = null;
     this.stepCount = 0;
     this.seed = seed;
     this.levelId = levelId;
@@ -424,6 +432,15 @@ export class SimWorld {
     return this.seed;
   }
 
+  /**
+   * Current servoed heading target of the direct steering authority, rad, or
+   * null while steering is disengaged. Read-only diagnostics for
+   * ControlDiagnostics.requestedHeadingRad; no write path exists.
+   */
+  steerHeadingTarget(): number | null {
+    return this.#steerHeadingTarget;
+  }
+
   getLevelId(): string {
     return this.levelId;
   }
@@ -543,6 +560,7 @@ export class SimWorld {
       this.#setWheelEngineForce(0);
       this.#setWheelBrake(0);
       this.#setTruckSteering(0, 0);
+      this.#steerHeadingTarget = null;
       return;
     }
     const body = this.requireBoard();
@@ -591,9 +609,10 @@ export class SimWorld {
     this.#setWheelEngineForce(wheelDriveForce);
     this.#setWheelBrake(clampNum(cmd.brakeForce, 0, loco.coastBrakeForce));
 
-    // Swept wheel volumes provide suspension contact while skateboard geometry owns
-    // steering: actual deck lean pivots the two truck axles in opposite
-    // directions, attenuated by speed and each axle's live suspension load.
+    // Trucks are FLAVOR, not the steering authority (reviews/03 §Stage 1):
+    // actual deck lean still pivots the axles in opposite directions for a
+    // physical carve accent, but the commanded heading no longer routes
+    // through truck geometry, wheel side friction, or suspension load.
     const frontLoad = this.#contactSolver?.frontLoad ?? 0;
     const rearLoad = this.#contactSolver?.rearLoad ?? 0;
     const rawLean = Math.asin(clampNum(right.y, -1, 1));
@@ -610,45 +629,10 @@ export class SimWorld {
       maxSteerRad: (loco.truckSteerMaxDeg * Math.PI) / 180,
       speedFade: loco.truckSteerSpeedFade,
     });
-    let headingError = 0;
-    let commandedSteer = 0;
-    const horizontalSpeed = Math.hypot(lv.x, lv.z);
-    if (cmd.steerAngle != null && Number.isFinite(cmd.steerAngle)) {
-      const boardYaw = Math.atan2(fwd.x, fwd.z);
-      headingError = wrapPi(cmd.steerAngle - boardYaw);
-      if (horizontalSpeed >= loco.rideMotionFullSpeed) {
-        const desiredYawRate = clampNum(
-          headingError * loco.steerHeadingBiasGain,
-          -phys.steerYawRateMax,
-          phys.steerYawRateMax,
-        );
-        // Opposing front/rear trucks behave like symmetric four-wheel steer:
-        // δ = atan(yawRate * wheelbase / (2 * speed)). This keeps the physical
-        // truck model while preventing an 18° full-lock toy snap at cruise.
-        commandedSteer = Math.atan2(
-          desiredYawRate * phys.wheelbase,
-          2 * horizontalSpeed,
-        );
-      }
-    } else if (horizontalSpeed >= loco.rideMotionFullSpeed && Number.isFinite(cmd.targetYawRate)) {
-      commandedSteer = Math.atan2(cmd.targetYawRate * phys.wheelbase, horizontalSpeed);
-    }
     const maxTruckSteer = loco.truckSteerMaxDeg * Math.PI / 180;
-    const yawRateSteerCap = horizontalSpeed >= loco.rideMotionFullSpeed
-      ? Math.atan2(phys.steerYawRateMax * phys.wheelbase, 2 * horizontalSpeed)
-      : maxTruckSteer;
-    const effectiveTruckSteerMax = Math.min(maxTruckSteer, yawRateSteerCap);
     this.#setTruckSteering(
-      clampNum(
-        leanSteer.front + commandedSteer,
-        -effectiveTruckSteerMax,
-        effectiveTruckSteerMax,
-      ),
-      clampNum(
-        leanSteer.rear - commandedSteer,
-        -effectiveTruckSteerMax,
-        effectiveTruckSteerMax,
-      ),
+      clampNum(leanSteer.front, -maxTruckSteer, maxTruckSteer),
+      clampNum(leanSteer.rear, -maxTruckSteer, maxTruckSteer),
     );
 
     // --- Push pulse: one-shot impulse, momentum-capped at maxGroundSpeed ------
@@ -662,34 +646,83 @@ export class SimWorld {
       }
     }
 
+    // --- Grip model: heading ≠ travel (reviews/03 design law #2) -------------
+    // ROTATE the horizontal velocity vector toward board-forward (never delete
+    // it): the slip angle between travel and the deck decays exponentially at
+    // gripRate (τ ≈ 125 ms — slow rotation carves, momentum redirects), while
+    // the redirect RATE saturates at gripRate × gripSlipSpeed worth of lateral
+    // velocity per second, so a fast rotation at speed out-runs the grip and
+    // leaves genuine slide (powerslide) as the remainder. Riding fakie
+    // redirects toward −forward (the nearer pole), never through 90°.
+    // Force-based (impulse toward the rotated vector); speed magnitude is
+    // untouched by construction — scrub stays owned by rolling friction and
+    // the wheel model.
+    {
+      const rh = Math.hypot(right.x, right.z);
+      if (hasForward && rh > 1e-4) {
+        const rx = right.x / rh;
+        const rz = right.z / rh;
+        const vFwd = lv.x * fx + lv.z * fz;
+        const vLat = lv.x * rx + lv.z * rz;
+        const speed = Math.hypot(vFwd, vLat);
+        if (speed > 1e-3 && Math.abs(vLat) > 1e-4) {
+          const slipAngle = Math.atan2(vLat, vFwd);
+          const pole = Math.abs(slipAngle) > Math.PI / 2 ? Math.sign(slipAngle) * Math.PI : 0;
+          const error = slipAngle - pole;
+          const gripRate = clampNum(loco.gripRate, 0, 60);
+          const decay = 1 - Math.exp(-gripRate * dt);
+          const maxTurn = (gripRate * Math.max(0, loco.gripSlipSpeed) * dt) / speed;
+          const turn = clampNum(error * decay, -maxTurn, maxTurn);
+          const newAngle = slipAngle - turn;
+          const nFwd = speed * Math.cos(newAngle);
+          const nLat = speed * Math.sin(newAngle);
+          impulse.x += (fx * (nFwd - vFwd) + rx * (nLat - vLat)) * mass;
+          impulse.z += (fz * (nFwd - vFwd) + rz * (nLat - vLat)) * mass;
+        }
+      }
+    }
+
     if (Number.isFinite(impulse.x) && Number.isFinite(impulse.z)) {
       body.applyImpulse({ x: impulse.x, y: 0, z: impulse.z }, true);
     }
 
-    // Rate-mode callers get a moving-only rider/truck yaw damper. Unlike the
-    // removed heading servo, it cannot rotate a stopped board toward an angle;
-    // it only rejects unintended spin (or tracks an explicit yaw rate) once
-    // the wheels are rolling. Absolute trackpad heading still acts through
-    // front/rear truck curvature above.
+    // --- Direct yaw authority (reviews/03 design law #1) ---------------------
+    // Fingers planted = the board's yaw is yours, now, at ANY speed (standstill
+    // pivot included — no rideMotionFullSpeed gate). SimWorld accumulates the
+    // relative headingDelta into a servoed target and tracks it with a
+    // two-loop servo: position error → desired yaw rate (steerTrackGain) plus
+    // the commanded rate as feedforward, then rate error → direct clamped
+    // torque about deck-up (steerServoGain / steerMaxTorque). Everything is
+    // clamped from config; fingers off releases the target (physics owns yaw).
     const deckUp = quatRotate(q, 0, 1, 0);
     let yawImpulse = 0;
-    if (
-      cmd.steerAngle == null &&
-      horizontalSpeed >= loco.rideMotionFullSpeed &&
-      Number.isFinite(cmd.targetYawRate)
-    ) {
+    if (cmd.headingDelta != null && Number.isFinite(cmd.headingDelta)) {
+      const boardYaw = Math.atan2(fwd.x, fwd.z);
+      const maxStepDelta = phys.steerYawRateMax * dt;
+      const delta = clampNum(cmd.headingDelta, -maxStepDelta, maxStepDelta);
+      const target = this.#steerHeadingTarget == null
+        ? wrapPi(boardYaw + delta)
+        : wrapPi(this.#steerHeadingTarget + delta);
+      // Anti-windup: if reality falls far behind (collision, wall pin), drag
+      // the target with the board instead of storing a multi-second catch-up.
+      const rawError = wrapPi(target - boardYaw);
+      const maxError = 0.6;
+      const error = clampNum(rawError, -maxError, maxError);
+      this.#steerHeadingTarget = wrapPi(boardYaw + error);
       const yawRate = av.x * deckUp.x + av.y * deckUp.y + av.z * deckUp.z;
-      const targetYawRate = clampNum(
-        cmd.targetYawRate,
+      const desiredRate = clampNum(
+        error * loco.steerTrackGain + delta / dt,
         -phys.steerYawRateMax,
         phys.steerYawRateMax,
       );
       const yawTorque = clampNum(
-        (targetYawRate - yawRate) * loco.steerServoGain,
+        (desiredRate - yawRate) * loco.steerServoGain,
         -loco.steerMaxTorque,
         loco.steerMaxTorque,
       );
       yawImpulse = yawTorque * dt;
+    } else {
+      this.#steerHeadingTarget = null;
     }
 
     // --- Lean roll: small clamped torque about the board-forward axis ---------
