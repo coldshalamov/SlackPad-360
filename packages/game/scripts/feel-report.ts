@@ -21,6 +21,8 @@ import {
   steerRatchet,
   steerTurn,
 } from '../test/feel/scenarios';
+import { runNavProbes } from '../test/feel/probes';
+import type { NavProbes, ProbeResult } from '../test/feel/probes';
 import type {
   FlickRunResult,
   PopRunResult,
@@ -287,7 +289,7 @@ function pitchPlot(title: string, run: PopRunResult, noseUpSign: 1 | -1): string
 // Gates
 // ---------------------------------------------------------------------------
 
-export type GateGroup = 'steer' | 'pop';
+export type GateGroup = 'steer' | 'pop' | 'nav';
 
 export interface FeelGate {
   id: string;
@@ -350,6 +352,20 @@ function outcomeCounts(runs: Array<{ outcome: string }>): Record<string, number>
   return counts;
 }
 
+function probeRow(p: ProbeResult): Record<string, unknown> {
+  return { success: p.success, timeSec: p.timeSec, ...p.detail };
+}
+
+function navMetrics(nav: NavProbes): Record<string, unknown> {
+  return {
+    rideStraight: probeRow(nav.rideStraight),
+    slalom: probeRow(nav.slalom),
+    pivot90: probeRow(nav.pivot90),
+    ollieBattery: probeRow(nav.ollieBattery),
+    popOverObstacle: probeRow(nav.popOverObstacle),
+  };
+}
+
 export async function runFeelReport(): Promise<FeelReportBundle> {
   // --- Scenarios (fixed seeds; the numbers ARE the API — never reseed casually)
   const turnPlus = await steerTurn(1, 0x5702a);
@@ -361,6 +377,7 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
   const ollies = await popBattery('ollie', 20, 0x0111e);
   const nollies = await popBattery('nollie', 20, 0x0110e);
   const flicks = await flickBattery(10, 0xf11c0);
+  const nav = await runNavProbes();
 
   // --- Steering metrics
   const lagPlus = crossCorrLag(
@@ -410,6 +427,8 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
     gate('pop.latencyMs', 'pop', 'S4', 'replant→first airborne step, worst of battery', popLatencyMs, '<=', 80),
     gate('pop.silhouetteRmsDeg', 'pop', 'S4', 'pitch vs authored curve RMS, worst of battery', popRms, '<', 4),
     gate('pop.bails', 'pop', 'S4', 'ollie battery bail count', ollieCounts.bail!, '==', 0),
+    gate('nav.slalom', 'nav', 'S2', '5-gate slalom, closed-loop wrist-range bot', nav.slalom.success ? 1 : 0, '==', 1),
+    gate('nav.pivot90', 'nav', 'S2', 'standstill 90° in ≤1.5 s (two grips)', nav.pivot90.success ? 1 : 0, '==', 1),
   ];
 
   const cfg = DEFAULT_SIM_CONFIG;
@@ -463,14 +482,7 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
         recognizedKickflipRate: round(flickRecognized / Math.max(1, flicks.length)),
         counts: outcomeCounts(flicks),
       },
-      nav: {
-        rideStraight: null,
-        slalom: null,
-        pivot90: null,
-        ollieBattery: null,
-        popOverObstacle: null,
-        note: 'S1.5 playability probes fill these',
-      },
+      nav: navMetrics(nav),
     },
     batteries: {
       ollie: batteryRows(ollies, 1),
@@ -543,6 +555,15 @@ function renderMarkdown(report: Record<string, unknown>): string {
   lines.push(`| nollie.latencyMs | ${fmt((m.nollie as Record<string, unknown>).latencyMs)} |`);
   lines.push(`| nollie.counts | ${JSON.stringify((m.nollie as Record<string, unknown>).counts)} |`);
   lines.push(`| flick.recognizedKickflipRate | ${fmt((m.flick as Record<string, unknown>).recognizedKickflipRate)} |`);
+  lines.push('');
+  lines.push('## Playability probes (nav.*)');
+  lines.push('');
+  lines.push('| probe | success | time (s) | detail |');
+  lines.push('| --- | --- | --- | --- |');
+  for (const [name, row] of Object.entries(m.nav as Record<string, Record<string, unknown>>)) {
+    const { success, timeSec, ...detail } = row;
+    lines.push(`| nav.${name} | ${success ? 'PASS' : 'fail'} | ${fmt(timeSec)} | ${JSON.stringify(detail)} |`);
+  }
   lines.push('');
   lines.push('## Config echo');
   lines.push('');

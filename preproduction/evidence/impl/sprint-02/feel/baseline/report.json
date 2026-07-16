@@ -68,12 +68,58 @@
       }
     },
     "nav": {
-      "rideStraight": null,
-      "slalom": null,
-      "pivot90": null,
-      "ollieBattery": null,
-      "popOverObstacle": null,
-      "note": "S1.5 playability probes fill these"
+      "rideStraight": {
+        "success": true,
+        "timeSec": 5.9,
+        "travelledM": 20.015,
+        "maxLateralDevM": 0.087
+      },
+      "slalom": {
+        "success": false,
+        "timeSec": 12.167,
+        "gatesPassed": 2,
+        "gatesCrossed": 5,
+        "gateErrorsM": [
+          0.118,
+          1.124,
+          1.116,
+          1.238,
+          0.987
+        ]
+      },
+      "pivot90": {
+        "success": false,
+        "timeSec": null,
+        "achievedDeg": 0.712,
+        "commandedDeg": 90
+      },
+      "ollieBattery": {
+        "success": true,
+        "timeSec": null,
+        "landed": 10,
+        "total": 10,
+        "outcomes": [
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean",
+          "clean"
+        ]
+      },
+      "popOverObstacle": {
+        "success": true,
+        "timeSec": null,
+        "popped": true,
+        "crossedCurbWindow": true,
+        "minLiftCrossingM": 0.452,
+        "curbHeightM": 0.25,
+        "outcome": "clean"
+      }
     }
   },
   "batteries": {
@@ -654,6 +700,26 @@
       "op": "==",
       "threshold": 0,
       "pass": true
+    },
+    {
+      "id": "nav.slalom",
+      "group": "nav",
+      "stage": "S2",
+      "description": "5-gate slalom, closed-loop wrist-range bot",
+      "value": 0,
+      "op": "==",
+      "threshold": 1,
+      "pass": false
+    },
+    {
+      "id": "nav.pivot90",
+      "group": "nav",
+      "stage": "S2",
+      "description": "standstill 90° in ≤1.5 s (two grips)",
+      "value": 0,
+      "op": "==",
+      "threshold": 1,
+      "pass": false
     }
   ]
 }

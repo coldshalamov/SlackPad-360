@@ -13,6 +13,8 @@ Metrics are instrument readings, not feel verdicts — feel is judged by a human
 | pop.latencyMs — replant→first airborne step, worst of battery | S4 | 66.667 | <= 80 | PASS |
 | pop.silhouetteRmsDeg — pitch vs authored curve RMS, worst of battery | S4 | 16.867 | < 4 | fail |
 | pop.bails — ollie battery bail count | S4 | 0 | == 0 | PASS |
+| nav.slalom — 5-gate slalom, closed-loop wrist-range bot | S2 | 0 | == 1 | fail |
+| nav.pivot90 — standstill 90° in ≤1.5 s (two grips) | S2 | 0 | == 1 | fail |
 
 ## Steering
 
@@ -45,6 +47,16 @@ Metrics are instrument readings, not feel verdicts — feel is judged by a human
 | nollie.latencyMs | 66.67 |
 | nollie.counts | {"clean":20,"dirty":0,"bail":0,"none":0} |
 | flick.recognizedKickflipRate | 1 |
+
+## Playability probes (nav.*)
+
+| probe | success | time (s) | detail |
+| --- | --- | --- | --- |
+| nav.rideStraight | PASS | 5.9 | {"travelledM":20.015,"maxLateralDevM":0.087} |
+| nav.slalom | fail | 12.167 | {"gatesPassed":2,"gatesCrossed":5,"gateErrorsM":[0.118,1.124,1.116,1.238,0.987]} |
+| nav.pivot90 | fail | — | {"achievedDeg":0.712,"commandedDeg":90} |
+| nav.ollieBattery | PASS | — | {"landed":10,"total":10,"outcomes":["clean","clean","clean","clean","clean","clean","clean","clean","clean","clean"]} |
+| nav.popOverObstacle | PASS | — | {"popped":true,"crossedCurbWindow":true,"minLiftCrossingM":0.452,"curbHeightM":0.25,"outcome":"clean"} |
 
 ## Config echo
 
