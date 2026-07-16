@@ -20,3 +20,6 @@ mcps/
 assets/generated/audio/unpacked/
 dist-release/
 GameDist/
+
+# Sprint 02 feel-report scratch output (baseline/after runs are committed explicitly)
+preproduction/evidence/impl/sprint-02/feel/latest/

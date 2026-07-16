@@ -1,0 +1,659 @@
+{
+  "schema": "slackpad-feel-report/1",
+  "build": {
+    "gameVersion": "0.2.0",
+    "rapierVersion": "0.19.3",
+    "hz": 60
+  },
+  "configEcho": {
+    "locomotion.steerHeadingBiasGain": 1.2,
+    "locomotion.steerYawGain": 1.2,
+    "locomotion.rideMotionFullSpeed": 0.35,
+    "physics.steerYawRateMax": 2.6,
+    "physics.boardMass": 2.4,
+    "physics.riderMass": 72,
+    "pop.baseQuality": 0.6,
+    "pop.jMin": 180,
+    "pop.jMax": 300,
+    "camera.chaseSide": -1.25,
+    "camera.chaseDistance": 1.2
+  },
+  "metrics": {
+    "steer": {
+      "lagMs": 233.33,
+      "lagCorr": 0.737,
+      "trackErrDeg": 36.629,
+      "pivotDeg": 0.241,
+      "pivotCommandedDeg": 200,
+      "ratchetCommandedDeg": 90,
+      "ratchetAchievedDeg": 30.137,
+      "holdYawDriftDeg": 0.046,
+      "holdPosDriftM": 0.034,
+      "cruiseTurnLagMs": 216.67,
+      "cruiseTurnErrDeg": 36.665,
+      "turnSpeedMps": 3.15
+    },
+    "pop": {
+      "latencyMs": 66.67,
+      "latencyMedianMs": 50,
+      "liftoffFailures": 0,
+      "silhouetteRmsDeg": 16.867,
+      "silhouetteRmsMedianDeg": 16.571
+    },
+    "land": {
+      "cleanRate": 1,
+      "counts": {
+        "clean": 20,
+        "dirty": 0,
+        "bail": 0,
+        "none": 0
+      }
+    },
+    "nollie": {
+      "latencyMs": 66.67,
+      "counts": {
+        "clean": 20,
+        "dirty": 0,
+        "bail": 0,
+        "none": 0
+      }
+    },
+    "flick": {
+      "recognizedKickflipRate": 1,
+      "counts": {
+        "clean": 9,
+        "dirty": 1,
+        "bail": 0,
+        "none": 0
+      }
+    },
+    "nav": {
+      "rideStraight": null,
+      "slalom": null,
+      "pivot90": null,
+      "ollieBattery": null,
+      "popOverObstacle": null,
+      "note": "S1.5 playability probes fill these"
+    }
+  },
+  "batteries": {
+    "ollie": [
+      {
+        "seed": 4382,
+        "gapSteps": 0,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.505,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.429
+      },
+      {
+        "seed": 4383,
+        "gapSteps": 1,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.511,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.619
+      },
+      {
+        "seed": 4384,
+        "gapSteps": 1,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.499,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.828
+      },
+      {
+        "seed": 4385,
+        "gapSteps": 0,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.498,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.867
+      },
+      {
+        "seed": 4386,
+        "gapSteps": 1,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.503,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.419
+      },
+      {
+        "seed": 4387,
+        "gapSteps": 0,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 66.67,
+        "heightM": 0.493,
+        "airtimeSec": 0.583,
+        "silhouetteRmsDeg": 16.617
+      },
+      {
+        "seed": 4388,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.513,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.56
+      },
+      {
+        "seed": 4389,
+        "gapSteps": 2,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.51,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.582
+      },
+      {
+        "seed": 4390,
+        "gapSteps": 2,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 66.67,
+        "heightM": 0.52,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.595
+      },
+      {
+        "seed": 4391,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.505,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.469
+      },
+      {
+        "seed": 4392,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.512,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.607
+      },
+      {
+        "seed": 4393,
+        "gapSteps": 1,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.496,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.714
+      },
+      {
+        "seed": 4394,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.507,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.474
+      },
+      {
+        "seed": 4395,
+        "gapSteps": 0,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 66.67,
+        "heightM": 0.496,
+        "airtimeSec": 0.583,
+        "silhouetteRmsDeg": 16.472
+      },
+      {
+        "seed": 4396,
+        "gapSteps": 1,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.506,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.434
+      },
+      {
+        "seed": 4397,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.502,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.458
+      },
+      {
+        "seed": 4398,
+        "gapSteps": 2,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.505,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.486
+      },
+      {
+        "seed": 4399,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.52,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.768
+      },
+      {
+        "seed": 4400,
+        "gapSteps": 0,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 50,
+        "heightM": 0.499,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.864
+      },
+      {
+        "seed": 4401,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "ollie",
+        "latencyMs": 66.67,
+        "heightM": 0.513,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.469
+      }
+    ],
+    "nollie": [
+      {
+        "seed": 4366,
+        "gapSteps": 0,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.513,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.794
+      },
+      {
+        "seed": 4367,
+        "gapSteps": 0,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.504,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.538
+      },
+      {
+        "seed": 4368,
+        "gapSteps": 2,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.512,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.724
+      },
+      {
+        "seed": 4369,
+        "gapSteps": 0,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.514,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.669
+      },
+      {
+        "seed": 4370,
+        "gapSteps": 0,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.497,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.898
+      },
+      {
+        "seed": 4371,
+        "gapSteps": 1,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.506,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.569
+      },
+      {
+        "seed": 4372,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.493,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.768
+      },
+      {
+        "seed": 4373,
+        "gapSteps": 1,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.508,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.753
+      },
+      {
+        "seed": 4374,
+        "gapSteps": 2,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.509,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.714
+      },
+      {
+        "seed": 4375,
+        "gapSteps": 0,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 66.67,
+        "heightM": 0.508,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.519
+      },
+      {
+        "seed": 4376,
+        "gapSteps": 2,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.506,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.592
+      },
+      {
+        "seed": 4377,
+        "gapSteps": 0,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.512,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.651
+      },
+      {
+        "seed": 4378,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 66.67,
+        "heightM": 0.506,
+        "airtimeSec": 0.583,
+        "silhouetteRmsDeg": 16.872
+      },
+      {
+        "seed": 4379,
+        "gapSteps": 0,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.505,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.567
+      },
+      {
+        "seed": 4380,
+        "gapSteps": 1,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.517,
+        "airtimeSec": 0.617,
+        "silhouetteRmsDeg": 16.711
+      },
+      {
+        "seed": 4381,
+        "gapSteps": 2,
+        "prepMoveFrames": 3,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.496,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.746
+      },
+      {
+        "seed": 4382,
+        "gapSteps": 1,
+        "prepMoveFrames": 2,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.5,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.787
+      },
+      {
+        "seed": 4383,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 66.67,
+        "heightM": 0.491,
+        "airtimeSec": 0.583,
+        "silhouetteRmsDeg": 16.62
+      },
+      {
+        "seed": 4384,
+        "gapSteps": 1,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.499,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.843
+      },
+      {
+        "seed": 4385,
+        "gapSteps": 0,
+        "prepMoveFrames": 4,
+        "outcome": "clean",
+        "label": "nollie",
+        "latencyMs": 50,
+        "heightM": 0.499,
+        "airtimeSec": 0.6,
+        "silhouetteRmsDeg": 16.686
+      }
+    ],
+    "flick": [
+      {
+        "seed": 987584,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.907
+      },
+      {
+        "seed": 987585,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.924
+      },
+      {
+        "seed": 987586,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.917
+      },
+      {
+        "seed": 987587,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.936
+      },
+      {
+        "seed": 987588,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.933
+      },
+      {
+        "seed": 987589,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.911
+      },
+      {
+        "seed": 987590,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.894
+      },
+      {
+        "seed": 987591,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.917
+      },
+      {
+        "seed": 987592,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "dirty",
+        "flipRotations": 0.879
+      },
+      {
+        "seed": 987593,
+        "recLabel": "kickflip",
+        "label": "kickflip",
+        "outcome": "clean",
+        "flipRotations": 0.919
+      }
+    ]
+  },
+  "gates": [
+    {
+      "id": "steer.lagMs",
+      "group": "steer",
+      "stage": "S2",
+      "description": "finger→board yaw lag (45° @200°/s, worst dir)",
+      "value": 233.333,
+      "op": "<",
+      "threshold": 50,
+      "pass": false
+    },
+    {
+      "id": "steer.trackErrDeg",
+      "group": "steer",
+      "stage": "S2",
+      "description": "max |commanded−actual| during turn (worst dir)",
+      "value": 36.629,
+      "op": "<",
+      "threshold": 5,
+      "pass": false
+    },
+    {
+      "id": "steer.pivotDeg",
+      "group": "steer",
+      "stage": "S2",
+      "description": "yaw achieved by 1 s standstill rotation",
+      "value": 0.241,
+      "op": ">=",
+      "threshold": 80,
+      "pass": false
+    },
+    {
+      "id": "pop.latencyMs",
+      "group": "pop",
+      "stage": "S4",
+      "description": "replant→first airborne step, worst of battery",
+      "value": 66.667,
+      "op": "<=",
+      "threshold": 80,
+      "pass": true
+    },
+    {
+      "id": "pop.silhouetteRmsDeg",
+      "group": "pop",
+      "stage": "S4",
+      "description": "pitch vs authored curve RMS, worst of battery",
+      "value": 16.867,
+      "op": "<",
+      "threshold": 4,
+      "pass": false
+    },
+    {
+      "id": "pop.bails",
+      "group": "pop",
+      "stage": "S4",
+      "description": "ollie battery bail count",
+      "value": 0,
+      "op": "==",
+      "threshold": 0,
+      "pass": true
+    }
+  ]
+}
