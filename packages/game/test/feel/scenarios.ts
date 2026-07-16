@@ -359,24 +359,30 @@ export interface PopRunResult {
   pitchSamples: PitchSample[];
 }
 
-/** Mirror of scriptOllie for the NOSE role: lift nose two reports, retap. */
-function scriptNollie(
+/**
+ * Mirror of scriptOllie for the NOSE role: lift the logical nose two reports,
+ * retap it. Uses driveLogical so goofy stance maps the physical contacts the
+ * same way scriptOllie does.
+ */
+export function scriptNollie(
   d: PadDriver,
   opts: { prepMoveFrames?: number; prepSpeedPerFrame?: number; gapSteps?: number } = {},
 ): number {
   const prepFrames = opts.prepMoveFrames ?? 0;
   const speed = opts.prepSpeedPerFrame ?? 0;
   const gap = opts.gapSteps ?? 0;
+  const noseBase = d.logicalNoseBase();
+  const tailBase = d.logicalTailBase();
   // Prep: move the TAIL (the foot that stays planted) to raise its vel EMA —
   // mirrors scriptOllie moving the nose before a tail tap.
   for (let i = 1; i <= prepFrames; i++) {
-    d.drive({ nose: NOSE_POS, tail: { x: TAIL_POS.x, y: TAIL_POS.y - speed * i } });
+    d.driveLogical({ nose: noseBase, tail: { x: tailBase.x, y: tailBase.y - speed * i } });
   }
-  d.drive({ nose: NOSE_POS, tail: TAIL_POS });
-  for (let i = 0; i < gap; i++) d.drive({ nose: NOSE_POS, tail: TAIL_POS });
-  d.drive({ nose: null, tail: TAIL_POS });
-  d.drive({ nose: null, tail: TAIL_POS });
-  d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+  d.driveLogical({ nose: noseBase, tail: tailBase });
+  for (let i = 0; i < gap; i++) d.driveLogical({ nose: noseBase, tail: tailBase });
+  d.driveLogical({ nose: null, tail: tailBase });
+  d.driveLogical({ nose: null, tail: tailBase });
+  d.driveLogical({ nose: noseBase, tail: tailBase });
   return d.step - 1;
 }
 
