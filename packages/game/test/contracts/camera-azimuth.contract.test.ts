@@ -2,13 +2,11 @@
  * S1 perceptual contract — camera reads the heading (reviews/03 §2.3, §3.6).
  *
  * While grounded, the settled route camera must sit BEHIND the board: the
- * flattened camera→board direction within 15° of the board heading. The
- * shipped config frames from the side (chaseSide −1.25 vs chaseDistance 1.2 ≈
- * 46° off at rest; ~15.1° at speed), so these land RED by design.
+ * flattened camera→board direction within 15° of the board heading.
  *
- * NEW-BEHAVIOR CONTRACT — marked `it.fails` until S3 retunes the camera
- * defaults; S3 flips these to plain `it` (the `.fails` marker starts failing
- * the moment the behavior is fixed, forcing the flip in the same commit).
+ * Landed red in S1 against the shipped side-on framing (chaseSide −1.25 vs
+ * chaseDistance 1.2 ≈ 46° off at rest; ~15.1° at speed); S3's
+ * behind-the-board defaults turned them green (rest ≈ 9°, fast ≈ 4.4°).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -60,12 +58,11 @@ function azimuthErrorDeg(obs: ObserveState): number {
 }
 
 describe('contract: camera azimuth reads the heading while grounded', () => {
-  // S3 flips these two to `it` when the behind-the-board defaults land.
-  it.fails('at rest the settled route camera is within 15° of heading (S3)', () => {
+  it('at rest the settled route camera is within 15° of heading', () => {
     expect(azimuthErrorDeg(groundedObs(0))).toBeLessThan(15);
   });
 
-  it.fails('at cruise speed the settled route camera is within 15° of heading (S3)', () => {
+  it('at cruise speed the settled route camera is within 15° of heading', () => {
     expect(azimuthErrorDeg(groundedObs(4))).toBeLessThan(15);
   });
 });

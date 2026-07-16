@@ -890,11 +890,32 @@ export interface CameraConfig {
 
   // --- Transitions ------------------------------------------------------
   /**
-   * Critically damped position smooth time, s (Unity-style SmoothDamp — the
-   * analytic critically damped spring). Smaller = snappier. `reducedMotion`
-   * snaps instantly regardless.
+   * Critically damped position smooth time on the GROUND, s (Unity-style
+   * SmoothDamp). Small (~0.12) keeps the follow tight — camera lag reads as
+   * input lag (reviews/03 §2.3). `reducedMotion` snaps instantly regardless.
    */
   positionSmoothTime: number;
+  /** Position smooth time for airborne/bail/grind shots, s (roomier easing). */
+  positionSmoothTimeAir: number;
+  /**
+   * Max slew rate of the FRAMING heading vector, deg/s. Replaces the old
+   * low-speed heading freeze (reviews/03 §2.3): the camera reads the live
+   * board heading at every grounded speed — standstill pivots included.
+   */
+  headingRateDegPerSec: number;
+  /**
+   * Heading hysteresis, deg: the framed heading holds until the live heading
+   * deviates past this angle, then follows (rate-limited) until re-converged.
+   * Filters suspension micro-yaw without ever freezing a real turn out of the
+   * frame; keep small (~2°) so stiction stays invisible.
+   */
+  headingDeadbandDeg: number;
+  /**
+   * Grounded rest-framing position deadband, m. The presentation anchor only
+   * re-centers after the board really moves; millimetre suspension settling
+   * stays invisible.
+   */
+  restDeadbandM: number;
   /** Max camera angular slew rate, deg/s (orientation slerp clamp, spec §6). */
   maxAngularRateDeg: number;
 
@@ -1201,11 +1222,11 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     far: 400,
     fovBase: 46,
     fovAir: 52,
-    chaseDistance: 1.2,
+    chaseDistance: 2.2,
     chaseHeight: 0.72,
-    chaseSide: -1.25,
-    chaseDistanceFast: 2.4,
-    chaseSideFast: -0.65,
+    chaseSide: -0.35,
+    chaseDistanceFast: 2.9,
+    chaseSideFast: -0.2,
     chaseSpeedRef: 6.0,
     aimHeight: 0.18,
     lookAheadMin: 0.35,
@@ -1224,7 +1245,11 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     grindHeight: 4.0,
     grindSide: 2.5,
     grindLookAhead: 2.5,
-    positionSmoothTime: 0.32,
+    positionSmoothTime: 0.12,
+    positionSmoothTimeAir: 0.32,
+    headingRateDegPerSec: 240,
+    headingDeadbandDeg: 2,
+    restDeadbandM: 0.05,
     maxAngularRateDeg: 150,
     occlusionRadius: 0.25,
     occlusionMinDistance: 0.8,

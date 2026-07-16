@@ -34,9 +34,6 @@ export type CameraViewMode = "route" | "fingerboard";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const GROUND_CAMERA_REST_SPEED = 0.08;
-// At sub-walking speeds, let a slow camera spring recenter only after a visible
-// quarter-metre drift instead of chasing each suspension/rolling micro-step.
-const GROUND_CAMERA_POSITION_DEADBAND = 0.25;
 
 /** Vec3 critically damped spring (Unity SmoothDamp), velocity mutated in place. */
 function smoothDampVec3(
@@ -87,10 +84,13 @@ export class CameraRig {
   readonly #posVel = new THREE.Vector3();
   #fov: number;
 
-  // Frozen heading (updated only on the ground so mid-air flips never swing the
-  // camera) + working temporaries reused each frame (no per-frame allocation).
+  // Framing heading: rate-limited toward the live grounded heading (airborne
+  // holds the take-off frame) + working temporaries (no per-frame allocation).
   readonly #heading = new THREE.Vector3(0, 0, 1);
+  readonly #liveHeading = new THREE.Vector3(0, 0, 1);
   #headingInitialized = false;
+  /** Hysteresis state: following the live heading vs holding the frame. */
+  #headingFollowing = false;
   #bailOrbit = 0;
   #lastMode: ShotMode = "chase";
   #viewMode: CameraViewMode = "route";
@@ -198,13 +198,14 @@ export class CameraRig {
     // motion makes the HDR background and every park edge shimmer. Hold a small
     // presentation-only framing anchor at rest; actual rolling/air still follows
     // the interpolated body immediately.
+    const restDeadband = Math.max(0, cfg.restDeadbandM);
     if (grounded && speed < GROUND_CAMERA_REST_SPEED) {
       if (!this.#groundFrameAnchorInitialized) {
         this.#groundFrameAnchor.copy(this.#rawBoardPos);
         this.#groundFrameAnchorInitialized = true;
       } else if (
         this.#groundFrameAnchor.distanceToSquared(this.#rawBoardPos) >
-        GROUND_CAMERA_POSITION_DEADBAND * GROUND_CAMERA_POSITION_DEADBAND
+        restDeadband * restDeadband
       ) {
         this.#groundFrameAnchor.copy(this.#rawBoardPos);
       }
@@ -214,12 +215,41 @@ export class CameraRig {
       this.#groundFrameAnchor.copy(this.#rawBoardPos);
       this.#groundFrameAnchorInitialized = true;
     }
-    if (
-      grounded &&
-      (!this.#headingInitialized || speed >= GROUND_CAMERA_REST_SPEED)
-    ) {
-      this.#headingInitialized = flatHeading(this.#boardQuat, this.#heading) ||
-        this.#headingInitialized;
+    // The framing heading stays LIVE at every grounded speed (a standstill
+    // pivot must swing the camera — reviews/03 §2.3): hysteresis + a rate
+    // clamp replace the old low-speed freeze. The frame holds inside a small
+    // angular deadband (suspension micro-yaw never moves it), follows once
+    // the live heading really deviates, and re-locks when converged.
+    // Airborne keeps the take-off heading (mid-air flips never swing the
+    // camera).
+    if (grounded && flatHeading(this.#boardQuat, this.#liveHeading)) {
+      if (!this.#headingInitialized || this.#reducedMotion) {
+        this.#heading.copy(this.#liveHeading);
+        this.#headingInitialized = true;
+        this.#headingFollowing = false;
+      } else {
+        const angle = this.#heading.angleTo(this.#liveHeading);
+        const deadband = THREE.MathUtils.degToRad(cfg.headingDeadbandDeg);
+        if (!this.#headingFollowing && angle > deadband) {
+          this.#headingFollowing = true;
+        }
+        if (this.#headingFollowing) {
+          const maxStep = THREE.MathUtils.degToRad(cfg.headingRateDegPerSec) * dt;
+          if (angle <= maxStep || angle < 1e-4) {
+            this.#heading.copy(this.#liveHeading);
+            this.#headingFollowing = false;
+          } else {
+            // Rotate about world up toward the live heading (both are flat).
+            const sign =
+              this.#heading.x * this.#liveHeading.z -
+                this.#heading.z * this.#liveHeading.x <=
+              0
+                ? 1
+                : -1;
+            this.#heading.applyAxisAngle(WORLD_UP, sign * maxStep).normalize();
+          }
+        }
+      }
     }
     const heading = this.#heading;
     this.#right.copy(WORLD_UP).cross(heading).normalize(); // right = up × heading
@@ -330,6 +360,10 @@ export class CameraRig {
     // PerspectiveCamera's identity rotation while position has already cut to
     // its target leaves the board behind the camera on the opening frame.
     const cutToTarget = !this.#initialized || this.#reducedMotion;
+    // Tight ground follow (camera lag reads as input lag); roomier easing for
+    // air/bail/grind shots.
+    const smoothTime =
+      mode === "chase" ? cfg.positionSmoothTime : cfg.positionSmoothTimeAir;
     if (cutToTarget) {
       this.#smoothed.copy(this.#desiredPos);
       this.#posVel.set(0, 0, 0);
@@ -339,7 +373,7 @@ export class CameraRig {
         this.camera.position,
         this.#desiredPos,
         this.#posVel,
-        cfg.positionSmoothTime,
+        smoothTime,
         dt,
         this.#smoothed,
       );
