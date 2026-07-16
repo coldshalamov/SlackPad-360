@@ -59,15 +59,22 @@ async function boot(): Promise<void> {
   harness.setScreenshotProvider(renderer.captureScreenshot);
   const underHost = HostInputSource.isHostEnvironment();
 
+  // S5 trace-corpus recording state (R hotkey). Traces are FULL-SESSION by
+  // contract, so arming the recorder resets the world first.
+  let corpusRecording = false;
+
   const hud = new DebugHud(app, harness.getTelemetry(), {
     reducedMotion: bootProfile.accessibility.reducedMotion,
     highContrast: bootProfile.accessibility.highContrastHud,
     vignetteMs: config.presentation.bailVignetteMs,
     respawnFadeMs: config.presentation.respawnFadeMs,
     mode: underHost ? 'player' : 'debug',
-    // S4 preset readout — visible in BOTH modes so the HUMAN_TEST session can
-    // cycle silhouettes with P and see which one is live.
-    extraStatus: () => `pitch [P] ${profileStore.get().popPitchPreset ?? 'crisp'}`,
+    // S4 preset readout + S5 corpus-recording indicator — visible in BOTH
+    // modes so the HUMAN_TEST session can cycle silhouettes with P, record
+    // labeled traces with R, and see both states live.
+    extraStatus: () =>
+      `pitch [P] ${profileStore.get().popPitchPreset ?? 'crisp'}` +
+      (corpusRecording ? '   ● REC [R stops]' : ''),
   });
 
   // S4 tail-strike accents: one CC0 wood-hit one-shot (mapping NON-FINAL — M9
@@ -212,6 +219,37 @@ async function boot(): Promise<void> {
     },
   });
 
+  // S5: R toggles a full-session corpus recording. Arming resets the world
+  // (v1 traces must start at step 0), stopping exports through the trusted
+  // host path with target 'corpus' → repo testdata/traces when running from a
+  // checkout (Documents fallback otherwise). Label convention lives in
+  // testdata/traces/README.md; the timestamped filename carries the date and
+  // the human renames/curates per that convention.
+  const toggleCorpusRecording = async (): Promise<void> => {
+    if (!corpusRecording) {
+      // Pause the loop so no step lands between the reset and startRecording
+      // (v1 traces must begin at step 0, and the loop is live).
+      loop.stop();
+      try {
+        await resetWorld();
+        harness.startRecording();
+        corpusRecording = true;
+        console.info('[corpus] recording started (R to stop + export)');
+      } finally {
+        loop.start();
+      }
+      return;
+    }
+    corpusRecording = false;
+    const trace = harness.stopRecording();
+    const exported = hostSource.exportControlTrace(trace, 'session', 'corpus');
+    console.info(
+      exported
+        ? `[corpus] session exported (${trace.frames.length} frames) → testdata/traces (rename per README)`
+        : '[corpus] no native host — trace NOT persisted (browser build cannot write files)',
+    );
+  };
+
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return;
     const key = event.key.toLowerCase();
@@ -219,6 +257,8 @@ async function boot(): Promise<void> {
     // S4: cycle the authored ollie pitch silhouette live (crisp → floaty →
     // aggressive); the DebugHud readout shows the active preset.
     if (key === 'p') profileStore.cyclePopPitchPreset();
+    // S5: toggle corpus trace recording.
+    if (key === 'r') void toggleCorpusRecording();
   });
 
   loop.start();

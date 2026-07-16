@@ -5,6 +5,16 @@
 **Source cycle:** `preproduction/cycles/03-production/`
 **Historical cycles:** `01-foundation/`, `02-adversarial/` (immutable)
 
+> **Status update (2026-07-16, Sprint 02 S5):** milestones M0–M10 were
+> implemented from this package; the game then passed its suites while being
+> unpleasant to play. `preproduction/reviews/03-feel-audit-and-redesign.md`
+> diagnoses why and now carries the design direction — where it conflicts
+> with `final-input-and-trick-spec` or `final-physics-animation-camera-spec`,
+> **reviews/03 and the sprint chain win**. Execution continues through
+> `SPRINT-RUNBOOK.md` (ledger: `../evidence/impl/SPRINT-LEDGER.md`); this
+> package remains the architecture reference (module ownership, determinism,
+> gates, asset policy).
+
 ---
 
 ## Readiness verdict

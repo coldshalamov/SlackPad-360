@@ -189,4 +189,53 @@ public class ControlTraceExporterTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void Export_CorpusNamingFollowsConventionAndBreaksCollisions()
+    {
+        string dir = TempDir();
+        try
+        {
+            using var doc = JsonDocument.Parse(ValidTrace(3, FullSimEventV3));
+            var stamp = new DateTimeOffset(2026, 7, 16, 18, 30, 15, TimeSpan.Zero);
+
+            string first = ControlTraceExporter.Export(
+                dir, doc.RootElement, "Hard Ollie", stamp, corpusNaming: true);
+            Assert.Equal("20260716-hard-ollie.trace.json", Path.GetFileName(first));
+
+            string second = ControlTraceExporter.Export(
+                dir, doc.RootElement, "Hard Ollie", stamp, corpusNaming: true);
+            Assert.Equal("20260716-hard-ollie-183015.trace.json", Path.GetFileName(second));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RepoPaths_FindsCorpusRootFromNestedBinDirAndNullOtherwise()
+    {
+        string root = TempDir();
+        try
+        {
+            // Simulated checkout: repo/{package.json, testdata}/host/.../bin
+            File.WriteAllText(Path.Combine(root, "package.json"), "{}");
+            Directory.CreateDirectory(Path.Combine(root, "testdata"));
+            string bin = Path.Combine(root, "host", "SlackPad.Host", "bin", "Release", "net10.0-windows");
+            Directory.CreateDirectory(bin);
+
+            string? corpus = RepoPaths.FindCorpusTracesRoot(bin);
+            Assert.Equal(Path.Combine(root, "testdata", "traces"), corpus);
+
+            // No repo markers above → null (packaged/installed build).
+            string bare = Path.Combine(root, "elsewhere", "deep", "dir");
+            Directory.CreateDirectory(bare);
+            Assert.Null(RepoPaths.FindCorpusTracesRoot(bare, maxLevels: 2));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

@@ -136,7 +136,13 @@ describe("HostInputSource attach + intake", () => {
 
     expect(source.exportControlTrace(trace, "kickflip-clean")).toBe(true);
     expect(wv.posted).toEqual([
-      { v: 1, type: "exportControlTrace", payload: { trace, label: "kickflip-clean" } },
+      // S5: the payload carries the export target ('documents' default;
+      // 'corpus' lands in the repo's testdata/traces when available).
+      {
+        v: 1,
+        type: "exportControlTrace",
+        payload: { trace, label: "kickflip-clean", target: "documents" },
+      },
     ]);
   });
 

@@ -16,7 +16,8 @@ public static class ControlTraceExporter
         string rootDirectory,
         JsonElement trace,
         string? label,
-        DateTimeOffset capturedAt)
+        DateTimeOffset capturedAt,
+        bool corpusNaming = false)
     {
         Validate(trace);
         string json = JsonSerializer.Serialize(trace, new JsonSerializerOptions { WriteIndented = true });
@@ -28,8 +29,17 @@ public static class ControlTraceExporter
         string root = Path.GetFullPath(rootDirectory);
         Directory.CreateDirectory(root);
         string safeLabel = SafeLabel(label);
-        string filename = $"control-{capturedAt:yyyyMMdd-HHmmss}-{safeLabel}.json";
+        // Corpus files follow testdata/traces/README.md: YYYYMMDD-<label>.trace.json
+        // (time-of-day suffix only to break a same-day same-label collision).
+        string filename = corpusNaming
+            ? $"{capturedAt:yyyyMMdd}-{safeLabel}.trace.json"
+            : $"control-{capturedAt:yyyyMMdd-HHmmss}-{safeLabel}.json";
         string path = Path.GetFullPath(Path.Combine(root, filename));
+        if (corpusNaming && File.Exists(path))
+        {
+            filename = $"{capturedAt:yyyyMMdd}-{safeLabel}-{capturedAt:HHmmss}.trace.json";
+            path = Path.GetFullPath(Path.Combine(root, filename));
+        }
         if (!string.Equals(Path.GetDirectoryName(path), root, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException("Control trace destination escaped its export root.");

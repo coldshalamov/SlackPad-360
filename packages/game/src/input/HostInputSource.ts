@@ -113,14 +113,22 @@ export class HostInputSource {
     }
   }
 
-  /** Persist a labeled native control-lab trace through the trusted host. */
-  exportControlTrace(trace: SessionTrace, label: string): boolean {
+  /**
+   * Persist a labeled native control-lab trace through the trusted host.
+   * target 'corpus' (S5) lands it in the repo's testdata/traces when the host
+   * runs from a checkout (deterministic test corpus); default stays Documents.
+   */
+  exportControlTrace(
+    trace: SessionTrace,
+    label: string,
+    target: "documents" | "corpus" = "documents",
+  ): boolean {
     if (!this.host) return false;
     try {
       this.host.postMessage({
         v: 1,
         type: "exportControlTrace",
-        payload: { trace, label },
+        payload: { trace, label, target },
       });
       return true;
     } catch {

@@ -291,9 +291,20 @@ internal sealed class GameForm : Form
             {
                 label = labelElement.GetString();
             }
+            // Sprint 02 S5: target 'corpus' lands the trace in the repo's
+            // testdata/traces (labeled deterministic test inputs) when the
+            // host runs from a checkout; otherwise fall back to Documents.
+            bool corpus = msg.Payload.TryGetValue("target", out object? rawTarget) &&
+                rawTarget is System.Text.Json.JsonElement targetElement &&
+                targetElement.ValueKind == System.Text.Json.JsonValueKind.String &&
+                targetElement.GetString() == "corpus";
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string root = Path.Combine(documents, "SlackPad 360", "traces");
-            string path = ControlTraceExporter.Export(root, trace, label, DateTimeOffset.Now);
+            if (corpus)
+            {
+                root = RepoPaths.FindCorpusTracesRoot(AppContext.BaseDirectory) ?? root;
+            }
+            string path = ControlTraceExporter.Export(root, trace, label, DateTimeOffset.Now, corpus);
             Trace.WriteLine($"[GameForm] saved control trace: {path}");
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
