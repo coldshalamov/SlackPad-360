@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows.Forms;
 using SlackPad.Host.Contracts;
 using SlackPad.Host.Core;
@@ -6,19 +7,49 @@ using SlackPad.Host.Interop;
 namespace SlackPad.Host.Adapters;
 
 /// <summary>
-/// P0-A (Win11 co-spike). Registers the window as touchpad-capable, handles WM_POINTER*
-/// messages, and reads the whole touchpad frame via GetPointerFrameTouchpadInfo. Normalizes
-/// each contact from its HIMETRIC location (NOT pixel — pixel freezes at gesture start)
-/// against the device rect from GetPointerDeviceRects. Degrades gracefully when the Win11
-/// touchpad-pointer APIs are unavailable.
+/// P0-A (degraded Win11 fallback; raw HID remains primary). Registers the window as
+/// touchpad-capable, handles WM_POINTER* messages, and reads whole touchpad frames. On
+/// WM_POINTERUPDATE it recovers coalesced history when the OS export is available. Contacts
+/// are normalized from HIMETRIC locations (NOT pixel, which freezes at gesture start) against
+/// the physical device rect. Degrades gracefully when Win11 touchpad-pointer APIs are absent.
 /// </summary>
 internal sealed class TouchpadPointerAdapter : IContactAdapter
 {
-    private readonly Dictionary<IntPtr, Rect> _deviceRects = new();
+    private const uint MaxNativePointers = 32;
+    private const uint MaxHistoryEntries = 64;
+    private const int MaxFrameIdsPerDevice = 128;
+    private const int MaxRememberedDevices = 16;
+
+    private sealed class RecentPointerFrames
+    {
+        private readonly Queue<uint> _order = new(MaxFrameIdsPerDevice);
+        private readonly HashSet<uint> _ids = new();
+
+        public bool Remember(uint frameId)
+        {
+            if (!_ids.Add(frameId))
+            {
+                return false;
+            }
+
+            _order.Enqueue(frameId);
+            if (_order.Count > MaxFrameIdsPerDevice)
+            {
+                _ids.Remove(_order.Dequeue());
+            }
+            return true;
+        }
+    }
+
+    private readonly record struct DeviceGeometry(Rect Rect, double? PhysicalAspectRatio);
+
+    private readonly Dictionary<IntPtr, DeviceGeometry> _deviceGeometry = new();
+    private readonly Dictionary<IntPtr, RecentPointerFrames> _recentFramesByDevice = new();
+    private readonly Queue<IntPtr> _rememberedDeviceOrder = new(MaxRememberedDevices);
     private IntPtr _hwnd;
     private long _frameId;
-    private uint _lastPointerFrameId = uint.MaxValue;
     private bool _registered;
+    private bool _historySupported;
 
     public string AdapterTag => "pointer";
     public string SessionTag => "P0-A";
@@ -42,9 +73,13 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
         try
         {
             _registered = Win32.RegisterTouchpadCapableWindow(hwnd, true);
+            _historySupported = _registered &&
+                Win32.User32HasExport("GetPointerFrameTouchpadInfoHistory");
             Supported = _registered;
             StatusMessage = _registered
-                ? "Registered touchpad-capable window (WM_POINTER)."
+                ? _historySupported
+                    ? "Degraded pointer fallback registered (WM_POINTER; coalesced history enabled)."
+                    : "Degraded pointer fallback registered (WM_POINTER; current frames only)."
                 : "RegisterTouchpadCapableWindow returned false.";
         }
         catch (EntryPointNotFoundException)
@@ -68,7 +103,11 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
             }
         }
         _registered = false;
+        _historySupported = false;
         _hwnd = IntPtr.Zero;
+        _deviceGeometry.Clear();
+        _recentFramesByDevice.Clear();
+        _rememberedDeviceOrder.Clear();
     }
 
     public bool ProcessMessage(ref Message m)
@@ -95,7 +134,7 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
             {
                 return false;
             }
-            HandleTouchpadFrame(pointerId);
+            HandleTouchpadFrame(pointerId, includeHistory: m.Msg == Win32.WM_POINTERUPDATE);
         }
         catch
         {
@@ -104,34 +143,169 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
         return true; // consumed; do not let DefWindowProc convert to mouse wheel
     }
 
-    private void HandleTouchpadFrame(uint pointerId)
+    private void HandleTouchpadFrame(uint pointerId, bool includeHistory)
     {
-        uint count = 0;
-        if (!Win32.GetPointerFrameTouchpadInfo(pointerId, ref count, null) || count == 0)
+        if (includeHistory && _historySupported)
         {
-            return;
+            try
+            {
+                if (TryReadHistory(pointerId, out PointerTouchpadInfo[] history,
+                    out int historyEntries, out int historyPointers))
+                {
+                    EmitFrames(history, historyEntries, historyPointers);
+                    return;
+                }
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // The documented Win11 export is not present on every servicing build.
+                _historySupported = false;
+                StatusMessage = "Degraded pointer fallback registered (history unavailable; current frames only).";
+            }
         }
 
-        var infos = new PointerTouchpadInfo[count];
+        if (TryReadCurrentFrame(pointerId, out PointerTouchpadInfo[] current, out int pointerCount))
+        {
+            EmitFrames(current, entryCount: 1, pointerCount);
+        }
+    }
+
+    private static bool TryReadHistory(
+        uint pointerId,
+        out PointerTouchpadInfo[] infos,
+        out int entryCount,
+        out int pointerCount)
+    {
+        infos = Array.Empty<PointerTouchpadInfo>();
+        entryCount = 0;
+        pointerCount = 0;
+
+        uint availableEntries = 0;
+        uint availablePointers = 0;
+        if (!Win32.GetPointerFrameTouchpadInfoHistory(
+                pointerId, ref availableEntries, ref availablePointers, null) ||
+            availableEntries == 0 || availablePointers == 0 ||
+            availablePointers > MaxNativePointers)
+        {
+            return false;
+        }
+
+        uint entryCapacity = Math.Min(availableEntries, MaxHistoryEntries);
+        uint pointerCapacity = availablePointers;
+        infos = new PointerTouchpadInfo[checked((int)(entryCapacity * pointerCapacity))];
+
+        uint writtenEntries = entryCapacity;
+        uint writtenPointers = pointerCapacity;
+        if (!Win32.GetPointerFrameTouchpadInfoHistory(
+                pointerId, ref writtenEntries, ref writtenPointers, infos) ||
+            writtenPointers != pointerCapacity)
+        {
+            infos = Array.Empty<PointerTouchpadInfo>();
+            return false;
+        }
+
+        entryCount = (int)Math.Min(writtenEntries, entryCapacity);
+        pointerCount = (int)pointerCapacity;
+        return entryCount > 0;
+    }
+
+    private static bool TryReadCurrentFrame(
+        uint pointerId,
+        out PointerTouchpadInfo[] infos,
+        out int pointerCount)
+    {
+        infos = Array.Empty<PointerTouchpadInfo>();
+        pointerCount = 0;
+
+        uint count = 0;
+        if (!Win32.GetPointerFrameTouchpadInfo(pointerId, ref count, null) ||
+            count == 0 || count > MaxNativePointers)
+        {
+            return false;
+        }
+
+        infos = new PointerTouchpadInfo[count];
         if (!Win32.GetPointerFrameTouchpadInfo(pointerId, ref count, infos))
         {
-            return;
+            infos = Array.Empty<PointerTouchpadInfo>();
+            return false;
         }
 
-        // Dedupe: one ContactFrame per pointer-frame id.
-        uint frameId = infos[0].PointerInfo.FrameId;
-        if (frameId == _lastPointerFrameId)
+        pointerCount = Math.Min((int)count, infos.Length);
+        return pointerCount > 0;
+    }
+
+    private void EmitFrames(
+        PointerTouchpadInfo[] infos,
+        int entryCount,
+        int pointerCount)
+    {
+        if (entryCount <= 0 || pointerCount <= 0)
         {
             return;
         }
-        _lastPointerFrameId = frameId;
+
+        long observedQpc = Stopwatch.GetTimestamp();
+        double observedPerfMs = PerfClock.NowMs();
+
+        for (int chronologicalIndex = 0; chronologicalIndex < entryCount; chronologicalIndex++)
+        {
+            int row = ChronologicalHistoryRow(entryCount, chronologicalIndex);
+            int offset = checked(row * pointerCount);
+            if (offset < 0 || offset + pointerCount > infos.Length)
+            {
+                continue;
+            }
+
+            // One ContactFrame per Windows pointer frame. A WM_POINTER message arrives for
+            // each pointer, and overlapping history windows can replay several older frames.
+            PointerInfo first = infos[offset].PointerInfo;
+            if (!ShouldEmitPointerFrame(first.SourceDevice, first.FrameId))
+            {
+                continue;
+            }
+
+            EmitFrame(infos, offset, pointerCount, observedQpc, observedPerfMs);
+        }
+    }
+
+    private bool ShouldEmitPointerFrame(IntPtr sourceDevice, uint pointerFrameId)
+    {
+        if (!_recentFramesByDevice.TryGetValue(sourceDevice, out RecentPointerFrames? recent))
+        {
+            while (_recentFramesByDevice.Count >= MaxRememberedDevices &&
+                _rememberedDeviceOrder.TryDequeue(out IntPtr oldestDevice))
+            {
+                if (_recentFramesByDevice.Remove(oldestDevice))
+                {
+                    break;
+                }
+            }
+
+            recent = new RecentPointerFrames();
+            _recentFramesByDevice[sourceDevice] = recent;
+            _rememberedDeviceOrder.Enqueue(sourceDevice);
+        }
+
+        return recent.Remember(pointerFrameId);
+    }
+
+    private void EmitFrame(
+        PointerTouchpadInfo[] infos,
+        int offset,
+        int pointerCount,
+        long observedQpc,
+        double observedPerfMs)
+    {
 
         var contacts = new List<Contact>();
         bool primary = false;
+        string? deviceId = null;
+        double? physicalAspectRatio = null;
 
-        for (int i = 0; i < count && contacts.Count < 5; i++)
+        for (int i = 0; i < pointerCount && contacts.Count < 5; i++)
         {
-            var pi = infos[i].PointerInfo;
+            var pi = infos[offset + i].PointerInfo;
             bool inContact = (pi.PointerFlags & Win32.POINTER_FLAG_INCONTACT) != 0;
             bool up = (pi.PointerFlags & Win32.POINTER_FLAG_UP) != 0;
             if ((pi.PointerFlags & Win32.POINTER_FLAG_FIRSTBUTTON) != 0)
@@ -145,10 +319,11 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
                 continue;
             }
 
-            Rect rect = GetDeviceRect(pi.SourceDevice);
-            double x = Normalize(pi.PtHimetricLocation.X, rect.Left, rect.Right);
-            double y = Normalize(pi.PtHimetricLocation.Y, rect.Top, rect.Bottom);
-            DeviceId = $"pointer-{pi.SourceDevice.ToInt64():x}";
+            DeviceGeometry geometry = GetDeviceGeometry(pi.SourceDevice);
+            double x = Normalize(pi.PtHimetricLocation.X, geometry.Rect.Left, geometry.Rect.Right);
+            double y = Normalize(pi.PtHimetricLocation.Y, geometry.Rect.Top, geometry.Rect.Bottom);
+            deviceId = $"pointer-{pi.SourceDevice.ToInt64():x}";
+            physicalAspectRatio = geometry.PhysicalAspectRatio;
 
             contacts.Add(new Contact
             {
@@ -156,22 +331,37 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
                 Tip = true,
                 X = x,
                 Y = y,
-                Confidence = true,
+                Confidence = HasPointerConfidence(pi.PointerFlags),
             });
         }
+
+        // Preserve device identity and geometry on lift-only frames as well.
+        PointerInfo first = infos[offset].PointerInfo;
+        if (deviceId is null)
+        {
+            DeviceGeometry geometry = GetDeviceGeometry(first.SourceDevice);
+            deviceId = $"pointer-{first.SourceDevice.ToInt64():x}";
+            physicalAspectRatio = geometry.PhysicalAspectRatio;
+        }
+        DeviceId = deviceId;
 
         var frame = new ContactFrame
         {
             FrameId = _frameId++,
-            TPerfMs = PerfClock.NowMs(),
+            TPerfMs = MapPerformanceCountToPerfMs(
+                first.PerformanceCount,
+                observedQpc,
+                observedPerfMs,
+                Stopwatch.Frequency),
             TScanUs = null,
             Source = "hardware",
             Contacts = contacts,
             Buttons = new ContactFrameButtons { Primary = primary },
             Meta = new ContactFrameMeta
             {
-                DeviceId = DeviceId,
-                ContactCountRaw = (int)count,
+                DeviceId = deviceId,
+                ContactCountRaw = pointerCount,
+                PhysicalAspectRatio = physicalAspectRatio,
                 Adapter = "pointer",
             },
         };
@@ -179,24 +369,59 @@ internal sealed class TouchpadPointerAdapter : IContactAdapter
         FrameReady?.Invoke(frame);
     }
 
-    private Rect GetDeviceRect(IntPtr device)
+    private DeviceGeometry GetDeviceGeometry(IntPtr device)
     {
-        if (_deviceRects.TryGetValue(device, out var cached))
+        if (_deviceGeometry.TryGetValue(device, out DeviceGeometry cached))
         {
             return cached;
         }
         Rect rect = default;
+        double? aspectRatio = null;
         if (Win32.GetPointerDeviceRects(device, out var deviceRect, out _) &&
             deviceRect.Width > 0 && deviceRect.Height > 0)
         {
             rect = deviceRect;
+            aspectRatio = PhysicalAspectRatio(deviceRect.Width, deviceRect.Height);
         }
         else
         {
             rect = new Rect { Left = 0, Top = 0, Right = 1, Bottom = 1 };
         }
-        _deviceRects[device] = rect;
-        return rect;
+        var geometry = new DeviceGeometry(rect, aspectRatio);
+        _deviceGeometry[device] = geometry;
+        return geometry;
+    }
+
+    internal static bool HasPointerConfidence(uint pointerFlags) =>
+        (pointerFlags & Win32.POINTER_FLAG_CONFIDENCE) != 0;
+
+    internal static double MapPerformanceCountToPerfMs(
+        ulong performanceCount,
+        long observedQpc,
+        double observedPerfMs,
+        long qpcFrequency)
+    {
+        if (performanceCount == 0 || performanceCount > long.MaxValue ||
+            qpcFrequency <= 0 || (long)performanceCount > observedQpc)
+        {
+            return observedPerfMs;
+        }
+
+        double ageMs = (observedQpc - (long)performanceCount) * 1000.0 / qpcFrequency;
+        double mapped = observedPerfMs - ageMs;
+        return double.IsFinite(mapped) ? mapped : observedPerfMs;
+    }
+
+    internal static int ChronologicalHistoryRow(int entryCount, int chronologicalIndex) =>
+        entryCount - 1 - chronologicalIndex;
+
+    internal static double PhysicalAspectRatio(int width, int height)
+    {
+        double absoluteWidth = Math.Abs((double)width);
+        double absoluteHeight = Math.Abs((double)height);
+        return absoluteWidth > 0 && absoluteHeight > 0
+            ? Math.Clamp(absoluteWidth / absoluteHeight, 0.25, 4.0)
+            : 1.0;
     }
 
     internal static double Normalize(int value, int min, int max)

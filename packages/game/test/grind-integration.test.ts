@@ -7,15 +7,23 @@
  * this being true in the real sim, not just in the unit tests.
  */
 import { describe, expect, it } from 'vitest';
-import { NOSE_POS, TAIL_POS, settledProfiled, eventsOf, scriptOllie, flyOut } from './helpers/maneuver';
-import { rotateAboutCenter } from '../src/input/FootTracker';
+import {
+  NOSE_POS,
+  TAIL_POS,
+  cruiseUntilZ,
+  eventsOf,
+  flyOut,
+  gesturePos,
+  scriptOllie,
+  settledProfiled,
+} from './helpers/maneuver';
 
 describe('grind integration (grind-lab 50-50)', () => {
   it('cruise + ollie onto the ledge → latched 50-50 ride with correct ObserveState', async () => {
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
 
-    d.cruise(70);
+    cruiseUntilZ(d, 5.15);
     // Plain straight ollie (no prep slide → no steering yaw → stays 50-50).
     scriptOllie(d, {});
 
@@ -41,7 +49,6 @@ describe('grind integration (grind-lab 50-50)', () => {
         maxGrindY = Math.max(maxGrindY, o.board.p.y);
       }
     }
-
     expect(sawGrind).toBe(true);
     expect(sawCandidate).toBe(true);
     // Rode ON the elevated ledge (well above the grounded band), not the floor.
@@ -75,7 +82,7 @@ describe('grind integration (grind-lab 50-50)', () => {
     // past the speed-end and confirm it ends grounded with no timeout bail.
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
-    d.cruise(70);
+    cruiseUntilZ(d, 5.15);
     scriptOllie(d, {});
     let sawGrind = false;
     let sawSpeedEndExit = false;
@@ -98,42 +105,48 @@ describe('grind integration (grind-lab 50-50)', () => {
   it('cruise + steer-ollie → latched BOARDSLIDE ride (yaw ~perpendicular, deck slides)', async () => {
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
-    d.cruise(55);
-    // Rotate the physical finger line toward the ledge. Pad Y grows toward the
-    // player, so the negative pad angle below produces the intended +yaw line.
-    let tail = TAIL_POS;
-    let nose = NOSE_POS;
-    for (let i = 1; i <= 20; i++) {
-      const deg = -i * 2.5;
-      nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, deg);
-      tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, deg);
-      d.drive({ nose, tail });
-    }
-    d.drive({ nose, tail: null });
-    d.drive({ nose, tail: null });
-    d.drive({ nose, tail });
+    cruiseUntilZ(d, 5.15);
+    scriptOllie(d, {});
+
+    // A boardslide is an airborne trick intent, not a sideways ground carve.
+    // Sweep the rear finger through a six-frame shuv arc immediately after the
+    // pop while the front finger is lifted, then replant while there is still
+    // enough flight for the front-foot guide to level the deck onto the ledge.
+    let airStart: number | null = null;
+    let gestureFrame = 0;
 
     let boardslideSteps = 0;
     let balanceInBand = true;
     let rodeOnLedge = false;
     for (let i = 0; i < 110; i++) {
-      d.drive({ nose, tail });
       const o = h.observe();
-      if (o.phase === 'grind' && o.grind?.family === 'boardslide') {
+      if (airStart === null && (o.phase === 'air' || o.phase === 'catch')) airStart = o.step;
+      if (airStart !== null && o.step >= airStart + 2 && gestureFrame < 6) gestureFrame += 1;
+      const tail = gestureFrame > 0
+        ? gesturePos('shuv-bs', gestureFrame, 0.1, 6)
+        : TAIL_POS;
+      const nose = airStart !== null && o.step >= airStart + 12 ? NOSE_POS : null;
+      d.drive({ nose, tail });
+      const after = h.observe();
+      if (after.phase === 'grind' && after.grind?.family === 'boardslide') {
         boardslideSteps += 1;
-        if (Math.abs(o.grind.balance) >= 1.0) balanceInBand = false;
-        if (o.board.p.y > 0.14) rodeOnLedge = true;
+        if (Math.abs(after.grind.balance) >= 1.0) balanceInBand = false;
+        if (after.board.p.y > 0.14) rodeOnLedge = true;
       }
     }
 
     // Rode a real boardslide for a meaningful stretch (not a 1-step latch-and-slip).
-    // Rode a real boardslide for a meaningful stretch (completion timing depends
-    // on ride length — the 300-step golden's semantic guard verifies the exit).
     expect(boardslideSteps).toBeGreaterThan(20);
     expect(balanceInBand).toBe(true);
     expect(rodeOnLedge).toBe(true);
     const latched = eventsOf(h, 'grindLatched');
     expect(latched.some((e) => e.family === 'boardslide')).toBe(true);
+    const completed = eventsOf(h, 'grindCompleted').find((e) => e.family === 'boardslide');
+    expect(completed?.durationSteps as number).toBeGreaterThan(20);
+    expect(eventsOf(h, 'grindExit').some(
+      (e) => e.family === 'boardslide' && e.reason === 'speed-end',
+    )).toBe(true);
+    expect(eventsOf(h, 'bail').some((e) => e.reason === 'hard-impact')).toBe(false);
   });
 
   it('a flat level with no rails never produces a grind candidate or latch', async () => {

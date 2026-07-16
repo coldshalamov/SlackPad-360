@@ -16,6 +16,7 @@
 
 import {
   CONTACT_FRAME_SCHEMA_VERSION,
+  DEFAULT_FLICK_SENSITIVITY,
   DEFAULT_SIM_CONFIG,
   deepFreezeConfig,
 } from '@slackpad/shared';
@@ -116,7 +117,7 @@ async function boot(): Promise<void> {
         const obs = harness.observe();
         renderer.render(harness.interpolatedRenderPose(alpha), obs, frameDeltaSeconds);
         hud.update(obs);
-        controlGuide?.update(obs);
+        controlGuide?.update(obs, harness.controlDiagnostics());
         harness.recordRenderSample(rawFrameMs, performance.now(), renderer.cameraState());
         if (!firstRenderDone) {
           firstRenderDone = true;
@@ -159,6 +160,8 @@ async function boot(): Promise<void> {
     ? new FlickItLab(app, labController, {
         getPreset: () => profileStore.get().assistPreset ?? 'classic',
         setPreset: (preset) => profileStore.setAssistPreset(preset),
+        getSensitivity: () => profileStore.get().flickSensitivity ?? DEFAULT_FLICK_SENSITIVITY,
+        setSensitivity: (sensitivity) => profileStore.setFlickSensitivity(sensitivity),
         calibrate: () => {
           const angle = hostSource.currentSegmentAngleDeg();
           if (angle === null) return false;

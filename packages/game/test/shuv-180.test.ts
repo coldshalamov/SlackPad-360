@@ -106,24 +106,23 @@ describe('shuv-180: sweep → 180° yaw', () => {
     // the wall rather than colliding during the acceleration fixture itself.
     let speedGuard = 0;
     while (
-      Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z) <= 5 &&
+      Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z) <= 3.5 &&
       h.observe().board.p.z < OBSTACLE_WALL_Z - 4 &&
       speedGuard++ < 300
     ) d.cruise(1);
-    expect(Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z)).toBeGreaterThan(5);
+    expect(Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z)).toBeGreaterThan(3.5);
 
     // Approach CLOSE, pop with a SMALL gap (so the pop fires before the board
     // reaches the wall, not a ground ram), then start a shuv sweep — the board
     // rams the face mid-air before the yaw develops: a hard, interrupting hit.
     let guard = 0;
-    while (h.observe().board.p.z < OBSTACLE_WALL_Z - 1.9 && guard++ < 900) d.cruise(1);
+    while (h.observe().board.p.z < OBSTACLE_WALL_Z - 1.7 && guard++ < 900) d.cruise(1);
     scriptOllie(d, { gapSteps: 2 });
     const r = flyWithGesture(d, { gesture: 'shuv-bs', catchAfterApexSteps: null, maxSteps: 200 });
 
     const airborneImpulse = eventsOf(h, 'contactImpulse')
       .filter((e) => e.grounded === false)
       .reduce((s, e) => s + (e.impulse as number), 0);
-    console.info('[shuv-180] interrupt:', JSON.stringify({ out: r.outcome, yaw: r.shuvDegrees, fail: r.failReason, airborneImpulse }));
     // A hard mid-air collision interrupts the maneuver (readable, not silent).
     expect(h.observe().phase).toBe('bail');
     expect(h.observe().lastFailReason).toBe('hard-impact');

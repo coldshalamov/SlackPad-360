@@ -190,6 +190,22 @@ describe("HostInputSource attach + intake", () => {
     expect(source.currentSegmentAngleDeg()).toBeCloseTo(45, 5);
   });
 
+  it("calibrates in physical trackpad space instead of a distorted normalized square", () => {
+    const wv = fakeWebview();
+    installHost(wv.api);
+    const source = new HostInputSource(new InputHub(new Telemetry()), new Telemetry());
+    source.attach();
+    wv.emit(contactBatch([hardwareFrame({
+      contacts: [
+        { id: 1, tip: true, x: 0.4, y: 0.4, confidence: true },
+        { id: 2, tip: true, x: 0.6, y: 0.6, confidence: true },
+      ],
+      meta: { physicalAspectRatio: 2 },
+    })]));
+
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(26.565, 3);
+  });
+
   it("preserves a press and release delivered in one host batch as one kick edge", () => {
     const wv = fakeWebview();
     installHost(wv.api);
@@ -298,6 +314,53 @@ describe("HostInputSource attach + intake", () => {
     wv.emit({ v: 1, type: "focus", payload: { focused: true } });
 
     expect(focusStates).toEqual([false, true]);
+  });
+
+  it("drops hardware batches while unfocused and resumes only after focus returns", () => {
+    const wv = fakeWebview();
+    installHost(wv.api);
+    const telemetry = new Telemetry();
+    const hub = new InputHub(telemetry);
+    const source = new HostInputSource(hub, telemetry);
+    source.attach();
+
+    wv.emit(contactBatch([hardwareFrame({
+      frameId: 0,
+      contacts: [
+        { id: 1, tip: true, x: 0.4, y: 0.5, confidence: true },
+        { id: 2, tip: true, x: 0.6, y: 0.5, confidence: true },
+      ],
+    })]));
+    expect(hub.drainForStep()).toHaveLength(1);
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(0, 5);
+
+    wv.emit({ v: 1, type: "focus", payload: { focused: false } });
+    wv.emit(contactBatch([hardwareFrame({
+      frameId: 1,
+      tPerfMs: 2,
+      contacts: [
+        { id: 1, tip: true, x: 0.4, y: 0.4, confidence: true },
+        { id: 2, tip: true, x: 0.6, y: 0.6, confidence: true },
+      ],
+    })]));
+
+    expect(hub.pendingCount()).toBe(0);
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(0, 5);
+    expect(telemetry.count("frameAccepted")).toBe(1);
+
+    wv.emit({ v: 1, type: "focus", payload: { focused: true } });
+    wv.emit(contactBatch([hardwareFrame({
+      frameId: 2,
+      tPerfMs: 3,
+      contacts: [
+        { id: 1, tip: true, x: 0.4, y: 0.4, confidence: true },
+        { id: 2, tip: true, x: 0.6, y: 0.6, confidence: true },
+      ],
+    })]));
+
+    expect(hub.pendingCount()).toBe(1);
+    expect(source.currentSegmentAngleDeg()).toBeCloseTo(45, 5);
+    expect(telemetry.count("frameAccepted")).toBe(2);
   });
 
   it("attach() is inert outside the host and pushes nothing", () => {

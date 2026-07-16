@@ -74,6 +74,8 @@ internal struct PointerInfo
 internal struct PointerTouchpadInfo
 {
     public PointerInfo PointerInfo;
+    public uint TouchFlags;
+    public uint TouchMask;
     public Rect RcContact;
     public Rect RcContactRaw;
     public uint Orientation;
@@ -110,7 +112,7 @@ internal static class Win32
     // POINTER_FLAGS bits.
     public const uint POINTER_FLAG_INCONTACT = 0x00000004;
     public const uint POINTER_FLAG_FIRSTBUTTON = 0x00000010;
-    public const uint POINTER_FLAG_CONFIDENCE = 0x00000400;
+    public const uint POINTER_FLAG_CONFIDENCE = 0x00004000;
     public const uint POINTER_FLAG_PRIMARY = 0x00002000;
     public const uint POINTER_FLAG_UP = 0x00040000;
 
@@ -169,6 +171,19 @@ internal static class Win32
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool GetPointerFrameTouchpadInfo(
         uint pointerId,
+        ref uint pointerCount,
+        [In, Out] PointerTouchpadInfo[]? touchpadInfo);
+
+    /// <summary>
+    /// Retrieves the complete touchpad frame history associated with the current
+    /// WM_POINTERUPDATE, including input that Windows coalesced while the UI thread
+    /// was busy. The returned flat array is laid out as
+    /// POINTER_TOUCH_INFO[entriesCount][pointerCount], newest row first.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool GetPointerFrameTouchpadInfoHistory(
+        uint pointerId,
+        ref uint entriesCount,
         ref uint pointerCount,
         [In, Out] PointerTouchpadInfo[]? touchpadInfo);
 

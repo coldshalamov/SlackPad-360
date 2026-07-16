@@ -67,6 +67,37 @@ describe("CameraRig riding composition", () => {
     expect(rotationStep).toBeLessThanOrEqual(maxStep + 1e-6);
   });
 
+  it("does not turn millimetre-scale grounded suspension settling into background camera jitter", () => {
+    const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9);
+    const still = { ...OBS, board: { ...OBS.board, lv: { x: 0, y: 0, z: 0 } } };
+    rig.update({ p: still.board.p, q: still.board.q }, still, 1 / 60);
+    const start = rig.camera.position.clone();
+    const startRotation = rig.camera.quaternion.clone();
+    let maxExcursion = 0;
+    let maxRotationExcursion = 0;
+
+    for (let i = 0; i < 120; i++) {
+      const jitter = (i % 2 === 0 ? 1 : -1) * 0.003;
+      const yaw = jitter;
+      rig.update(
+        {
+          p: { x: jitter, y: still.board.p.y + jitter, z: -jitter },
+          q: { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) },
+        },
+        still,
+        1 / 60,
+      );
+      maxExcursion = Math.max(maxExcursion, rig.camera.position.distanceTo(start));
+      maxRotationExcursion = Math.max(
+        maxRotationExcursion,
+        rig.camera.quaternion.angleTo(startRotation),
+      );
+    }
+
+    expect(maxExcursion).toBeLessThan(1e-5);
+    expect(maxRotationExcursion).toBeLessThan(1e-5);
+  });
+
   it("still cuts immediately when reduced motion is enabled after startup", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9);
     rig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
@@ -87,7 +118,7 @@ describe("CameraRig riding composition", () => {
     expect(board.z).toBeLessThan(1);
   });
 
-  it("defaults to a side-on fingerboard view at riding speed", () => {
+  it("defaults to a route-readable chase view at riding speed", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     rig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
 
@@ -95,16 +126,17 @@ describe("CameraRig riding composition", () => {
       .clone()
       .sub(new THREE.Vector3(0, 0.05, 0));
     const horizontalDistance = Math.hypot(offset.x, offset.z);
-    expect(rig.viewMode).toBe("fingerboard");
-    expect(horizontalDistance).toBeGreaterThanOrEqual(0.8);
+    expect(rig.viewMode).toBe("route");
+    expect(horizontalDistance).toBeGreaterThanOrEqual(1.2);
     expect(
-      Math.abs(offset.x),
-      "camera sits beside the +Z-facing board",
-    ).toBeGreaterThan(Math.abs(offset.z) * 3);
+      Math.abs(offset.z),
+      "camera sits primarily behind the +Z-facing board",
+    ).toBeGreaterThan(Math.abs(offset.x));
   });
 
   it("regular/right-handed forward travel reads toward screen-right", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    rig.setViewMode("fingerboard");
     rig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
     rig.camera.updateMatrixWorld(true);
 
@@ -113,7 +145,7 @@ describe("CameraRig riding composition", () => {
     expect(forward.x).toBeGreaterThan(board.x);
   });
 
-  it("looks across the deck rather than primarily down the route", () => {
+  it("looks primarily down the route", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const pose = { p: OBS.board.p, q: OBS.board.q };
     rig.update(pose, OBS, 1 / 60);
@@ -125,11 +157,12 @@ describe("CameraRig riding composition", () => {
     const boardForward = new THREE.Vector3(0, 0, 1);
 
     const routeAlignment = Math.abs(cameraToBoard.dot(boardForward));
-    expect(routeAlignment).toBeLessThan(0.35);
+    expect(routeAlignment).toBeGreaterThan(0.65);
   });
 
   it("keeps the tactile side-on frame in the air", () => {
     const rig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
+    rig.setViewMode("fingerboard");
     const airObs: ObserveState = {
       ...OBS,
       phase: "air",
@@ -149,21 +182,23 @@ describe("CameraRig riding composition", () => {
     expect(Math.abs(cameraToBoard.dot(new THREE.Vector3(0, 0, 1)))).toBeLessThan(0.35);
   });
 
-  it("does not turn the default view into a chase camera as speed rises", () => {
+  it("pulls the default camera farther back as speed rises", () => {
     const slowRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const fastRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const slow = { ...OBS, board: { ...OBS.board, lv: { x: 0, y: 0, z: 0.5 } } };
     const fast = { ...OBS, board: { ...OBS.board, lv: { x: 0, y: 0, z: 7 } } };
     slowRig.update({ p: slow.board.p, q: slow.board.q }, slow, 1 / 60);
     fastRig.update({ p: fast.board.p, q: fast.board.q }, fast, 1 / 60);
-    expect(Math.abs(fastRig.camera.position.x)).toBeGreaterThan(Math.abs(fastRig.camera.position.z) * 3);
-    expect(Math.abs(slowRig.camera.position.x)).toBeGreaterThan(Math.abs(slowRig.camera.position.z) * 3);
+    const origin = new THREE.Vector3(0, 0.05, 0);
+    expect(fastRig.camera.position.distanceTo(origin)).toBeGreaterThan(
+      slowRig.camera.position.distanceTo(origin) + 0.5,
+    );
   });
 
-  it("offers the route camera only as an explicit alternate view", () => {
+  it("offers the close fingerboard camera only as an explicit alternate view", () => {
     const routeRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
     const closeRig = new CameraRig(DEFAULT_SIM_CONFIG.camera, 16 / 9, true);
-    routeRig.setViewMode("route");
+    closeRig.setViewMode("fingerboard");
     routeRig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
     closeRig.update({ p: OBS.board.p, q: OBS.board.q }, OBS, 1 / 60);
 
@@ -171,6 +206,7 @@ describe("CameraRig riding composition", () => {
     const closeOffset = closeRig.camera.position.clone().sub(new THREE.Vector3(0, 0.05, 0));
     expect(closeOffset.length()).toBeLessThan(routeOffset.length());
     expect(Math.abs(closeOffset.x)).toBeGreaterThan(Math.abs(closeOffset.z));
+    expect(routeRig.viewMode).toBe("route");
     expect(closeRig.viewMode).toBe("fingerboard");
   });
 });

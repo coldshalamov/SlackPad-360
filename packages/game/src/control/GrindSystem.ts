@@ -23,9 +23,9 @@
  *     an inescapable state.
  *  4. EXPLICIT ENVELOPE REJECTION — a near-but-wrong-speed/angle approach emits
  *     `grindRejected {reason}` and NEVER latches.
- *  5. PHASE EXCLUSIVE — while a candidate is active in the air (approach) or a
- *     grind is latched, the FSM suppresses air-shuv/flip and catch (the FSM gates
- *     on `candidateActive()` / phase==='grind').
+ *  5. PHASE EXCLUSIVE — an airborne candidate suppresses catch but continues to
+ *     read the player's post-pop sweep; a committed grind suppresses all other
+ *     air actions until exit.
  *
  * Determinism: step arithmetic + pure maths on plain data; no wall clock, no
  * Math.random.
@@ -134,12 +134,7 @@ export class GrindSystem {
     return this.#latched;
   }
 
-  /**
-   * A candidate is active in the air right now (approach window). The FSM gates
-   * air-shuv/flip + catch off this so a boardslide approach is never misread as
-   * a shuv (final-input-and-trick §3.1: "grind candidate + lateral yaw near rail
-   * → grind path; phase exclusive").
-   */
+  /** A provisional rail approach is active; the FSM defers catch until resolved. */
   candidateActive(): boolean {
     return this.#candidate;
   }
@@ -225,18 +220,23 @@ export class GrindSystem {
     this.#candidate = true;
     this.#candidateFamily = family;
 
-    const contact = approach.lateralDist <= rSnap && Math.abs(heightDelta) <= Math.max(rSnap, 0.03);
+    const contact =
+      approach.lateralDist <= rSnap &&
+      Math.abs(heightDelta) <= Math.max(rSnap, 0.03) &&
+      inp.pose.lv.y <= 0.1;
     if (inp.canLatch && inp.step >= this.#cooldownUntilStep && contact) {
       return this.#openLatch(inp, rail, approach, family);
     }
 
     // Airborne candidate not yet latched: emit the APPROACH orientation snap — a
     // yaw-align-only command (no lateral spring, no positional magnetism) that
-    // assists the player's rotation into the family orientation "on entry" so a
-    // boardslide can actually be entered before the phase-exclusive gate would
-    // otherwise freeze its yaw near the rail. Assist-scaled (springGain 0 at L0).
+    // assists the player's rotation into the family orientation during the
+    // descending commit window. Assist-scaled (springGain 0 at L0).
     const res = inactiveResult(true, family, null);
-    if (inp.canLatch && inp.step >= this.#cooldownUntilStep) {
+    // Never counter-steer an authored post-pop trick while the board is still
+    // rising. Entry alignment belongs to the descending rail-commit window;
+    // ascent remains under the player's shuv/flip intent.
+    if (inp.canLatch && inp.step >= this.#cooldownUntilStep && inp.pose.lv.y <= 0.1) {
       res.approachOnly = true;
       res.axis = { ...approach.tangent };
       res.perp = { ...rail.perp };

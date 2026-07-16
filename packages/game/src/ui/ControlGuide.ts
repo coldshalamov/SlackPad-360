@@ -1,6 +1,29 @@
 import type { InputProfile, ObserveState } from '@slackpad/shared';
+import type { ControlDiagnostics } from '../agent/AgentHarness';
 
 type Role = 'nose' | 'tail';
+
+const degrees = (radians: number): string => `${(radians * 180 / Math.PI).toFixed(1)}°`;
+
+/** Plain-text causal chain used by both the native HUD and headless tests. */
+export function controlParityText(value: ControlDiagnostics): string {
+  const contact = (role: Role): string => {
+    const c = value.contacts[role];
+    return `${role.toUpperCase()} #${c.id ?? '—'} ${c.planted ? '●' : '○'} ` +
+      `(${c.pad.x.toFixed(3)}, ${c.pad.y.toFixed(3)})`;
+  };
+  const heading = value.requestedHeadingRad == null
+    ? 'heading request —'
+    : `heading request ${degrees(value.requestedHeadingRad)} → ` +
+      `board ${degrees(value.actualHeadingRad)}  Δ ${degrees(value.headingErrorRad ?? 0)}`;
+  const pop = value.popSide == null
+    ? `deck nose ${value.noseOverTailMeters >= 0 ? '+' : ''}${(value.noseOverTailMeters * 100).toFixed(1)} cm`
+    : `POP ${value.popSide.toUpperCase()} → ` +
+      `${value.popSide === 'tail' ? 'nose' : 'tail'} ` +
+      `${value.noseOverTailMeters >= 0 ? '+' : ''}${(value.noseOverTailMeters * 100).toFixed(1)} cm ` +
+      `${value.popPolarityOk == null ? '…' : value.popPolarityOk ? '✓' : '✕ WRONG WAY'}`;
+  return `${contact('tail')}\n${contact('nose')}\n${heading}\n${pop}`;
+}
 
 /** Small native-host stance mirror: makes the finger↔foot contract visible. */
 export class ControlGuide {
@@ -9,6 +32,7 @@ export class ControlGuide {
   readonly #middle: HTMLDivElement;
   readonly #indexLabel: HTMLDivElement;
   readonly #middleLabel: HTMLDivElement;
+  readonly #parity: HTMLDivElement;
   #profile: InputProfile;
 
   constructor(container: HTMLElement, profile: InputProfile) {
@@ -67,13 +91,22 @@ export class ControlGuide {
     const copy = document.createElement('div');
     copy.innerHTML =
       '<b>Rotate the two-finger line</b> — set board heading; hold the angle to hold heading<br>' +
-      '<b>Hold CTRL</b> — accelerate &nbsp;·&nbsp; release to brake<br>' +
+      '<b>Hold CTRL</b> — push/accelerate &nbsp;·&nbsp; release to coast<br>' +
       '<b>Lift + retap rear finger</b> — ollie &nbsp;·&nbsp; <b>front</b> — nollie<br>' +
       '<b>Swipe one finger after the pop</b> — Flick-It flip or shuv<br>' +
-      '<b>V</b> — side-on / route camera';
+      '<b>V</b> — route / close side-on camera';
     Object.assign(copy.style, { lineHeight: '1.48', color: 'rgba(215,228,236,.9)' });
 
-    root.append(close, title, hand, copy);
+    const parity = document.createElement('div');
+    parity.textContent = 'waiting for contact diagnostics';
+    Object.assign(parity.style, {
+      marginTop: '8px', paddingTop: '7px', borderTop: '1px solid rgba(125,235,180,.18)',
+      whiteSpace: 'pre', font: '10px ui-monospace, SFMono-Regular, Menlo, monospace',
+      lineHeight: '1.45', color: 'rgba(190,224,211,.92)',
+    });
+    this.#parity = parity;
+
+    root.append(close, title, hand, copy, parity);
     container.appendChild(root);
     this.#root = root;
     this.setProfile(profile);
@@ -90,7 +123,7 @@ export class ControlGuide {
     this.#middleLabel.style.whiteSpace = 'pre-line';
   }
 
-  update(obs: ObserveState): void {
+  update(obs: ObserveState, diagnostics?: ControlDiagnostics): void {
     let indexRole: Role = this.#profile.stance === 'regular' ? 'tail' : 'nose';
     if (this.#profile.swapFeet) indexRole = indexRole === 'nose' ? 'tail' : 'nose';
     const set = (el: HTMLDivElement, role: Role): void => {
@@ -101,6 +134,12 @@ export class ControlGuide {
     };
     set(this.#index, indexRole);
     set(this.#middle, indexRole === 'nose' ? 'tail' : 'nose');
+    if (diagnostics) {
+      this.#parity.textContent = controlParityText(diagnostics);
+      this.#parity.style.color = diagnostics.popPolarityOk === false
+        ? 'rgba(255,125,105,.98)'
+        : 'rgba(190,224,211,.92)';
+    }
   }
 
   dispose(): void {

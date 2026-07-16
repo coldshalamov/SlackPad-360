@@ -6,14 +6,14 @@
  * frame however reads best.
  *
  * Shot modes are keyed off `ObserveState.phase`:
- *   ground/none/pop → side-on fingerboard view by default
- *   air             → side-on pull-back; heading freezes at take-off
+ *   ground/none/pop → route-readable chase view by default
+ *   air             → pulled-back route view; heading freezes at take-off
  *   catch           → air pose tightening back toward chase
  *   bail            → wide slow-orbit hold (failure readable)
  *   grind           → overhead blend (implemented; only triggers once M6 emits
  *                     phase 'grind')
  *   replay/tutorial → mode enum placeholders (fall through to chase for now)
- * `V` toggles the optional route camera without changing controls.
+ * `V` toggles the optional close fingerboard camera without changing controls.
  *
  * Transitions: a critically damped spring (Unity-style SmoothDamp — the analytic
  * critically damped solution) on position, and a slerp with a max angular-rate
@@ -33,6 +33,10 @@ export type ShotMode =
 export type CameraViewMode = "route" | "fingerboard";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const GROUND_CAMERA_REST_SPEED = 0.08;
+// At sub-walking speeds, let a slow camera spring recenter only after a visible
+// quarter-metre drift instead of chasing each suspension/rolling micro-step.
+const GROUND_CAMERA_POSITION_DEADBAND = 0.25;
 
 /** Vec3 critically damped spring (Unity SmoothDamp), velocity mutated in place. */
 function smoothDampVec3(
@@ -86,9 +90,10 @@ export class CameraRig {
   // Frozen heading (updated only on the ground so mid-air flips never swing the
   // camera) + working temporaries reused each frame (no per-frame allocation).
   readonly #heading = new THREE.Vector3(0, 0, 1);
+  #headingInitialized = false;
   #bailOrbit = 0;
   #lastMode: ShotMode = "chase";
-  #viewMode: CameraViewMode = "fingerboard";
+  #viewMode: CameraViewMode = "route";
 
   #occluders: THREE.Object3D[] = [];
   readonly #ray = new THREE.Raycaster();
@@ -96,6 +101,9 @@ export class CameraRig {
 
   // Scratch.
   readonly #boardPos = new THREE.Vector3();
+  readonly #rawBoardPos = new THREE.Vector3();
+  readonly #groundFrameAnchor = new THREE.Vector3();
+  #groundFrameAnchorInitialized = false;
   readonly #boardQuat = new THREE.Quaternion();
   readonly #right = new THREE.Vector3();
   readonly #desiredPos = new THREE.Vector3();
@@ -177,18 +185,45 @@ export class CameraRig {
    */
   update(pose: RenderPose, obs: ObserveState, dt: number): void {
     const cfg = this.#cfg;
-    this.#boardPos.set(pose.p.x, pose.p.y, pose.p.z);
+    this.#rawBoardPos.set(pose.p.x, pose.p.y, pose.p.z);
     this.#boardQuat.set(pose.q.x, pose.q.y, pose.q.z, pose.q.w);
     const mode = this.#modeForPhase(obs.phase);
 
     // Heading is refreshed only while grounded; airborne flips keep the frame.
     const grounded =
       obs.phase === "ground" || obs.phase === "none" || obs.phase === "pop";
-    if (grounded) flatHeading(this.#boardQuat, this.#heading);
+    const speed = Math.hypot(obs.board.lv.x, obs.board.lv.z);
+    // A loaded physical deck never becomes mathematically motionless: wheel
+    // suspension and contact solving settle by millimetres. Following that
+    // motion makes the HDR background and every park edge shimmer. Hold a small
+    // presentation-only framing anchor at rest; actual rolling/air still follows
+    // the interpolated body immediately.
+    if (grounded && speed < GROUND_CAMERA_REST_SPEED) {
+      if (!this.#groundFrameAnchorInitialized) {
+        this.#groundFrameAnchor.copy(this.#rawBoardPos);
+        this.#groundFrameAnchorInitialized = true;
+      } else if (
+        this.#groundFrameAnchor.distanceToSquared(this.#rawBoardPos) >
+        GROUND_CAMERA_POSITION_DEADBAND * GROUND_CAMERA_POSITION_DEADBAND
+      ) {
+        this.#groundFrameAnchor.copy(this.#rawBoardPos);
+      }
+      this.#boardPos.copy(this.#groundFrameAnchor);
+    } else {
+      this.#boardPos.copy(this.#rawBoardPos);
+      this.#groundFrameAnchor.copy(this.#rawBoardPos);
+      this.#groundFrameAnchorInitialized = true;
+    }
+    if (
+      grounded &&
+      (!this.#headingInitialized || speed >= GROUND_CAMERA_REST_SPEED)
+    ) {
+      this.#headingInitialized = flatHeading(this.#boardQuat, this.#heading) ||
+        this.#headingInitialized;
+    }
     const heading = this.#heading;
     this.#right.copy(WORLD_UP).cross(heading).normalize(); // right = up × heading
 
-    const speed = Math.hypot(obs.board.lv.x, obs.board.lv.z);
     const laT = Math.min(
       1,
       Math.max(0, speed / Math.max(1e-3, cfg.lookAheadSpeedRef)),
@@ -222,8 +257,8 @@ export class CameraRig {
       .addScaledVector(heading, routeLookAhead)
       .addScaledVector(WORLD_UP, cfg.aimHeight);
 
-    // The default tactile camera stays beside the deck through a pop. The
-    // optional route view keeps the farther pull-back behavior.
+    // The optional tactile camera stays beside the deck through a pop. The
+    // default route view keeps the farther pull-back behavior.
     if (this.#viewMode === "fingerboard") {
       this.#airPos
         .copy(this.#boardPos)

@@ -118,8 +118,12 @@ describe('air-gesture harness property', () => {
           }
           noseOn = cur.nose != null;
           tailOn = cur.tail != null;
-          inject(contacts, cur.primary && s % 2 === 0, h.getStep());
-          if (h.observe().phase === 'air') airSteps.add(h.observe().step);
+          const processedStep = h.getStep();
+          inject(contacts, cur.primary && s % 2 === 0, processedStep);
+          // Gesture telemetry is stamped with the step being processed, while
+          // observe().step is the world step after integration. Record the
+          // former so recognition on the exact pop→air transition is covered.
+          if (h.observe().phase === 'air') airSteps.add(processedStep);
           if (++held >= cur.hold) {
             held = 0;
             spec += 1;

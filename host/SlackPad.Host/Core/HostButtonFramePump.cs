@@ -34,6 +34,7 @@ public sealed class HostButtonFramePump
     private bool _lastLeftDown;
     private bool _lastRightDown;
     private bool _lastAuxiliaryDown;
+    private bool _suppressButtonsUntilReleased;
 
     /// <summary>
     /// Forget every retained contact/button snapshot when the game loses focus.
@@ -41,6 +42,26 @@ public sealed class HostButtonFramePump
     /// finger stance that existed before deactivation.
     /// </summary>
     public void ResetForFocusLoss()
+    {
+        ResetRetainedInput();
+        _suppressButtonsUntilReleased = false;
+    }
+
+    /// <summary>
+    /// Start a fresh foreground input epoch. The activation sample is consumed,
+    /// not emitted: its pressed-since-poll bits may belong to the click that
+    /// merely refocused the window. Buttons still physically held at activation
+    /// remain neutral until they are released once.
+    /// </summary>
+    public void ResetForFocusGain(HostButtonSample activationSample)
+    {
+        ResetRetainedInput();
+        _suppressButtonsUntilReleased = activationSample.LeftDown ||
+            activationSample.RightDown ||
+            activationSample.AuxiliaryDown;
+    }
+
+    private void ResetRetainedInput()
     {
         _pending.Clear();
         _lastLiveFrame = null;
@@ -75,6 +96,18 @@ public sealed class HostButtonFramePump
     /// </summary>
     public IReadOnlyList<ContactFrame> Drain(HostButtonSample sample, double nowMs)
     {
+        if (_suppressButtonsUntilReleased)
+        {
+            bool allReleased = !sample.LeftDown &&
+                !sample.RightDown &&
+                !sample.AuxiliaryDown;
+            sample = new HostButtonSample(false, false, false, false, false);
+            if (allReleased)
+            {
+                _suppressButtonsUntilReleased = false;
+            }
+        }
+
         ContactFrameButtons current = HostButtonMerge.Merge(
             sample.LeftDown,
             sample.RightDown,
@@ -220,6 +253,7 @@ public sealed class HostButtonFramePump
         {
             DeviceId = source.DeviceId,
             ContactCountRaw = source.ContactCountRaw,
+            PhysicalAspectRatio = source.PhysicalAspectRatio,
             Adapter = source.Adapter,
         };
 }

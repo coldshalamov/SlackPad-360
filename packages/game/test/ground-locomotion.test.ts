@@ -83,7 +83,7 @@ describe("ground locomotion (a) cruise", () => {
     expect(Math.abs(speed2 - speed)).toBeLessThan(0.6);
   });
 
-  it("releasing Ctrl brakes monotonically to a controllable stop in about two seconds", async () => {
+  it("releasing Ctrl coasts with smooth resistance instead of applying an automatic brake", async () => {
     const h = await grounded(0x5709);
     for (let i = 0; i < 150; i++) {
       h.injectContactFrame(plantFrame(60 + i, REST));
@@ -101,10 +101,11 @@ describe("ground locomotion (a) cruise", () => {
     for (let i = 1; i < samples.length; i++) {
       expect(samples[i]!).toBeLessThanOrEqual(samples[i - 1]! + 0.03);
     }
-    expect(samples.at(-1)).toBeLessThan(0.25);
+    expect(samples.at(-1)).toBeGreaterThan(start * 0.35);
+    expect(samples.at(-1)).toBeLessThan(start);
   });
 
-  it("still brakes after Ctrl release when both fingers lift off the pad", async () => {
+  it("still coasts after Ctrl release when both fingers lift off the pad", async () => {
     const h = await grounded(0x5710);
     for (let i = 0; i < 150; i++) {
       h.injectContactFrame(plantFrame(60 + i, REST));
@@ -116,7 +117,7 @@ describe("ground locomotion (a) cruise", () => {
       h.injectContactFrame(plantFrame(210 + i, [], false, false));
       h.step(1);
     }
-    expect(hSpeed(h)).toBeLessThan(0.25);
+    expect(hSpeed(h)).toBeGreaterThan(1.25);
   });
 });
 
@@ -142,8 +143,8 @@ describe("ground locomotion (b) push pulses", () => {
     const after = hSpeed(h);
     const dv =
       DEFAULT_SIM_CONFIG.physics.pushImpulse /
-      DEFAULT_SIM_CONFIG.physics.boardMass;
-    expect(after - before).toBeGreaterThan(dv * 0.6); // ~1.2 m/s, minus a little drag
+      (DEFAULT_SIM_CONFIG.physics.boardMass + DEFAULT_SIM_CONFIG.physics.riderMass);
+    expect(after - before).toBeGreaterThan(dv * 0.6);
     expect(after - before).toBeLessThan(dv * 1.2);
 
     // Hammer pushes past the cap: speed climbs but never exceeds maxGroundSpeed.
@@ -171,6 +172,7 @@ describe("ground locomotion (c) finger-line heading", () => {
     contacts: Contact[],
     stance: InputProfile["stance"] = "regular",
     steps = 120,
+    accelerating = false,
   ): Promise<{ yaw: number; yawRate: number }> {
     const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
       ...DEFAULT_SIM_CONFIG_PROFILE,
@@ -181,7 +183,7 @@ describe("ground locomotion (c) finger-line heading", () => {
     // The very first confident two-finger placement establishes the requested
     // board heading. There is no hidden re-anchor to the board's old yaw.
     for (let i = 0; i < steps; i++) {
-      h.injectContactFrame(plantFrame(60 + i, contacts, false, false));
+      h.injectContactFrame(plantFrame(60 + i, contacts, false, accelerating));
       h.step(1);
     }
     const { q, av } = h.observe().board;
@@ -190,7 +192,7 @@ describe("ground locomotion (c) finger-line heading", () => {
     return { yaw: Math.atan2(forwardX, forwardZ), yawRate: av.y };
   }
 
-  it("a clockwise 90-degree finger line turns the board clockwise 90 degrees and holds it", async () => {
+  it("a clockwise 90-degree finger line does not rotate a stationary board", async () => {
     // Native pad Y grows toward the player. Moving the nose contact downward
     // is a physical clockwise hand rotation, which is world -yaw in the
     // side-on camera frame (world +Z reads screen-right, world -X toward us).
@@ -199,17 +201,21 @@ describe("ground locomotion (c) finger-line heading", () => {
       { ...REST[1]!, x: 0.5, y: 0.6 },
     ];
     const result = await headingAfterContacts(vertical);
-    expect(result.yaw).toBeCloseTo(-Math.PI / 2, 1);
+    expect(Math.abs(result.yaw)).toBeLessThan(0.12);
     expect(Math.abs(result.yawRate)).toBeLessThan(0.08);
   });
 
-  it("tracks a 90-degree hand rotation within 15 degrees in 300 ms", async () => {
+  it("turns toward the requested heading while rolling without snapping in 300 ms", async () => {
     const vertical: Contact[] = [
       { ...REST[0]!, x: 0.5, y: 0.4 },
       { ...REST[1]!, x: 0.5, y: 0.6 },
     ];
-    const result = await headingAfterContacts(vertical, "regular", 18);
-    expect(Math.abs(-Math.PI / 2 - result.yaw)).toBeLessThan(Math.PI / 12);
+    const early = await headingAfterContacts(vertical, "regular", 18, true);
+    expect(Math.abs(early.yaw)).toBeGreaterThan(0.02);
+    expect(Math.abs(early.yaw)).toBeLessThan(Math.PI / 3);
+
+    const settled = await headingAfterContacts(vertical, "regular", 180, true);
+    expect(Math.abs(-Math.PI / 2 - settled.yaw)).toBeLessThan(Math.PI / 5);
   });
 
   it("sliding both fingers together without rotating them does not steer", async () => {

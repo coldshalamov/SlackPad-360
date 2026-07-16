@@ -19,8 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { AgentHarness } from '../src/agent/AgentHarness';
 import type { InjectableFrame } from '../src/agent/AgentHarness';
 import type { Contact, ReplayCheckpoint, SessionTrace } from '@slackpad/shared';
-import { DT_MS, NOSE_POS, TAIL_POS, eventsOf } from './helpers/maneuver';
-import { rotateAboutCenter } from '../src/input/FootTracker';
+import { DT_MS, NOSE_POS, TAIL_POS, eventsOf, gesturePos } from './helpers/maneuver';
 
 const BASELINE_PATH = join(dirname(fileURLToPath(import.meta.url)), 'goldens', 'grind-baselines.json');
 const UPDATE_GOLDENS = process.env.UPDATE_GOLDENS === '1';
@@ -40,16 +39,18 @@ function checkBaseline(key: string, actual: string): void {
 }
 
 const SEED = 12345;
-const SESSION_STEPS = 300;
-const FIFTY_POP_STEP = 130;
-const BOARDSLIDE_POP_STEP = 135;
+const SESSION_STEPS = 420;
+// The 50-50 retains its longer authored approach. The boardslide uses 130
+// Ctrl-stroke steps to reach z≈5.43 m, matching the live integration line;
+// two lift reports follow, then the retap opens the pop on this step.
+const FIFTY_POP_STEP = 207;
+const BOARDSLIDE_POP_STEP = 192;
 
 function c(id: number, x: number, y: number): Contact {
   return { id, tip: true, x, y, confidence: true };
 }
 
-/** Fixed 50-50 script (deterministic default-config physics; latch ≈ step 202
- * over the ledge, clean 82-step ride, speed-end dismount). */
+/** Fixed 50-50 script: physical approach, pop, clean ride, speed-end dismount. */
 function scriptFifty(step: number, frameId: number): InjectableFrame | null {
   if (step < 60) return null; // settle drop
 
@@ -64,32 +65,32 @@ function scriptFifty(step: number, frameId: number): InjectableFrame | null {
   return { schemaVersion: 1, frameId, tPerfMs: step * DT_MS, contacts, buttons: { primary: false, secondary: false, auxiliary: step < FIFTY_POP_STEP - 2 } };
 }
 
-/** Fixed BOARDSLIDE script: a held common-mode carve (steer off the rail)
- * before the pop; approach-align completes the turn onto the sliding ledge. */
+/** Fixed BOARDSLIDE script: straight approach, then a six-frame airborne shuv. */
 function scriptBoardslide(step: number, frameId: number): InjectableFrame | null {
   if (step < 60) return null; // settle drop
 
   let contacts: Contact[];
-  const nose50 = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, -50);
-  const tail50 = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, -50);
-  if (step < BOARDSLIDE_POP_STEP - 22) {
+  if (step < BOARDSLIDE_POP_STEP - 2) {
     contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(2, TAIL_POS.x, TAIL_POS.y)]; // cruise
-  } else if (step < BOARDSLIDE_POP_STEP - 2) {
-    const i = step - (BOARDSLIDE_POP_STEP - 22) + 1;
-    const nose = rotateAboutCenter(NOSE_POS.x, NOSE_POS.y, -i * 2.5);
-    const tail = rotateAboutCenter(TAIL_POS.x, TAIL_POS.y, -i * 2.5);
-    contacts = [c(1, nose.x, nose.y), c(2, tail.x, tail.y)];
   } else if (step < BOARDSLIDE_POP_STEP) {
-    contacts = [c(1, nose50.x, nose50.y)]; // hold heading, lift tail
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y)]; // lift tail
+  } else if (step === BOARDSLIDE_POP_STEP) {
+    contacts = [c(1, NOSE_POS.x, NOSE_POS.y), c(3, TAIL_POS.x, TAIL_POS.y)]; // retap
   } else {
-    contacts = [c(1, nose50.x, nose50.y), c(3, tail50.x, tail50.y)]; // retap + hold boardslide heading
+    const k = Math.max(0, Math.min(6, step - (BOARDSLIDE_POP_STEP + 1)));
+    const tail = k > 0 ? gesturePos('shuv-bs', k, 0.1, 6) : TAIL_POS;
+    // Lift the guide/front finger during the sweep, then replant soon enough
+    // for the physical front-foot guide to level the deck before rail contact.
+    contacts = step >= BOARDSLIDE_POP_STEP + 12
+      ? [c(4, NOSE_POS.x, NOSE_POS.y), c(3, tail.x, tail.y)]
+      : [c(3, tail.x, tail.y)];
   }
   return {
     schemaVersion: 1,
     frameId,
     tPerfMs: step * DT_MS,
     contacts,
-    buttons: { primary: false, secondary: false, auxiliary: step < BOARDSLIDE_POP_STEP - 22 },
+    buttons: { primary: false, secondary: false, auxiliary: step < BOARDSLIDE_POP_STEP - 2 },
   };
 }
 
@@ -175,7 +176,14 @@ describe('grind golden (M6)', () => {
     expect(families.has('boardslide')).toBe(true);
     const latched = eventsOf(harness, 'grindLatched');
     expect(latched.some((e) => e.family === 'boardslide')).toBe(true);
-    expect(eventsOf(harness, 'grindCompleted').length).toBeGreaterThanOrEqual(1);
+    const completed = eventsOf(harness, 'grindCompleted').find(
+      (event) => event.family === 'boardslide',
+    );
+    expect(completed?.durationSteps as number).toBeGreaterThan(20);
+    expect(eventsOf(harness, 'grindExit').some(
+      (event) => event.family === 'boardslide' && event.reason === 'speed-end',
+    )).toBe(true);
+    expect(eventsOf(harness, 'bail').some((event) => event.reason === 'hard-impact')).toBe(false);
   });
 
   afterAll(() => {

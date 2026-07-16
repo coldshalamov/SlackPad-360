@@ -15,6 +15,7 @@
  */
 
 import type { ContactFrame, SessionTrace } from "@slackpad/shared";
+import { physicalizePadPoint } from './FootTracker';
 import { isHostToPageEnvelope } from "@slackpad/shared";
 import type { InputHub } from "./InputHub";
 import type { Telemetry } from "../telemetry/Telemetry";
@@ -44,6 +45,7 @@ export class HostInputSource {
   private attached = false;
   private chip: HTMLDivElement | null = null;
   private latestHardwareFrame: ContactFrame | null = null;
+  private acceptsHardwareFrames = true;
 
   constructor(
     private readonly inputHub: InputHub,
@@ -70,6 +72,10 @@ export class HostInputSource {
   attach(): boolean {
     if (!this.host || this.attached) return false;
     this.attached = true;
+    // Startup remains permissive until the native host supplies its first
+    // authoritative focus envelope. This also makes a disposed/re-attached
+    // source behave like a fresh bridge rather than retaining stale focus.
+    this.acceptsHardwareFrames = true;
 
     this.host.addEventListener("message", this.onMessage);
     this.inputHub.registerSource("hardware");
@@ -124,7 +130,8 @@ export class HostInputSource {
 
   /** Angle of the farthest confident live contact pair, used by calibration. */
   currentSegmentAngleDeg(): number | null {
-    const contacts = this.latestHardwareFrame?.contacts.filter(
+    const frame = this.latestHardwareFrame;
+    const contacts = frame?.contacts.filter(
       (contact) => contact.tip && contact.confidence,
     ) ?? [];
     if (contacts.length < 2) return null;
@@ -135,8 +142,14 @@ export class HostInputSource {
       for (let j = i + 1; j < contacts.length; j++) {
         const left = contacts[i]!;
         const right = contacts[j]!;
-        const dx = right.x - left.x;
-        const dy = right.y - left.y;
+        const leftPhysical = physicalizePadPoint(
+          left.x, left.y, frame?.meta?.physicalAspectRatio,
+        );
+        const rightPhysical = physicalizePadPoint(
+          right.x, right.y, frame?.meta?.physicalAspectRatio,
+        );
+        const dx = rightPhysical.x - leftPhysical.x;
+        const dy = rightPhysical.y - leftPhysical.y;
         const distance2 = dx * dx + dy * dy;
         if (distance2 > maxDistance2) {
           maxDistance2 = distance2;
@@ -148,7 +161,12 @@ export class HostInputSource {
     // Calibration records the orientation of the physical finger line, not a
     // directed tail-to-nose vector. Hardware contact enumeration may reverse
     // between frames, so canonicalize equivalent angles into [-90, 90).
-    let angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    const aPhysical = physicalizePadPoint(a.x, a.y, frame?.meta?.physicalAspectRatio);
+    const bPhysical = physicalizePadPoint(b.x, b.y, frame?.meta?.physicalAspectRatio);
+    let angle = Math.atan2(
+      bPhysical.y - aPhysical.y,
+      bPhysical.x - aPhysical.x,
+    ) * 180 / Math.PI;
     if (angle >= 90) angle -= 180;
     if (angle < -90) angle += 180;
     return angle;
@@ -162,6 +180,10 @@ export class HostInputSource {
 
     switch (data.type) {
       case "contactBatch": {
+        // The host can still have already-buffered HID samples in flight after
+        // reporting focus loss. Keep them out of both gameplay intake and the
+        // calibration snapshot until an explicit focused:true envelope arrives.
+        if (!this.acceptsHardwareFrames) return;
         // Frames already carry source:'hardware'; InputHub validates each and
         // rejects malformed ones without throwing (gt-malformed contract). Guard
         // the array itself so a malformed batch can never throw out of the
@@ -173,6 +195,7 @@ export class HostInputSource {
         return;
       }
       case "focus":
+        this.acceptsHardwareFrames = data.payload.focused;
         this.onFocusChanged?.(data.payload.focused);
         this.setChipFocused(data.payload.focused);
         this.telemetry.log({

@@ -248,6 +248,47 @@ public class HostButtonFramePumpTests
         Assert.False(fresh[0].Buttons.Primary);
     }
 
+    [Fact]
+    public void FocusLoss_BackgroundInputAndRefocusClick_DoNotProduceGameplayEdge()
+    {
+        var pump = PrimedTwoContactPump();
+
+        pump.ResetForFocusLoss();
+
+        // Model both inputs that may race after WM_ACTIVATE deactivation: a raw
+        // background report and the left click Windows uses to refocus the form.
+        pump.Enqueue(Fixtures.Frame(
+            id: 80,
+            tMs: 50,
+            contacts: new[] { Fixtures.Tip(20, 0.35, 0.5), Fixtures.Tip(21, 0.65, 0.5) },
+            primary: true));
+        pump.ResetForFocusGain(new HostButtonSample(true, false, true, false));
+
+        // The first legitimate foreground contact report can arrive while the
+        // refocus click is still physically held. It must remain a neutral
+        // stance, and releasing that click must not synthesize an edge either.
+        pump.Enqueue(Fixtures.Frame(
+            id: 81,
+            tMs: 51,
+            contacts: new[] { Fixtures.Tip(30, 0.4, 0.5), Fixtures.Tip(31, 0.6, 0.5) }));
+        var held = pump.Drain(
+            new HostButtonSample(true, false, false, false),
+            nowMs: 52);
+        var released = pump.Drain(
+            new HostButtonSample(false, false, false, false),
+            nowMs: 53);
+
+        Assert.Single(held);
+        Assert.Equal(new[] { 30, 31 }, held[0].Contacts.Select(contact => contact.Id));
+        Assert.DoesNotContain(held.Concat(released), frame => frame.Buttons.Primary);
+
+        // A later deliberate foreground click remains playable.
+        var intentional = pump.Drain(
+            new HostButtonSample(true, false, true, false),
+            nowMs: 54);
+        Assert.Contains(intentional, frame => frame.Buttons.Primary);
+    }
+
     private static HostButtonFramePump PrimedTwoContactPump()
     {
         var pump = new HostButtonFramePump();

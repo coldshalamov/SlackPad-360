@@ -11,6 +11,10 @@ export interface SkateWheelObservation {
   contactNormal: Vec3 | null;
   suspensionLength: number;
   rotation: number;
+  normalLoad: number;
+  suspensionCompression: number;
+  longitudinalSlip: number;
+  lateralSlip: number;
 }
 
 interface WheelState extends SkateWheelObservation {
@@ -92,6 +96,10 @@ export class SkateboardContactSolver {
       contactNormal: null,
       suspensionLength: rest + p.wheelMaxSuspensionTravel,
       rotation: 0,
+      normalLoad: 0,
+      suspensionCompression: 0,
+      longitudinalSlip: 0,
+      lateralSlip: 0,
     }));
   }
 
@@ -111,11 +119,13 @@ export class SkateboardContactSolver {
 
   update(world: World, body: RigidBody, dt: number): void {
     const p = this.config;
+    const systemMass = p.boardMass + p.riderMass;
     const q = body.rotation();
     const origin = body.translation();
     const down = normalize(quatRotate(q, { x: 0, y: -1, z: 0 }));
     const rest = p.wheelSuspensionRestLength + p.deckThickness / 2;
-    const rayLength = rest + p.wheelMaxSuspensionTravel + p.wheelRadius;
+    const castDistance = rest + p.wheelMaxSuspensionTravel;
+    const wheelShape = new RAPIER.Ball(p.wheelRadius);
     this.#frontLoad = 0;
     this.#rearLoad = 0;
     this.#maxSupportImpulse = 0;
@@ -127,6 +137,10 @@ export class SkateboardContactSolver {
       wheel.contactPoint = null;
       wheel.contactNormal = null;
       wheel.suspensionLength = rest + p.wheelMaxSuspensionTravel;
+      wheel.normalLoad = 0;
+      wheel.suspensionCompression = 0;
+      wheel.longitudinalSlip = 0;
+      wheel.lateralSlip = 0;
 
       const offset = quatRotate(q, wheel.connection);
       const hardPoint = {
@@ -134,10 +148,13 @@ export class SkateboardContactSolver {
         y: origin.y + offset.y,
         z: origin.z + offset.z,
       };
-      const ray = new RAPIER.Ray(hardPoint, down);
-      const hit = world.castRayAndGetNormal(
-        ray,
-        rayLength,
+      const hit = world.castShape(
+        hardPoint,
+        { x: 0, y: 0, z: 0, w: 1 },
+        down,
+        wheelShape,
+        0,
+        castDistance,
         true,
         undefined,
         undefined,
@@ -146,19 +163,40 @@ export class SkateboardContactSolver {
       );
       if (!hit) continue;
 
-      const normal = normalize({ x: hit.normal.x, y: hit.normal.y, z: hit.normal.z });
+      // World.castShape returns world-space witness/normal data even though the
+      // base ShapeCastHit declaration describes local-space values. Rotating
+      // normal2 by the collider transform again doubles a bank's angle. Use the
+      // world-space wheel-facing normal1 directly.
+      let normal = normalize(hit.normal1);
+      // GJK shape casts can return a tiny tangential component for a sphere
+      // against a huge, truly level planar box. Snap that numerical noise only
+      // when the hit collider itself is level. A shallow bank/transition may
+      // also have normal.y > 0.995, but its rotated collider-up must survive so
+      // gravity, pumping, and truck traction see the real surface.
+      const colliderRotation = hit.collider.rotation();
+      const colliderUp = quatRotate(colliderRotation, { x: 0, y: 1, z: 0 });
+      if (colliderUp.y > 0.999999 && normal.y > 0.995) {
+        normal = { x: 0, y: 1, z: 0 };
+      }
       const supportAlignment = -dot(down, normal);
       if (supportAlignment < 0.2) continue;
-      const point = ray.pointAt(hit.timeOfImpact);
       const suspensionLength = clamp(
-        hit.timeOfImpact - p.wheelRadius,
+        hit.time_of_impact,
         Math.max(0, rest - p.wheelMaxSuspensionTravel),
         rest + p.wheelMaxSuspensionTravel,
       );
       const wheelCenter = {
-        x: point.x + normal.x * p.wheelRadius,
-        y: point.y + normal.y * p.wheelRadius,
-        z: point.z + normal.z * p.wheelRadius,
+        x: hardPoint.x + down.x * hit.time_of_impact,
+        y: hardPoint.y + down.y * hit.time_of_impact,
+        z: hardPoint.z + down.z * hit.time_of_impact,
+      };
+      // Rapier's World query returns witness1 in world space (despite the base
+      // ShapeCastHit declaration describing shape-local witnesses). Keep that
+      // exact point instead of reconstructing it from a noisy radial normal.
+      const point = {
+        x: hit.witness1.x,
+        y: hit.witness1.y,
+        z: hit.witness1.z,
       };
       const pointVelocity = body.velocityAtPoint(wheelCenter);
       const normalSpeed = pointVelocity.x * normal.x + pointVelocity.y * normal.y + pointVelocity.z * normal.z;
@@ -166,9 +204,9 @@ export class SkateboardContactSolver {
       const damping = normalSpeed < 0
         ? p.wheelSuspensionCompression
         : p.wheelSuspensionRelaxation;
-      const springForce = p.wheelSuspensionStiffness * p.boardMass * compression;
+      const springForce = p.wheelSuspensionStiffness * systemMass * compression;
       const supportForce = clamp(
-        springForce * supportAlignment - damping * p.boardMass * normalSpeed,
+        springForce * supportAlignment - damping * systemMass * normalSpeed,
         0,
         p.wheelMaxSuspensionForce,
       );
@@ -179,6 +217,8 @@ export class SkateboardContactSolver {
       wheel.contactNormal = normal;
       wheel.suspensionLength = suspensionLength;
       wheel.load = supportForce;
+      wheel.normalLoad = supportForce;
+      wheel.suspensionCompression = compression;
       if (index < 2) this.#frontLoad += supportForce;
       else this.#rearLoad += supportForce;
       this.#maxSupportImpulse = Math.max(
@@ -216,13 +256,22 @@ export class SkateboardContactSolver {
       const right = normalize(cross(normal, forward));
       const longitudinalSpeed = dot(pointVelocity, forward);
       const lateralSpeed = dot(pointVelocity, right);
+      // Wheels are currently massless rolling constraints: their visual spin
+      // is derived directly from travel, so they have no independent angular
+      // velocity from which physical longitudinal slip can be measured. Zero
+      // is the honest diagnostic for pure rolling; lateral slip remains the
+      // real contact-patch velocity that the solver actively corrects.
+      wheel.longitudinalSlip = 0;
+      wheel.lateralSlip = lateralSpeed;
       const frictionCap = supportImpulse * Math.max(0, p.wheelFrictionSlip);
-      const driveImpulse = this.#engineForce * dt;
+      // #engineForce is the total rider push/drive force. Split it across the
+      // four wheel patches exactly once instead of applying four copies.
+      const driveImpulse = this.#engineForce * dt * 0.25;
       const brakeImpulse = longitudinalSpeed === 0
         ? 0
         : -Math.sign(longitudinalSpeed) * Math.min(
-            Math.abs(longitudinalSpeed) * p.boardMass / 4,
-            this.#brakeForce * dt,
+            Math.abs(longitudinalSpeed) * systemMass / 4,
+            this.#brakeForce * dt * 0.25,
           );
       const longitudinalImpulse = clamp(
         driveImpulse + brakeImpulse,
@@ -231,7 +280,7 @@ export class SkateboardContactSolver {
       );
       const lateralGain = clamp(p.wheelSideFrictionStiffness * dt, 0, 1);
       const lateralImpulse = clamp(
-        -lateralSpeed * p.boardMass * 0.25 * lateralGain,
+        -lateralSpeed * systemMass * 0.25 * lateralGain,
         -frictionCap,
         frictionCap,
       );
@@ -250,13 +299,30 @@ export class SkateboardContactSolver {
     }
   }
 
-  get contactCount(): number {
-    return this.#wheels.reduce((count, wheel) => count + (wheel.inContact ? 1 : 0), 0);
-  }
-
   get frontLoad(): number { return this.#frontLoad; }
   get rearLoad(): number { return this.#rearLoad; }
   get maxSupportImpulse(): number { return this.#maxSupportImpulse; }
+  get contactCount(): number {
+    let count = 0;
+    for (const wheel of this.#wheels) if (wheel.inContact) count += 1;
+    return count;
+  }
+
+  /** Load-weighted world-space support normal from the latest wheel solve. */
+  get supportNormal(): Vec3 | null {
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    let load = 0;
+    for (const wheel of this.#wheels) {
+      if (!wheel.inContact || !wheel.contactNormal || wheel.load <= 0) continue;
+      x += wheel.contactNormal.x * wheel.load;
+      y += wheel.contactNormal.y * wheel.load;
+      z += wheel.contactNormal.z * wheel.load;
+      load += wheel.load;
+    }
+    return load > 1e-6 ? normalize({ x, y, z }) : null;
+  }
 
   observations(): SkateWheelObservation[] {
     return this.#wheels.map((wheel) => ({
@@ -266,6 +332,10 @@ export class SkateboardContactSolver {
       contactNormal: wheel.contactNormal ? { ...wheel.contactNormal } : null,
       suspensionLength: wheel.suspensionLength,
       rotation: wheel.rotation,
+      normalLoad: wheel.normalLoad,
+      suspensionCompression: wheel.suspensionCompression,
+      longitudinalSlip: wheel.longitudinalSlip,
+      lateralSlip: wheel.lateralSlip,
     }));
   }
 }

@@ -17,9 +17,10 @@ import {
 import type { AssistLevel, AssistPreset, InputProfile, Stance } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 
-// v5 installs the all-motion Tech Deck contract for existing local builds:
-// lift+retap tail = ollie, lift+retap nose = nollie; clicks are ignored.
-export const PROFILE_STORAGE_KEY = 'slackpad.profile.v5';
+// v6 adds player-facing flick sensitivity and moves yaw calibration into the
+// physicalized pad-coordinate space. A v5 yaw therefore cannot be reused.
+export const PROFILE_STORAGE_KEY = 'slackpad.profile.v6';
+export const LEGACY_PROFILE_STORAGE_KEY = 'slackpad.profile.v5';
 
 type Listener = (profile: InputProfile) => void;
 
@@ -36,7 +37,9 @@ export class ProfileStore {
   private readonly listeners = new Set<Listener>();
 
   constructor(private readonly telemetry?: Telemetry) {
-    this.profile = this.load();
+    const loaded = this.load();
+    this.profile = loaded.profile;
+    if (loaded.migrated) this.persist();
   }
 
   /** Immutable snapshot the harness reads per reset. */
@@ -89,20 +92,23 @@ export class ProfileStore {
     this.update({ padYawOffset: deg });
   }
 
+  setFlickSensitivity(sensitivity: number): void {
+    this.update({ flickSensitivity: sensitivity });
+  }
+
   toggleSwapFeet(): void {
     this.update({ swapFeet: !this.profile.swapFeet });
   }
 
-  private load(): InputProfile {
+  private load(): { profile: InputProfile; migrated: boolean } {
     const base = structuredClone(DEFAULT_INPUT_PROFILE);
-    if (!hasLocalStorage()) return base;
-    try {
-      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-      if (!raw) return base;
-      const saved = JSON.parse(raw) as Partial<InputProfile>;
-      return normalizeInputProfile({
+    if (!hasLocalStorage()) return { profile: base, migrated: false };
+
+    const hydrate = (saved: Partial<InputProfile>, resetYaw: boolean): InputProfile =>
+      normalizeInputProfile({
         ...base,
         ...saved,
+        padYawOffset: resetYaw ? 0 : saved.padYawOffset,
         assistPreset:
           saved.assistPreset ??
           ASSIST_PRESET_BY_LEVEL[saved.assistLevel ?? base.assistLevel],
@@ -110,8 +116,20 @@ export class ProfileStore {
         bothClickMeans: 'ollie',
         accessibility: { ...base.accessibility, ...saved.accessibility },
       });
+
+    try {
+      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<InputProfile>;
+        return { profile: hydrate(saved, false), migrated: false };
+      }
+
+      const legacyRaw = localStorage.getItem(LEGACY_PROFILE_STORAGE_KEY);
+      if (!legacyRaw) return { profile: base, migrated: false };
+      const legacy = JSON.parse(legacyRaw) as Partial<InputProfile>;
+      return { profile: hydrate(legacy, true), migrated: true };
     } catch {
-      return base;
+      return { profile: base, migrated: false };
     }
   }
 

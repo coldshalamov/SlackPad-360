@@ -186,15 +186,18 @@ describe('playable-park default level contract', () => {
     for (let i = 0; i < 90; i++) world.step();
     for (let i = 0; i < 1800 && world.boardPose().p.z < 38.3; i++) {
       const pose = world.boardPose();
-      const targetX = pose.p.z < 28 ? -0.75 : 2;
-      const targetYawRate = Math.max(-0.45, Math.min(0.45, (targetX - pose.p.x) * 0.35));
+      // The north bank is 4 m wide, so x=2 is its exact side edge. Aim one
+      // metre inside the transition so this verifies the ride and lip, rather
+      // than a deterministic roll-off from a physically invalid test line.
+      const targetX = pose.p.z < 28 ? -0.75 : 1;
+      const targetHeading = Math.atan2(targetX - pose.p.x, 5);
       world.applyGroundForces({
         active: true,
         driveForce: DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
         brakeForce: 0,
         pushImpulse: 0,
-        targetYawRate,
-        steerAngle: null,
+        targetYawRate: 0,
+        steerAngle: targetHeading,
         rollTorque: 0,
       });
       world.step();
@@ -205,13 +208,16 @@ describe('playable-park default level contract', () => {
     ).toBeGreaterThanOrEqual(38.3);
     let maxZ = world.boardPose().p.z;
     let maxY = world.boardPose().p.y;
+    let sawLipLaunch = false;
     for (let i = 0; i < 180; i++) {
       world.step();
       maxZ = Math.max(maxZ, world.boardPose().p.z);
       maxY = Math.max(maxY, world.boardPose().p.y);
+      if (world.lastTransitionAssist()?.kind === 'lip-launch') sawLipLaunch = true;
     }
     expect(maxZ).toBeGreaterThan(41);
     expect(maxY, 'the bank visibly redirects line speed upward').toBeGreaterThan(0.45);
+    expect(sawLipLaunch, 'the interior bank line receives one physical lip launch').toBe(true);
     world.free();
   });
 

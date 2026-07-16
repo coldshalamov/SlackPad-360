@@ -36,6 +36,46 @@ const CONCRETE_BASE = '/textures/concrete/';
 const GROUND_TINT = 0x9aa0a4;
 /** Concrete tile size, m (albedo repeats every this many metres). */
 const GROUND_TILE_M = 2.0;
+const SUN_OFFSET = Object.freeze({ x: 6, y: 10, z: 4 });
+
+/**
+ * Snap horizontal shadow-camera translation in its own right/up plane. Moving
+ * the orthographic projection by whole texels keeps static edges registered to
+ * the map instead of shimmering as the interpolated board advances.
+ */
+export function stableShadowAnchor(
+  x: number,
+  z: number,
+  shadowSpan: number,
+  mapSize: number,
+  previous?: { x: number; z: number },
+): { x: number; z: number } {
+  const texel = shadowSpan / Math.max(1, mapSize);
+  const forwardLength = Math.hypot(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
+  const fx = -SUN_OFFSET.x / forwardLength;
+  const fy = -SUN_OFFSET.y / forwardLength;
+  const fz = -SUN_OFFSET.z / forwardLength;
+  const rightLength = Math.hypot(-fz, fx) || 1;
+  const rx = -fz / rightLength;
+  const rz = fx / rightLength;
+  const ux = -rz * fy;
+  const uz = rx * fy;
+  if (previous) {
+    const rightDelta = (x - previous.x) * rx + (z - previous.z) * rz;
+    const upDelta = (x - previous.x) * ux + (z - previous.z) * uz;
+    if (Math.abs(rightDelta) <= texel * 2 && Math.abs(upDelta) <= texel * 2) {
+      return previous;
+    }
+  }
+  const rightCoord = Math.round((x * rx + z * rz) / texel) * texel;
+  const upCoord = Math.round((x * ux + z * uz) / texel) * texel;
+  const determinant = rx * uz - rz * ux;
+  if (Math.abs(determinant) < 1e-9) return { x, z };
+  return {
+    x: (rightCoord * uz - rz * upCoord) / determinant,
+    z: (rx * upCoord - rightCoord * ux) / determinant,
+  };
+}
 
 export interface GameRendererOptions {
   stance: Stance;
@@ -56,6 +96,7 @@ export class GameRenderer {
   #shoeAnimator: ShoeAnimator | null = null;
   #ground: THREE.Mesh | null = null;
   #sun: THREE.DirectionalLight;
+  #shadowAnchor: { x: number; z: number } | null = null;
 
   #lastPose: RenderPose | null = null;
   #lastObs: ObserveState | null = null;
@@ -89,7 +130,7 @@ export class GameRenderer {
 
     // Exactly one directional sun (env provides the rest of the IBL).
     this.#sun = new THREE.DirectionalLight(0xfff2e0, 2.0);
-    this.#sun.position.set(6, 10, 4);
+    this.#sun.position.set(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
     this.#sun.castShadow = true;
     this.#sun.shadow.mapSize.set(2048, 2048);
     const sc = this.#sun.shadow.camera;
@@ -260,9 +301,23 @@ export class GameRenderer {
       wheel.node.rotateX(delta);
     }
 
-    // Keep the sun shadow frustum centred on the board (plaza-scale tightness).
-    this.#sun.target.position.set(pose.p.x, 0, pose.p.z);
-    this.#sun.position.set(pose.p.x + 6, 10, pose.p.z + 4);
+    // Keep the sun shadow frustum centred on the board, but translate its light-
+    // space projection only by whole shadow texels so the background stays still.
+    const shadowCamera = this.#sun.shadow.camera;
+    const anchor = stableShadowAnchor(
+      pose.p.x,
+      pose.p.z,
+      shadowCamera.right - shadowCamera.left,
+      this.#sun.shadow.mapSize.x,
+      this.#shadowAnchor ?? undefined,
+    );
+    this.#shadowAnchor = anchor;
+    this.#sun.target.position.set(anchor.x, 0, anchor.z);
+    this.#sun.position.set(
+      anchor.x + SUN_OFFSET.x,
+      SUN_OFFSET.y,
+      anchor.z + SUN_OFFSET.z,
+    );
 
     this.#shoeAnimator?.update(pose, obs, dt);
     this.#rig.update(pose, obs, dt);

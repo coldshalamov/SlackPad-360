@@ -86,6 +86,14 @@ public sealed class ContactFrameMeta
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ContactCountRaw { get; set; }
 
+    /// <summary>
+    /// Physical touch-surface width divided by height when the device reports
+    /// HID/HIMETRIC extents. Gameplay uses this to keep gesture distance and
+    /// direction isotropic across differently shaped trackpads.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? PhysicalAspectRatio { get; set; }
+
     /// <summary>Adapter identity tag: "raw" (P0-B) or "pointer" (P0-A).</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Adapter { get; set; }

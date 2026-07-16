@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-function maneuverImplementation(): string {
+function simWorldSource(): string {
   const path = fileURLToPath(new URL('../src/sim/SimWorld.ts', import.meta.url));
-  const source = readFileSync(path, 'utf8');
+  return readFileSync(path, 'utf8');
+}
+
+function maneuverImplementation(): string {
+  const source = simWorldSource();
   const start = source.indexOf('  applyManeuver(cmd: ManeuverCommand): void {');
   const end = source.indexOf('  interpolatedRenderPose(', start);
   expect(start).toBeGreaterThanOrEqual(0);
@@ -21,8 +25,9 @@ describe('physical maneuver implementation contract', () => {
   });
 
   it('applies the kick at a physical nose or tail point', () => {
-    const source = maneuverImplementation();
+    const source = simWorldSource();
     expect(source).toContain('.applyImpulseAtPoint(');
     expect(source).toContain('cmd.popSide');
+    expect(source).toContain('envelope.popSide');
   });
 });

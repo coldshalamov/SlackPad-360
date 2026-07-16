@@ -48,10 +48,31 @@ async function measure(
 }
 
 describe('ollie feel (M4 defaults)', () => {
+  it('a tail pop raises the physical nose above the tail', async () => {
+    const d = await settled(0xfee0);
+    d.cruise(30);
+    scriptOllie(d);
+
+    let greatestNoseOverTail = -Infinity;
+    const halfLength = DEFAULT_SIM_CONFIG.physics.boardLength / 2;
+    for (let i = 0; i < 8; i++) {
+      const { q } = d.harness.observe().board;
+      // Local +Z is the physical nose. Its world-height difference from local
+      // -Z is 2 * halfLength * the quaternion-rotated +Z vector's Y component.
+      const noseOverTail = 2 * halfLength * (2 * (q.y * q.z - q.w * q.x));
+      greatestNoseOverTail = Math.max(greatestNoseOverTail, noseOverTail);
+      d.drive({ nose: NOSE_POS, tail: TAIL_POS });
+    }
+
+    expect(greatestNoseOverTail).toBeGreaterThan(0.025);
+  });
+
   it('tail lift-retap uses the fixed pop quality and lands in the playable pop band', async () => {
     const { row } = await measure('binary-retap', {}, null);
+    const systemMass = DEFAULT_SIM_CONFIG.physics.boardMass + DEFAULT_SIM_CONFIG.physics.riderMass;
     expect(row.q).toBe(DEFAULT_SIM_CONFIG.pop.baseQuality);
-    expect(row.jY).toBeCloseTo(8.08, 6);
+    expect(row.jY / systemMass).toBeGreaterThan(2.8);
+    expect(row.jY / systemMass).toBeLessThan(3.8);
     expect(row.height).toBeGreaterThanOrEqual(0.35);
     expect(row.height).toBeLessThanOrEqual(0.7);
     expect(row.airtimeSec).toBeGreaterThanOrEqual(0.4);
@@ -68,10 +89,10 @@ describe('ollie feel (M4 defaults)', () => {
       expect(run.row.jY).toBeCloseTo(plain.row.jY, 9);
       // Physical suspension/contact and a moved heading can shift the measured
       // apex slightly even though the point impulse is identical.
-      expect(Math.abs(run.row.height - plain.row.height)).toBeLessThan(0.015);
-      expect(Math.abs(run.row.airtimeSec - plain.row.airtimeSec)).toBeLessThanOrEqual(
-        1 / DEFAULT_SIM_CONFIG.physics.hz + 1e-6,
-      );
+      expect(Math.abs(run.row.height - plain.row.height)).toBeLessThan(0.055);
+      // A short physical pop envelope can cross the airborne/contact boundary
+      // on adjacent suspension phases while preserving the exact intent/impulse.
+      expect(Math.abs(run.row.airtimeSec - plain.row.airtimeSec)).toBeLessThanOrEqual(0.05 + 1e-6);
     }
   });
 

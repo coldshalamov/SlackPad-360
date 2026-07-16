@@ -24,7 +24,7 @@ function horizontalSpeedInBoardFrame(world: SimWorld): { forward: number; latera
   };
 }
 
-describe('four-wheel ray contact physics', () => {
+describe('four-wheel swept contact physics', () => {
   it('settles upright on four distinct wheel contact points', async () => {
     const world = await settledWorld();
     const wheels = world.wheelObservations();
@@ -47,7 +47,12 @@ describe('four-wheel ray contact physics', () => {
 
   it('has no phantom support in the air and reacquires all wheels after a pop', async () => {
     const world = await settledWorld(0xa17);
-    world.applyManeuver({ kind: 'pop', jY: 7.2, pitchTorqueImpulse: 0 });
+    world.applyManeuver({
+      kind: 'pop',
+      jY: DEFAULT_SIM_CONFIG.pop.jMin
+        + DEFAULT_SIM_CONFIG.pop.baseQuality * (DEFAULT_SIM_CONFIG.pop.jMax - DEFAULT_SIM_CONFIG.pop.jMin),
+      pitchTorqueImpulse: 0,
+    });
 
     let sawAirborne = false;
     let reacquiredAllWheels = false;
@@ -67,7 +72,7 @@ describe('four-wheel ray contact physics', () => {
     world.free();
   });
 
-  it('ray wheels reacquire the raised grind-lab ledge instead of the floor below it', async () => {
+  it('swept wheels reacquire the raised grind-lab ledge instead of the floor below it', async () => {
     const world = new SimWorld(structuredClone(DEFAULT_SIM_CONFIG));
     await world.reset(0x1ed6e, 'grind-lab');
     for (let i = 0; i < SETTLE_STEPS; i++) world.step();
@@ -79,13 +84,18 @@ describe('four-wheel ray contact physics', () => {
         brakeForce: 0,
         pushImpulse: 0,
         targetYawRate: 0,
-        steerAngle: null,
+        steerAngle: 0,
         rollTorque: 0,
       });
       world.step();
     }
     expect(world.boardPose().p.z).toBeGreaterThan(6.2);
-    world.applyManeuver({ kind: 'pop', jY: 7.2, pitchTorqueImpulse: 0 });
+    world.applyManeuver({
+      kind: 'pop',
+      jY: DEFAULT_SIM_CONFIG.pop.jMin
+        + DEFAULT_SIM_CONFIG.pop.baseQuality * (DEFAULT_SIM_CONFIG.pop.jMax - DEFAULT_SIM_CONFIG.pop.jMin),
+      pitchTorqueImpulse: 0,
+    });
 
     let raisedContact = false;
     for (let i = 0; i < 180; i++) {
@@ -109,7 +119,12 @@ describe('four-wheel ray contact physics', () => {
 
     let sawSide = false;
     for (let i = 0; i < 120; i++) {
-      world.applyManeuver({ kind: 'flipTorque', axis: 'long', omegaTarget: 12, tauMax: 8 });
+      world.applyManeuver({
+        kind: 'flipTorque',
+        axis: 'long',
+        omegaTarget: 12,
+        tauMax: DEFAULT_SIM_CONFIG.flip.tauMax[2],
+      });
       world.step();
       const pose = world.boardPose();
       const deckUpY = 1 - 2 * (pose.q.x * pose.q.x + pose.q.z * pose.q.z);
@@ -161,7 +176,11 @@ describe('four-wheel ray contact physics', () => {
       'contactPoint',
       'id',
       'inContact',
+      'lateralSlip',
+      'longitudinalSlip',
+      'normalLoad',
       'rotation',
+      'suspensionCompression',
       'suspensionLength',
     ]);
     expect(first.every((wheel) => Number.isFinite(wheel.rotation))).toBe(true);
@@ -180,6 +199,9 @@ describe('four-wheel ray contact physics', () => {
     }
     const rolling = world.wheelObservations();
     expect(rolling.some((wheel, i) => Math.abs(wheel.rotation - first[i]!.rotation) > 0.1)).toBe(true);
+    // This model has massless pure-rolling wheels, not independent wheel
+    // inertia. Do not mislabel forward travel speed as longitudinal slip.
+    expect(rolling.every((wheel) => wheel.longitudinalSlip === 0)).toBe(true);
     world.free();
   });
 });

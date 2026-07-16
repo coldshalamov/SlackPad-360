@@ -37,6 +37,8 @@ export interface ContactFrameButtons {
 export interface ContactFrameMeta {
   deviceId?: string;
   contactCountRaw?: number;
+  /** Physical touch-surface width / height, when the hardware exposes it. */
+  physicalAspectRatio?: number;
   [key: string]: unknown;
 }
 
@@ -138,6 +140,20 @@ export function validateContactFrame(value: unknown): ContactFrameValidationResu
   } else {
     for (const key of ['primary', 'secondary', 'auxiliary'] as const) {
       if (typeof buttons[key] !== 'boolean') errors.push(`buttons.${key} must be boolean`);
+    }
+  }
+
+  if (f.meta !== undefined) {
+    if (typeof f.meta !== 'object' || f.meta === null || Array.isArray(f.meta)) {
+      errors.push('meta must be an object');
+    } else {
+      const meta = f.meta as Record<string, unknown>;
+      if (meta.physicalAspectRatio !== undefined
+        && (!isFiniteNumber(meta.physicalAspectRatio)
+          || meta.physicalAspectRatio < 0.25
+          || meta.physicalAspectRatio > 4)) {
+        errors.push('meta.physicalAspectRatio must be in [0.25,4]');
+      }
     }
   }
 

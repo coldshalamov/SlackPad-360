@@ -22,14 +22,15 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
         public int XLogicalMax = 1;
         public int YLogicalMin;
         public int YLogicalMax = 1;
+        public double? PhysicalAspectRatio;
         public string DeviceId = "";
         public bool SawConfidenceUsage; // learned at runtime to distinguish palm from no-confidence-format
+        public readonly HidReportAssembler Assembler = new();
     }
 
     private readonly Dictionary<IntPtr, DeviceInfo> _devices = new();
-    private readonly HidReportAssembler _assembler = new();
+    private readonly RawInputContactFrameFactory _frameFactory = new();
     private IntPtr _hwnd;
-    private long _frameId;
 
     public string AdapterTag => "raw";
     public string SessionTag => "P0-B";
@@ -133,6 +134,7 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
 
             for (int r = 0; r < rawHid.Count; r++)
             {
+                double observedPerfMs = PerfClock.NowMs();
                 int reportLen = (int)rawHid.SizeHid;
                 byte[] report = new byte[reportLen];
                 Marshal.Copy(dataPtr + r * reportLen, report, 0, reportLen);
@@ -142,9 +144,9 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
                     continue;
                 }
 
-                foreach (var logical in _assembler.Process(parsed))
+                foreach (var logical in dev.Assembler.Process(parsed))
                 {
-                    Emit(dev, logical);
+                    Emit(dev, logical, observedPerfMs);
                 }
             }
         }
@@ -266,40 +268,13 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
         return Math.Clamp(n, 0.0, 1.0);
     }
 
-    private void Emit(DeviceInfo dev, LogicalContactFrame logical)
+    private void Emit(DeviceInfo dev, LogicalContactFrame logical, double observedPerfMs)
     {
-        var contacts = new List<Contact>(Math.Min(logical.Contacts.Count, 5));
-        foreach (var c in logical.Contacts)
-        {
-            if (contacts.Count >= 5)
-            {
-                break; // schema max; ignore extras (§4: >2 contacts -> keep gameplay feet)
-            }
-            contacts.Add(new Contact
-            {
-                Id = c.Id,
-                Tip = c.Tip,
-                X = c.X,
-                Y = c.Y,
-                Confidence = c.Confidence,
-            });
-        }
-
-        var frame = new ContactFrame
-        {
-            FrameId = _frameId++,
-            TPerfMs = PerfClock.NowMs(),
-            TScanUs = logical.ScanTime * 100, // PTP Scan Time unit is 100 microseconds
-            Source = "hardware",
-            Contacts = contacts,
-            Buttons = new ContactFrameButtons { Primary = logical.Primary },
-            Meta = new ContactFrameMeta
-            {
-                DeviceId = dev.DeviceId,
-                ContactCountRaw = logical.ContactCountRaw,
-                Adapter = "raw",
-            },
-        };
+        ContactFrame frame = _frameFactory.Build(
+            dev.DeviceId,
+            logical,
+            observedPerfMs,
+            dev.PhysicalAspectRatio);
 
         DeviceId = dev.DeviceId;
         FrameReady?.Invoke(frame);
@@ -347,7 +322,14 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
 
         var info = new DeviceInfo { Preparsed = preparsed };
 
-        // Value caps -> X/Y logical ranges + finger collections' X caps.
+        // Value caps -> logical ranges plus physical trackpad aspect. Keeping
+        // X/Y as schema-normalized [0,1] while carrying the physical ratio in
+        // metadata lets gameplay undo unit-square distortion without changing
+        // the replay/input contract.
+        double? xPhysicalSpan = null;
+        double? yPhysicalSpan = null;
+        uint? xUnits = null;
+        uint? yUnits = null;
         if (caps.NumberInputValueCaps > 0)
         {
             ushort valueCapsLen = caps.NumberInputValueCaps;
@@ -362,13 +344,25 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
                     {
                         info.XLogicalMin = vc.LogicalMin;
                         info.XLogicalMax = vc.LogicalMax != 0 ? vc.LogicalMax : info.XLogicalMax;
+                        xPhysicalSpan ??= PhysicalSpan(vc);
+                        xUnits ??= vc.Units;
                     }
                     else if (vc.UsagePage == HidNative.UsagePageGenericDesktop && vc.Usage == HidNative.UsageY)
                     {
                         info.YLogicalMin = vc.LogicalMin;
                         info.YLogicalMax = vc.LogicalMax != 0 ? vc.LogicalMax : info.YLogicalMax;
+                        yPhysicalSpan ??= PhysicalSpan(vc);
+                        yUnits ??= vc.Units;
                     }
                 }
+            }
+        }
+        if (xPhysicalSpan is > 0 && yPhysicalSpan is > 0 && xUnits == yUnits)
+        {
+            double aspect = xPhysicalSpan.Value / yPhysicalSpan.Value;
+            if (double.IsFinite(aspect) && aspect is >= 0.25 and <= 4.0)
+            {
+                info.PhysicalAspectRatio = aspect;
             }
         }
 
@@ -394,6 +388,24 @@ internal sealed class TouchpadRawInputAdapter : IContactAdapter
         info.DeviceId = ReadDeviceName(hDevice);
 
         return info;
+    }
+
+    private static double? PhysicalSpan(HidpValueCaps cap)
+    {
+        long rawSpan = Math.Abs((long)cap.PhysicalMax - cap.PhysicalMin);
+        if (rawSpan == 0)
+        {
+            return null;
+        }
+
+        // HID unit exponent is a signed four-bit decimal exponent.
+        int exponent = (int)(cap.UnitsExp & 0x0F);
+        if (exponent > 7)
+        {
+            exponent -= 16;
+        }
+        double span = rawSpan * Math.Pow(10, exponent);
+        return double.IsFinite(span) && span > 0 ? span : null;
     }
 
     private static string ReadDeviceName(IntPtr hDevice)

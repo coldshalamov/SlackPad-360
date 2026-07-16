@@ -40,6 +40,8 @@ export type TelemetryEvent =
       label: string;
       cleanliness: 'clean' | 'dirty';
       thetaDeg: number;
+      headingErrorDeg: number;
+      impactSpeed: number;
       // M5: signed measured rotation at land (feeds the M9 scorer).
       flipRotations?: number;
       shuvDegrees?: number;

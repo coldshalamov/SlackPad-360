@@ -18,8 +18,9 @@ development fixture, not a substitute for independent trackpad contacts.
 - The line between the two contacts is the absolute heading target. Rotating the
   pair 90 degrees targets a 90-degree board turn; translating both contacts
   together does not steer, and holding the angle holds heading.
-- Ctrl is the only acceleration input. Release it for predictable physical
-  wheel braking; finger motion by itself never creates phantom speed.
+- Ctrl is the only acceleration input. Holding it repeats eased push strokes
+  with a short coast gap; releasing it coasts on wheel/bearing resistance.
+  Finger motion by itself never creates phantom speed.
 - Lift the tail finger briefly and tap it back near its previous position for an
   ollie. Lift and retap the nose finger for a nollie. The other finger stays
   planted, initial contact is never a pop, and a distant or slow replant is
@@ -35,13 +36,16 @@ development fixture, not a substitute for independent trackpad contacts.
 All presets share that grammar. **Classic** is the default; **Streamlined** adds
 recognition tolerance, stabilization, catch help, and landing forgiveness, while
 **Experienced** minimizes those aids. Presets change explicit parameter bundles,
-not hidden gestures.
+not hidden gestures. Flick sensitivity is independently adjustable in Flick-It
+Lab so different physical trackpads can reach the same gesture grammar without
+changing trick semantics.
 
 ## Technical direction
 
 - Three.js, TypeScript, and Vite render the locally hosted WebView2 game.
 - Rapier supplies rigid bodies, collision queries, and contact resolution.
-- A 60 Hz fixed simulation uses a skateboard-specific four-wheel/truck contact
+- A 60 Hz fixed gameplay clock runs two deterministic Rapier substeps (120 Hz
+  contact integration) with CCD and a skateboard-specific four-wheel/truck
   solver. Wheel load, suspension, grip, board lean, speed, and truck geometry
   produce support and carving; the old car-oriented vehicle controller is gone.
 - The dynamic body uses board geometry plus an effective rider mass/inertia
@@ -59,7 +63,9 @@ not hidden gestures.
 
 Press `F8` in the native build to open the Flick-It Lab. It records raw contact
 frames, lift/retap events, raw button truth, calibrated feet, recognizer phases, `TrickIntentV1`,
-rigid-body/contact and camera state, outcomes, and input/simulation/render timing
+ControlTrace V3 body mass/inertia, per-wheel load/compression/slip, assists,
+camera state, landing line error, normal impact speed, outcomes, and
+input/simulation/render timing
 on one timeline. Attempts can be labeled, replayed, compared, and exported to
 `Documents\SlackPad 360\traces`; the report accumulates recognition confusions.
 

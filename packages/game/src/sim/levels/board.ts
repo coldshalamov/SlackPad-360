@@ -10,10 +10,10 @@
  *
  * M4: the board collider emits CONTACT_FORCE_EVENTS so SimWorld can
  * observe hard-collision magnitudes for the maneuver interrupt rule
- * (final-physics §3.3). The report threshold is set to HALF the configured
- * interrupt threshold — the exact comparison happens in GestureFSM against
- * `physics.interruptCollisionImpulse`; the collider threshold only keeps the
- * event queue small. Purely observational: dynamics are unchanged.
+ * (final-physics §3.3). The report threshold is deliberately lower than the
+ * interrupt threshold: SimWorld classifies reported force into support and
+ * off-axis impact channels before GestureFSM makes the actual decision.
+ * Purely observational: dynamics are unchanged.
  */
 
 import type { RigidBody, World } from '@dimforge/rapier3d-deterministic-compat';
@@ -23,6 +23,7 @@ import {
   TRUCK_HANGER_COLLISION_GROUPS,
 } from '../collisionGroups';
 import type { RapierModule, Rng } from './types';
+import { positiveSubstepCount } from '../simRates';
 
 export interface BoardSpawn {
   x: number;
@@ -43,26 +44,29 @@ export function buildBoard(
   const jx = (rng() * 2 - 1) * j;
   const jy = (rng() * 2 - 1) * j;
   const jz = (rng() * 2 - 1) * j;
-  const avx = (rng() * 2 - 1) * j;
-  const avy = (rng() * 2 - 1) * j;
-  const avz = (rng() * 2 - 1) * j;
-
   const spawn: BoardSpawn = { x: jx, y: phys.spawnHeight + jy, z: jz };
 
   const bodyDesc = rapier.RigidBodyDesc.dynamic()
     .setTranslation(spawn.x, spawn.y, spawn.z)
-    .setAngvel({ x: avx, y: avy, z: avz })
+    // A reset is a neutral riding state, not an unseen shove. Random angular
+    // velocity made the board slowly yaw/roll before the player touched it and
+    // could move a straight approach completely off a narrow ledge.
+    .setAngvel({ x: 0, y: 0, z: 0 })
     .setLinearDamping(phys.linearDamping)
-    .setAngularDamping(phys.angularDamping);
+    .setAngularDamping(phys.angularDamping)
+    .setCcdEnabled(true)
+    .setAdditionalSolverIterations(4);
   const board = world.createRigidBody(bodyDesc);
 
   // Contact-force report threshold, N: impulse (N·s) → force at one fixed step.
-  const forceThreshold = 0.5 * phys.interruptCollisionImpulse * phys.hz;
+  const forceThreshold =
+    phys.contactReportImpulse * phys.hz * positiveSubstepCount(phys.physicsSubsteps);
 
-  // Deck cuboid (long axis local +Z, width local X) carries the mass.
+  // One stable simcade body carries the deck plus invisible rider/load proxy.
+  // The renderer still shows only the board and two authored shoe sockets.
   world.createCollider(
     rapier.ColliderDesc.cuboid(phys.boardWidth / 2, phys.deckThickness / 2, phys.boardLength / 2)
-      .setMass(phys.boardMass)
+      .setMass(phys.boardMass + phys.riderMass)
       .setFriction(phys.boardFriction)
       .setRestitution(phys.boardRestitution)
       .setCollisionGroups(DECK_COLLISION_GROUPS)

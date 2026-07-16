@@ -125,6 +125,19 @@ export class PadDriver {
   }
 }
 
+/** Ctrl-drive to a world-Z approach marker without coupling fixtures to cadence tuning. */
+export function cruiseUntilZ(d: PadDriver, targetZ: number, maxSteps = 600): number {
+  let steps = 0;
+  while (d.harness.observe().board.p.z < targetZ && steps < maxSteps) {
+    d.cruise(1);
+    steps += 1;
+  }
+  if (d.harness.observe().board.p.z < targetZ) {
+    throw new Error(`cruiseUntilZ did not reach ${targetZ} m within ${maxSteps} steps`);
+  }
+  return steps;
+}
+
 /** Reset + settle onto the ground (phase 'ground', rest pose fresh). */
 export async function settled(seed: number, levelId = 'flat-dev', harness?: AgentHarness): Promise<PadDriver> {
   const h = harness ?? new AgentHarness();

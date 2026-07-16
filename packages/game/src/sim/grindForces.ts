@@ -69,7 +69,10 @@ export function grindLatchImpulse(
   const nz = p.perp.z / pLen;
 
   const lin: Vec3 = { x: 0, y: 0, z: 0 };
-  const springGain = clampNum(p.springGain, 0, 1000);
+  // Clamp to the strongest configured assist instead of a stale pre-loaded-
+  // mass ceiling. L1 and L2 are intentionally distinct tuning levels.
+  const maxConfiguredSpring = Math.max(0, ...g.latchLateralSpring);
+  const springGain = clampNum(p.springGain, 0, maxConfiguredSpring);
 
   // Positional forces apply ONLY on a committed latch — never on the approach
   // snap (no positional magnetism before commit).

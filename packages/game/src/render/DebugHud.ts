@@ -244,7 +244,9 @@ export class DebugHud {
 
   #onEvent(e: { type: string; [k: string]: unknown }): void {
     if (e.type === 'trickCompleted') {
-      this.#lastTrick = `${String(e.label)} (${String(e.cleanliness)}, θ=${Number(e.thetaDeg).toFixed(0)}°)`;
+      const heading = typeof e.headingErrorDeg === 'number' ? e.headingErrorDeg.toFixed(0) : '—';
+      const impact = typeof e.impactSpeed === 'number' ? e.impactSpeed.toFixed(1) : '—';
+      this.#lastTrick = `${String(e.label)} (${String(e.cleanliness)}, θ=${Number(e.thetaDeg).toFixed(0)}°, line=${heading}°, hit=${impact}m/s)`;
     } else if (e.type === 'bail') {
       this.#lastBailReason = String(e.reason);
       this.#lastTrick = `bail: ${this.#lastBailReason}`;

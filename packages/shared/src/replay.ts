@@ -1,6 +1,6 @@
 import type { ContactFrame } from './contactFrame';
 import type { InputProfile } from './config';
-import type { ControlTraceV2 } from './controlTrace';
+import type { ControlTrace } from './controlTrace';
 
 /**
  * Replay format v1. Body is the ordered ContactFrame stream plus periodic
@@ -35,7 +35,7 @@ export interface SessionTrace {
   frames: Array<{ step: number; frame: ContactFrame }>;
   checkpoints: ReplayCheckpoint[];
   /** Rich input/intent/body timeline; replay authority remains `frames`. */
-  controlTrace?: ControlTraceV2;
+  controlTrace?: ControlTrace;
 }
 
 /** Stable 32-bit FNV-1a over a string, hex-encoded. Deterministic across runs. */

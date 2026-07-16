@@ -9,13 +9,13 @@
  *     grind path, not misread as a shuv.
  */
 import { describe, expect, it } from 'vitest';
-import { NOSE_POS, TAIL_POS, settledProfiled, scriptOllie, eventsOf } from './helpers/maneuver';
+import { cruiseUntilZ, NOSE_POS, TAIL_POS, settledProfiled, scriptOllie, eventsOf } from './helpers/maneuver';
 
 /** Drive cruise + ollie onto the grind-lab ledge and stop once latched. */
 async function enterGrind() {
   const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
   const h = d.harness;
-  d.cruise(70);
+  cruiseUntilZ(d, 5.15);
   scriptOllie(d, {});
   for (let i = 0; i < 60; i++) {
     d.drive({ nose: NOSE_POS, tail: TAIL_POS });
@@ -60,7 +60,7 @@ describe('grind phase-exclusive (§3.1)', () => {
     // and no shuv/flip should be recognised once the candidate is live.
     const d = await settledProfiled(12345, { levelId: 'grind-lab', assistLevel: 1 });
     const h = d.harness;
-    d.cruise(70);
+    cruiseUntilZ(d, 5.75);
     scriptOllie(d, {});
     let latched = false;
     for (let i = 0; i < 60; i++) {

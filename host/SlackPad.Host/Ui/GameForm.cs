@@ -34,6 +34,7 @@ internal sealed class GameForm : Form
     // click/Ctrl/F11 keys (GetAsyncKeyState is a poll, not a message).
     private readonly System.Windows.Forms.Timer _batchTimer = new() { Interval = 8 };
     private readonly HostButtonFramePump _buttonPump = new();
+    private bool _inputActive;
 
     private readonly bool _devTools;
     private Label _messageLabel = null!;
@@ -166,11 +167,24 @@ internal sealed class GameForm : Form
 
     private void OnFrame(ContactFrame frame)
     {
+        // RIDEV_INPUTSINK intentionally delivers WM_INPUT while this form is in
+        // the background. Those reports are observability noise, not gameplay.
+        if (!_inputActive)
+        {
+            return;
+        }
         _buttonPump.Enqueue(frame);
     }
 
     private void OnTick(object? sender, EventArgs e)
     {
+        // Do not poll or drain global button state while inactive. Activation
+        // explicitly consumes that epoch before foreground streaming resumes.
+        if (!_inputActive)
+        {
+            return;
+        }
+
         // F11 → fullscreen, rising-edge + only when we are the foreground window
         // (GetAsyncKeyState is global, so gate it or a background F11 flips us).
         bool f11 = Win32.IsKeyDown(Win32.VK_F11);
@@ -290,14 +304,32 @@ internal sealed class GameForm : Form
 
     protected override void OnActivated(EventArgs e)
     {
+        // Keep both adapter callbacks and the timer closed while base handlers
+        // run, then consume/reset the complete native input epoch before the
+        // page is told it may accept hardware again.
+        _inputActive = false;
         base.OnActivated(e);
+        short lmbState = Win32.GetAsyncKeyState(Win32.VK_LBUTTON);
+        short rmbState = Win32.GetAsyncKeyState(Win32.VK_RBUTTON);
+        short ctrlState = Win32.GetAsyncKeyState(Win32.VK_CONTROL);
+        _buttonPump.ResetForFocusGain(new HostButtonSample(
+            Win32.IsKeyDown(lmbState),
+            Win32.IsKeyDown(rmbState),
+            Win32.WasPressedSinceLastRead(lmbState),
+            Win32.WasPressedSinceLastRead(rmbState),
+            Win32.IsKeyDown(ctrlState)));
+        _f11WasDown = Win32.IsKeyDown(Win32.VK_F11);
+        _inputActive = true;
         _bridge.PostFocus(true);
     }
 
     protected override void OnDeactivate(EventArgs e)
     {
-        base.OnDeactivate(e);
+        // Close the INPUTSINK path before any event handler can re-enter the UI
+        // loop, then forget everything retained from the foreground epoch.
+        _inputActive = false;
         _buttonPump.ResetForFocusLoss();
+        base.OnDeactivate(e);
         _bridge.PostFocus(false);
     }
 

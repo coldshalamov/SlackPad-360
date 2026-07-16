@@ -119,6 +119,17 @@ describe('FootTracker rebind + lift', () => {
 });
 
 describe('FootTracker robustness', () => {
+  it('uses hardware physical aspect so equal real distances stay isotropic across pad shapes', () => {
+    const t = tracker();
+    const widePad = frame(0, [c(1, 0.45, 0.5), c(2, 0.55, 0.5)]);
+    widePad.meta = { physicalAspectRatio: 2 };
+
+    const s = t.update([widePad], 0);
+
+    expect(Math.abs(s.nose.pos.x - s.tail.pos.x)).toBeCloseTo(0.2, 6);
+    expect(s.segment.angle).toBeCloseTo(0, 6);
+  });
+
   it('preserves every calibrated hardware sample drained in one physics step', () => {
     const t = tracker();
     t.update(

@@ -58,7 +58,13 @@
  * no wall clock, no Math.random.
  */
 
-import type { SimConfig, Stance } from '@slackpad/shared';
+import {
+  DEFAULT_FLICK_SENSITIVITY,
+  FLICK_SENSITIVITY_MAX,
+  FLICK_SENSITIVITY_MIN,
+  type SimConfig,
+  type Stance,
+} from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { Vec2 } from '../input/FootTracker';
 
@@ -109,6 +115,14 @@ function wrapPi(a: number): number {
   return x;
 }
 
+/**
+ * A near-180° velocity discontinuity is a finger reversing along the same
+ * line, not evidence that its path curved around the board. Genuine scripted
+ * and human shuv sweeps build their turn across multiple smaller segments.
+ */
+const MAX_SWEEP_SEGMENT_TURN_RAD = Math.PI * 0.75;
+const MIN_SWEEP_TURN_SEGMENTS = 2;
+
 /** Label from the trick axis + signed rotation (the one shared naming rule). */
 export function labelFor(kind: AirGestureKind, sign: number): AirGestureLabel {
   if (kind === 'flip') return sign >= 0 ? 'kickflip' : 'heelflip';
@@ -124,18 +138,28 @@ export class AirGestureClassifier {
   #peakLat = 0;
   #peakLong = 0;
   #yawArc = 0;
+  #sweepTurnSegments = 0;
   #prevDir: number | null = null;
   #activeFoot: 'nose' | 'tail' | null = null;
   #movingSamples = 0;
 
   private readonly regular: boolean;
+  private readonly sensitivity: number;
 
   constructor(
     private readonly config: SimConfig,
     stance: Stance,
     private readonly telemetry?: Telemetry,
+    flickSensitivity = DEFAULT_FLICK_SENSITIVITY,
   ) {
     this.regular = stance === 'regular';
+    const finiteSensitivity = Number.isFinite(flickSensitivity)
+      ? flickSensitivity
+      : DEFAULT_FLICK_SENSITIVITY;
+    this.sensitivity = Math.max(
+      FLICK_SENSITIVITY_MIN,
+      Math.min(FLICK_SENSITIVITY_MAX, finiteSensitivity),
+    );
   }
 
   /** Fresh maneuver: clear the open label and all evidence. */
@@ -146,6 +170,7 @@ export class AirGestureClassifier {
     this.#peakLat = 0;
     this.#peakLong = 0;
     this.#yawArc = 0;
+    this.#sweepTurnSegments = 0;
     this.#prevDir = null;
     this.#activeFoot = null;
     this.#movingSamples = 0;
@@ -183,7 +208,15 @@ export class AirGestureClassifier {
     }
     if (!active) return this.open; // no planted foot to read — hold current state
 
-    const { vLong, vLat } = this.decompose(active.vel);
+    // Sensitivity is deliberately local to trick recognition. It scales the
+    // player's post-pop motion evidence (speed, travel, and sweep arc) without
+    // touching BoardController or the board's physical propulsion.
+    const gestureVel = {
+      x: active.vel.x * this.sensitivity,
+      y: active.vel.y * this.sensitivity,
+    };
+    const gestureSpeed = active.speed * this.sensitivity;
+    const { vLong, vLat } = this.decompose(gestureVel);
     if (this.#activeFoot !== active.foot) {
       this.#prevDir = null; // foot switched — don't accumulate a bogus turn
       this.#activeFoot = active.foot;
@@ -195,10 +228,16 @@ export class AirGestureClassifier {
     // Turning of the velocity direction (arc evidence for sweep). Only integrate
     // when actually moving, so a near-still foot's noisy direction is ignored.
     const rec = this.config.recognition;
-    if (active.speed > rec.flickSpeedMin * 0.25) {
+    if (gestureSpeed > rec.flickSpeedMin * 0.25) {
       this.#movingSamples += 1;
-      const dir = Math.atan2(active.vel.y, active.vel.x);
-      if (this.#prevDir !== null) this.#yawArc += wrapPi(dir - this.#prevDir);
+      const dir = Math.atan2(gestureVel.y, gestureVel.x);
+      if (this.#prevDir !== null) {
+        const turn = wrapPi(dir - this.#prevDir);
+        if (Math.abs(turn) <= MAX_SWEEP_SEGMENT_TURN_RAD) {
+          this.#yawArc += turn * this.sensitivity;
+          if (Math.abs(turn) > 1e-3) this.#sweepTurnSegments += 1;
+        }
+      }
       this.#prevDir = dir;
     }
 
@@ -217,7 +256,9 @@ export class AirGestureClassifier {
       this.#peakLat >= rec.flickSpeedMin &&
       this.#peakLat >= flip.axisDominanceRatio * this.#peakLong &&
       Math.abs(this.#latDisp) >= flip.flickPathMinLen;
-    const sweepGate = Math.abs(this.#yawArc) >= rec.sweepMinAngleRad;
+    const sweepGate =
+      this.#sweepTurnSegments >= MIN_SWEEP_TURN_SEGMENTS &&
+      Math.abs(this.#yawArc) >= rec.sweepMinAngleRad;
     if (!flickGate && !sweepGate) return null;
 
     // Dominant-axis resolution (spec §3.1): compare threshold-normalized scores.

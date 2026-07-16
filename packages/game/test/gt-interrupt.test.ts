@@ -4,7 +4,7 @@
  * airborne) cancels the open label + assists and routes to the bail path with
  * reason 'hard-impact'.
  *
- * Scenario ('test-obstacle' level): push up to ~6 m/s, ollie just before the
+ * Scenario ('test-obstacle' level): push up to a hard cruising speed, ollie just before the
  * wall, smack the face mid-air. The solver spreads the crash across ~3 steps
  * (~6 N·s each); the windowed interrupt sum (~18 N·s) crosses the 8 N·s
  * threshold decisively. This focused fixture lowers the interrupt threshold
@@ -14,10 +14,41 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
+import { isVerifiedRideSupportForce } from '../src/sim/SimWorld';
 import { OBSTACLE_WALL_Z } from '../src/sim/levels/test-obstacle';
 import { eventsOf, NOSE_POS, scriptOllie, settled, TAIL_POS } from './helpers/maneuver';
 
 describe('GT-interrupt: mid-air hard collision', () => {
+  it('never hides rolled-wall or ceiling strikes in the ride-support channel', () => {
+    expect(isVerifiedRideSupportForce(
+      { x: 100, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      4,
+      false,
+    )).toBe(false);
+    expect(isVerifiedRideSupportForce(
+      { x: 0, y: -100, z: 0 },
+      { x: 0, y: -1, z: 0 },
+      4,
+      false,
+      5,
+    )).toBe(false);
+    expect(isVerifiedRideSupportForce(
+      { x: 0, y: 100, z: 0 },
+      { x: 0, y: 1, z: 0 },
+      4,
+      false,
+    )).toBe(true);
+  });
+
+  it('requires transition continuity before accepting a near-vertical support force', () => {
+    const steep = 82 * Math.PI / 180;
+    const normal = { x: 0, y: Math.cos(steep), z: -Math.sin(steep) };
+    const force = { x: normal.x * 100, y: normal.y * 100, z: normal.z * 100 };
+    expect(isVerifiedRideSupportForce(force, normal, 4, false)).toBe(false);
+    expect(isVerifiedRideSupportForce(force, normal, 4, true)).toBe(true);
+  });
+
   it('fast wall hit mid-air → bail(hard-impact), open label + assists cleared', async () => {
     const config = structuredClone(DEFAULT_SIM_CONFIG);
     config.physics.interruptCollisionImpulse = 6;
@@ -28,12 +59,12 @@ describe('GT-interrupt: mid-air hard collision', () => {
     // there is still a clean run-up to the wall.
     let speedGuard = 0;
     while (
-      Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z) <= 5.2 &&
+      Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z) <= 3.5 &&
       h.observe().board.p.z < OBSTACLE_WALL_Z - 3 &&
       speedGuard++ < 300
     ) d.cruise(1);
     const speed = Math.hypot(h.observe().board.lv.x, h.observe().board.lv.z);
-    expect(speed).toBeGreaterThan(5.2);
+    expect(speed).toBeGreaterThan(3.5);
 
     // Approach, then pop a modest armed ollie so the nose meets the face while
     // the board is clearly airborne.

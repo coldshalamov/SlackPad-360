@@ -1,5 +1,5 @@
 /**
- * GT-land (M4) — landing cones (final-physics §3.2): board-up vs world-up θ
+ * GT-land (M4) — landing cones: board-up vs live wheel-support plane θ
  * classifies clean (≤25°) / dirty (≤70°, speed scrub) / bail (beyond, or
  * inverted deck). Binary click pop strength is fixed, so cone entry is
  * engineered by scaling pop pitch torque via config overrides (never a pose
@@ -36,9 +36,62 @@ async function popAndLand(
 
 const CLICK = {};
 
+function directLanding(
+  q: { x: number; y: number; z: number; w: number },
+  approachVelocity: { x: number; y: number; z: number },
+) {
+  const feet: FeetState = {
+    nose: {
+      role: 'nose', planted: true, pos: { x: 0.6, y: 0.5 }, vel: { x: 0, y: 0 },
+      offsetFromRest: { x: 0, y: 0 }, contactId: 1,
+    },
+    tail: {
+      role: 'tail', planted: true, pos: { x: 0.4, y: 0.5 }, vel: { x: 0, y: 0 },
+      offsetFromRest: { x: 0, y: 0 }, contactId: 2,
+    },
+    segment: {
+      valid: true, angle: 0, angleFromRest: 0, angVel: 0,
+      midpoint: { x: 0.5, y: 0.5 }, midpointOffsetFromRest: { x: 0, y: 0 },
+      midpointVel: { x: 0, y: 0 }, lengthRatio: 1,
+    },
+    bothPlanted: true,
+    plantCount: 2,
+  };
+  const pose = {
+    p: { x: 0, y: 0.3, z: 0 },
+    q,
+    lv: approachVelocity,
+    av: { x: 0, y: 0, z: 0 },
+  };
+  const input = (step: number, patch: Partial<FsmInputs> = {}): FsmInputs => ({
+    feet,
+    pops: [],
+    grounded: false,
+    pose,
+    contactImpulse: 0,
+    supportContactImpulse: 0,
+    railProximity: null,
+    step,
+    ...patch,
+  });
+  const fsm = new GestureFSM(DEFAULT_SIM_CONFIG, 1, 'regular');
+  fsm.update(input(0, { grounded: true }));
+  fsm.update(input(1, {
+    grounded: true,
+    pops: [{ step: 1, label: 'ollie', q: DEFAULT_SIM_CONFIG.pop.baseQuality }],
+  }));
+  fsm.update(input(2));
+  return fsm.update(input(3, {
+    grounded: true,
+    contactImpulse: 1,
+    supportContactImpulse: 1,
+    supportNormal: { x: 0, y: 1, z: 0 },
+  }));
+}
+
 function dirtyPitchConfig(scrub = DEFAULT_SIM_CONFIG.land.dirtySpeedScrub): SimConfig {
   return configWith((c) => {
-    (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.12;
+    (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.07;
     (c.pop as { levelKp: number }).levelKp = 0;
     (c.pop as { levelKd: number }).levelKd = 0;
     (c.land as { dirtySpeedScrub: number }).dirtySpeedScrub = scrub;
@@ -46,11 +99,13 @@ function dirtyPitchConfig(scrub = DEFAULT_SIM_CONFIG.land.dirtySpeedScrub): SimC
 }
 
 describe('GT-land: landing cones', () => {
-  it('small pop lands CLEAN: θ ≤ thetaCleanDeg, phase ground, no fail reason', async () => {
+  it('small pop lands CLEAN inside the active assist cone, phase ground, no fail reason', async () => {
     const { h, flight } = await popAndLand(0x1a2d1, undefined, CLICK);
     expect(flight.outcome).toBe('clean');
     expect(flight.thetaDeg).not.toBeNull();
-    expect(flight.thetaDeg!).toBeLessThanOrEqual(DEFAULT_SIM_CONFIG.land.thetaCleanDeg);
+    const cleanLimit = DEFAULT_SIM_CONFIG.land.thetaCleanDeg
+      + DEFAULT_SIM_CONFIG.land.cleanAssistBonusDeg[1];
+    expect(flight.thetaDeg!).toBeLessThanOrEqual(cleanLimit);
     expect(h.observe().phase).toBe('ground');
     expect(h.observe().lastFailReason).toBeNull();
     // trickCompleted telemetry carries the label for the future scorer (M9).
@@ -80,7 +135,7 @@ describe('GT-land: landing cones', () => {
 
   it('a landing outside the configured dirty cone BAILS with reason over-rotation', async () => {
     const cfg = configWith((c) => {
-      (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.12;
+      (c.pop as { pitchTorqueScale: number }).pitchTorqueScale = 0.07;
       (c.pop as { levelKp: number }).levelKp = 0;
       (c.pop as { levelKd: number }).levelKd = 0;
       // Collapse the dirty cone onto the clean cone. The same click landing
@@ -151,5 +206,95 @@ describe('GT-land: landing cones', () => {
     expect(result.phase).toBe('bail');
     expect(result.lastFailReason).toBe('inverted');
     expect(result.events).toContainEqual({ kind: 'bail', reason: 'inverted' });
+  });
+
+  it('judges a steep transition landing against the wheel-support plane', () => {
+    const feet: FeetState = {
+      nose: {
+        role: 'nose', planted: true, pos: { x: 0.6, y: 0.5 }, vel: { x: 0, y: 0 },
+        offsetFromRest: { x: 0, y: 0 }, contactId: 1,
+      },
+      tail: {
+        role: 'tail', planted: true, pos: { x: 0.4, y: 0.5 }, vel: { x: 0, y: 0 },
+        offsetFromRest: { x: 0, y: 0 }, contactId: 2,
+      },
+      segment: {
+        valid: true, angle: 0, angleFromRest: 0, angVel: 0,
+        midpoint: { x: 0.5, y: 0.5 }, midpointOffsetFromRest: { x: 0, y: 0 },
+        midpointVel: { x: 0, y: 0 }, lengthRatio: 1,
+      },
+      bothPlanted: true,
+      plantCount: 2,
+    };
+    const angle = 80 * Math.PI / 180;
+    const supportNormal = { x: 0, y: Math.cos(angle), z: Math.sin(angle) };
+    const alignedPose = {
+      p: { x: 0, y: 0.3, z: 0 },
+      q: { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) },
+      lv: { x: 0, y: -1, z: 2 },
+      av: { x: 0, y: 0, z: 0 },
+    };
+    const input = (step: number, patch: Partial<FsmInputs> = {}): FsmInputs => ({
+      feet,
+      pops: [],
+      grounded: false,
+      pose: { ...alignedPose, q: { x: 0, y: 0, z: 0, w: 1 } },
+      contactImpulse: 0,
+      supportContactImpulse: 0,
+      railProximity: null,
+      step,
+      ...patch,
+    });
+    const fsm = new GestureFSM(DEFAULT_SIM_CONFIG, 1, 'regular');
+    fsm.update(input(0, { grounded: true }));
+    fsm.update(input(1, {
+      grounded: true,
+      pops: [{ step: 1, label: 'ollie', q: DEFAULT_SIM_CONFIG.pop.baseQuality }],
+    }));
+    fsm.update(input(2));
+    const result = fsm.update(input(3, {
+      grounded: true,
+      pose: alignedPose,
+      contactImpulse: 1,
+      supportContactImpulse: 1,
+      supportNormal,
+    }));
+
+    expect(result.phase).toBe('ground');
+    expect(result.events).toContainEqual(expect.objectContaining({
+      kind: 'land',
+      cleanliness: 'clean',
+      thetaDeg: expect.closeTo(0, 6),
+    }));
+  });
+
+  it('bails a grip-up board that lands sideways to its travel', () => {
+    const yaw90 = Math.PI / 2;
+    const result = directLanding(
+      { x: 0, y: Math.sin(yaw90 / 2), z: 0, w: Math.cos(yaw90 / 2) },
+      { x: 0, y: -2, z: 4 },
+    );
+    expect(result.phase).toBe('bail');
+    expect(result.lastFailReason).toBe('misaligned');
+  });
+
+  it('accepts a completed 180 landing because switch/fakie travel is valid', () => {
+    const result = directLanding(
+      { x: 0, y: 1, z: 0, w: 0 },
+      { x: 0, y: -2, z: 4 },
+    );
+    expect(result.phase).toBe('ground');
+    expect(result.events).toContainEqual(expect.objectContaining({
+      kind: 'land', cleanliness: 'clean', headingErrorDeg: expect.closeTo(0, 6),
+    }));
+  });
+
+  it('bails an otherwise level landing whose surface-normal impact is extreme', () => {
+    const result = directLanding(
+      { x: 0, y: 0, z: 0, w: 1 },
+      { x: 0, y: -12, z: 2 },
+    );
+    expect(result.phase).toBe('bail');
+    expect(result.lastFailReason).toBe('hard-landing');
   });
 });

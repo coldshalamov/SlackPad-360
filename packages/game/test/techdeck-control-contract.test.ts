@@ -53,15 +53,32 @@ describe('Tech Deck riding contract', () => {
   it('uses the explicit Ctrl action as predictable beginner acceleration', () => {
     const planted = feet(0) as FeetState & { accelerating: boolean };
     planted.accelerating = true;
-    expect(controller().applyGroundControl(planted, [], true, 1).driveForce).toBe(
-      DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce,
-    );
+    const firstStroke = controller().applyGroundControl(planted, [], true, 1).driveForce;
+    expect(firstStroke).toBeGreaterThan(0);
+    expect(firstStroke).toBeLessThan(DEFAULT_SIM_CONFIG.locomotion.accelerationStrokePeakForce);
   });
 
-  it('requests physical wheel braking whenever grounded Ctrl is released', () => {
-    expect(controller().applyGroundControl(feet(0), [], true, 1).brakeForce).toBeGreaterThan(0);
+  it('coasts instead of auto-braking whenever grounded Ctrl is released', () => {
+    expect(controller().applyGroundControl(feet(0), [], true, 1).brakeForce).toBe(0);
     const planted = feet(0) as FeetState & { accelerating: boolean };
     planted.accelerating = true;
     expect(controller().applyGroundControl(planted, [], true, 2).brakeForce).toBe(0);
+  });
+
+  it('turns held Ctrl into eased push strokes with a real coast gap', () => {
+    const c = controller();
+    const planted = feet(0) as FeetState & { accelerating: boolean };
+    planted.accelerating = true;
+    const forces: number[] = [];
+    for (let step = 0; step < DEFAULT_SIM_CONFIG.locomotion.accelerationCadenceSteps; step++) {
+      forces.push(c.applyGroundControl(planted, [], true, step).driveForce);
+    }
+
+    expect(forces.some((force) => force === 0)).toBe(true);
+    expect(forces.some((force) => force > DEFAULT_SIM_CONFIG.locomotion.cruiseDriveForce)).toBe(true);
+    expect(Math.max(...forces)).toBeLessThanOrEqual(
+      DEFAULT_SIM_CONFIG.locomotion.accelerationStrokePeakForce,
+    );
+    expect(forces[0]).toBeLessThan(Math.max(...forces) * 0.35);
   });
 });

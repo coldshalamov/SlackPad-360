@@ -20,6 +20,10 @@ export const ASSIST_PRESET_BY_LEVEL: Readonly<Record<AssistLevel, AssistPreset>>
   2: "streamlined",
 };
 export type BothClickMeans = "ignore" | "push" | "ollie";
+/** Player-facing gesture gain. It affects trick recognition, never propulsion. */
+export const FLICK_SENSITIVITY_MIN = 0.6;
+export const FLICK_SENSITIVITY_MAX = 1.6;
+export const DEFAULT_FLICK_SENSITIVITY = 1;
 /**
  * How the player's kick gesture chooses which end of the board pops:
  *
@@ -43,6 +47,12 @@ export interface InputProfile {
   stance: Stance;
   /** Degrees; hand approach angle mapping pad axes → board local. */
   padYawOffset: number;
+  /**
+   * Gain applied to post-pop flick/sweep evidence. Optional for compatibility
+   * with profiles and traces recorded before profile v6; normalization always
+   * supplies the default value.
+   */
+  flickSensitivity?: number;
   swapFeet: boolean;
   assistLevel: AssistLevel;
   /** Named player-facing bundle; assistLevel remains the deterministic index. */
@@ -61,6 +71,7 @@ export interface InputProfile {
 export const DEFAULT_INPUT_PROFILE: InputProfile = deepFreezeConfig({
   stance: "regular",
   padYawOffset: 0,
+  flickSensitivity: DEFAULT_FLICK_SENSITIVITY,
   swapFeet: false,
   assistLevel: 1,
   assistPreset: "classic",
@@ -98,6 +109,10 @@ export function normalizeInputProfile(value: unknown): InputProfile {
   const padYawOffset = typeof raw.padYawOffset === "number" && Number.isFinite(raw.padYawOffset)
     ? Math.max(-180, Math.min(180, raw.padYawOffset))
     : base.padYawOffset;
+  const flickSensitivity =
+    typeof raw.flickSensitivity === "number" && Number.isFinite(raw.flickSensitivity)
+      ? Math.max(FLICK_SENSITIVITY_MIN, Math.min(FLICK_SENSITIVITY_MAX, raw.flickSensitivity))
+      : DEFAULT_FLICK_SENSITIVITY;
   const accessibility: Partial<InputProfile["accessibility"]> =
     raw.accessibility !== null && typeof raw.accessibility === "object"
       ? raw.accessibility
@@ -106,6 +121,7 @@ export function normalizeInputProfile(value: unknown): InputProfile {
   return deepFreezeConfig({
     stance: raw.stance === "goofy" || raw.stance === "regular" ? raw.stance : base.stance,
     padYawOffset,
+    flickSensitivity,
     swapFeet: typeof raw.swapFeet === "boolean" ? raw.swapFeet : base.swapFeet,
     assistLevel: level,
     assistPreset: ASSIST_PRESET_BY_LEVEL[level],
@@ -205,8 +221,10 @@ export interface FootTrackerConfig {
 }
 
 export interface PopConfig {
+  /** Internal physics substeps used to deliver the physical pop impulse. */
+  actuationSubsteps: number;
   /**
-   * Vertical pop impulse range, N·s at board mass scale (M4, hypothesis —
+   * Vertical pop impulse range, N·s at loaded board+rider scale (M4 —
    * retuned from the cycle-3 placeholders so pop heights land in the playable
    * 0.25–0.8 m band at boardMass 2.4: v0 = jY/m, h ≈ v0²/2g).
    * jY = jMin + q·(jMax − jMin) where q ∈ [0,1] is pop prep quality.
@@ -342,7 +360,7 @@ export interface CatchConfig {
 }
 
 export interface LandConfig {
-  /** Board-up vs world-up angle for a clean landing, deg (~25). */
+  /** Board-up vs contacted wheel-support plane for a clean landing, deg (~25). */
   thetaCleanDeg: number;
   /** Extra clean cone by assist preset (Experienced, Classic, Streamlined). */
   cleanAssistBonusDeg: [number, number, number];
@@ -350,12 +368,60 @@ export interface LandConfig {
   thetaDirtyDeg: number;
   /** Extra recoverable cone by assist preset. */
   dirtyAssistBonusDeg: [number, number, number];
+  /** Travel speed below which heading alignment is irrelevant, m/s. */
+  headingCheckMinSpeed: number;
+  /** Board-forward vs travel alignment for a clean landing, modulo switch, deg. */
+  headingCleanDeg: number;
+  /** Largest recoverable sideways landing error, modulo switch, deg. */
+  headingDirtyDeg: number;
+  /** Largest surface-normal approach speed that can score clean, m/s. */
+  impactSpeedCleanMax: number;
+  /** Surface-normal approach speed beyond which the landing bails, m/s. */
+  impactSpeedDirtyMax: number;
   /**
    * Fraction of horizontal speed scrubbed on a DIRTY landing (M4, hypothesis).
    * Applied by SimWorld as an opposing impulse (−mass·scrub·v_horizontal),
    * force/impulse-based — never a velocity write.
    */
   dirtySpeedScrub: number;
+}
+
+/**
+ * Simcade transition/vert assistance. Rapier still owns contact and momentum;
+ * these bounds only add rider-like pump/launch impulses and a near-aligned
+ * landing correction at a detected sloped wheel support.
+ */
+export interface TransitionConfig {
+  /** Minimum wheel-support slope that counts as transition geometry, degrees. */
+  minSlopeDeg: number;
+  /** Minimum horizontal uphill speed required to arm pump/lip assistance, m/s. */
+  minApproachSpeed: number;
+  /** Stable supported physics substeps required before a lip can arm. */
+  minSupportedSubsteps: number;
+  /** Consecutive unsupported substeps that confirm a real lip departure. */
+  lipDepartureConfirmSubsteps: number;
+  /** Maximum rider pump force along the current surface motion, N. */
+  pumpForceMax: number;
+  /** Transition speed at which automatic pump force fades fully out, m/s. */
+  pumpSpeedLimit: number;
+  /** Incoming uphill speed above the minimum converted to extra vertical speed. */
+  lipLaunchSpeedGain: number;
+  /** Hard cap on added lip-launch vertical speed, m/s. */
+  lipLaunchDeltaSpeedMax: number;
+  /** Forward share paired with the vertical launch so travel never reverses. */
+  lipLaunchForwardShare: number;
+  /** Hard cap on the complete lip-launch impulse, N·s. */
+  lipLaunchImpulseMax: number;
+  /** Airborne physics substeps required before transition landing help can open. */
+  landingMinAirborneSubsteps: number;
+  /** Board-up versus surface-normal cone in which landing help is allowed, deg. */
+  landingAssistConeDeg: number;
+  /** Surface alignment angular-speed correction gain, 1/s. */
+  landingAlignRate: number;
+  /** Fraction of surface-tangent angular velocity removed at contact. */
+  landingAngularDamping: number;
+  /** Hard cap on the landing correction torque impulse, N·m·s. */
+  landingAngularImpulseMax: number;
 }
 
 /** Air-phase guards (M4). */
@@ -507,7 +573,14 @@ export interface PhysicsConfig {
   boardLength: number;
   boardWidth: number;
   wheelbase: number;
+  /** Physical deck/trucks/wheels mass, kg. */
   boardMass: number;
+  /** Invisible simcade rider/load proxy coupled to the playable board, kg. */
+  riderMass: number;
+  /** Fixed Rapier integration steps inside one 60 Hz gameplay step. */
+  physicsSubsteps: number;
+  /** Maximum nonlinear CCD substeps for the fast thin board/truck body. */
+  ccdSubsteps: number;
   /** Ground locomotion. */
   pushImpulse: number;
   maxGroundSpeed: number;
@@ -516,6 +589,8 @@ export interface PhysicsConfig {
   rollingFriction: number;
   /** Collision impulse above which maneuvers interrupt (T_col). */
   interruptCollisionImpulse: number;
+  /** Smallest collision impulse reported to observability/landing logic. */
+  contactReportImpulse: number;
   /**
    * Steps over which airborne contact impulses accumulate toward the
    * interrupt threshold (M4, hypothesis). The contact solver spreads a sharp
@@ -572,9 +647,9 @@ export interface PhysicsConfig {
   /** Board center height at spawn/reset, m (board drops onto the ground). */
   spawnHeight: number;
   /**
-   * Seeded reset variation magnitude. Position jitter is up to this many m and
-   * angular-velocity jitter up to this many rad/s, both derived from the reset
-   * seed so that different seeds diverge (M2 determinism / cross-seed golden).
+   * Seeded reset position variation magnitude, m. Resets deliberately start
+   * with zero angular velocity so the board never turns from an unseen shove.
+   * Position still varies by seed for determinism/cross-seed coverage.
    */
   spawnJitter: number;
   /** Board (deck) collider friction coefficient. Deck grips rails/ledges. */
@@ -594,7 +669,7 @@ export interface PhysicsConfig {
    */
   groundedTolerance: number;
   /**
-   * Minimum dot(board-up, world-up) for the deck to count as rideable ground.
+   * Minimum board-up alignment with world-up or the live wheel-support normal.
    * Height alone is insufficient: a deck resting on its edge is supported by
    * the floor, but it is not a stance a rider can stand on or steer from.
    */
@@ -627,16 +702,23 @@ export interface LocomotionConfig {
    */
   cruiseTargetSpeed: number;
   /**
-   * Base forward drive force for cruise, N. SimWorld scales it by
+   * Nominal low-level cruise force, N (used by deterministic fixtures and
+   * direct commands). SimWorld scales any authored drive force by
    * `(1 - forwardSpeed / cruiseTargetSpeed)` so drive fades to zero at the
    * target — force-based saturation, never a hard velocity write.
    */
   cruiseDriveForce: number;
-  /** Per-wheel physical brake force, N, while grounded and Ctrl is released. */
+  /** Peak force of one eased Ctrl push stroke, N. */
+  accelerationStrokePeakForce: number;
+  /** Active eased-force duration of each held-Ctrl push stroke, sim steps. */
+  accelerationStrokeSteps: number;
+  /** Start-to-start cadence of repeated held-Ctrl push strokes, sim steps. */
+  accelerationCadenceSteps: number;
+  /** Clamp for an explicit physical brake command, N. Shipping Ctrl release coasts. */
   coastBrakeForce: number;
   /** Two-finger centroid speed toward the screen below which no drive occurs. */
   rideMotionMinSpeed: number;
-  /** Two-finger centroid speed toward the screen that reaches full drive force. */
+  /** Minimum board speed at which truck steering/heading authority is enabled. */
   rideMotionFullSpeed: number;
   /** Minimum sim steps between push pulses (cooldown) so a held click is one push. */
   pushCooldownSteps: number;
@@ -653,10 +735,7 @@ export interface LocomotionConfig {
   steerInputFullScale: number;
   /** Sustained yaw rate requested at full common-mode steering input, rad/s. */
   steerRateAtFull: number;
-  /**
-   * Board-heading error → corrective target yaw rate, 1/s. The error compares
-   * live board yaw with the one-to-one segment-heading target captured at plant.
-   */
+  /** Board-heading error → desired physical yaw-rate gain, 1/s. */
   steerHeadingBiasGain: number;
   /**
    * Yaw servo gain, N·m per (rad/s) of yaw-rate error. SimWorld drives angular
@@ -668,10 +747,18 @@ export interface LocomotionConfig {
   steerMaxTorque: number;
   /** Actual deck lean → opposing front/rear truck steering gain. */
   truckLeanToSteer: number;
+  /** Neutral rider lean below this angle is treated as truck/bearing noise. */
+  truckLeanDeadzoneDeg: number;
   /** Physical truck steering clamp, degrees. */
   truckSteerMaxDeg: number;
   /** Speed-dependent truck steering attenuation per m/s. */
   truckSteerSpeedFade: number;
+  /** Loaded-rider surface-alignment spring, N·m per radian of tilt error. */
+  groundBalanceKp: number;
+  /** Loaded-rider tilt-rate damping, N·m per rad/s. */
+  groundBalanceKd: number;
+  /** Maximum neutral rider balance torque while wheel-supported, N·m. */
+  groundBalanceTorqueMax: number;
   /**
    * Midpoint lateral offset-from-rest (calibrated pad units) → mild carve yaw
    * rate contribution, 1/s. Lets a lateral lean add a gentle turn.
@@ -848,6 +935,7 @@ export interface SimConfig {
   flip: FlipConfig;
   catch: CatchConfig;
   land: LandConfig;
+  transition: TransitionConfig;
   air: AirConfig;
   bail: BailConfig;
   grind: GrindConfig;
@@ -890,18 +978,23 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     motionTapReplantRadius: 0.24,
   },
   pop: {
-    jMin: 5.8,
-    jMax: 9.6,
+    actuationSubsteps: 4,
+    jMin: 180,
+    jMax: 300,
     baseQuality: 0.6,
     pitchBias: 0.35,
-    pitchTorqueScale: 0.064,
-    pitchTorqueImpulseMax: 0.5,
+    // jY already includes the full board+rider load. This is a lever/feel
+    // fraction, not another mass multiplier; scaling it with rider mass makes
+    // a basic ollie somersault like a weightless toy.
+    pitchTorqueScale: 0.04,
+    pitchTorqueImpulseMax: 15.5,
     noseUpTargetDeg: 24,
     snapHoldSteps: 7,
     levelEndSteps: 30,
-    levelKp: 6.0,
-    levelKd: 0.8,
-    levelTorqueMax: 1.5,
+    // PD gains scale with the board+rider pitch inertia.
+    levelKp: 186,
+    levelKd: 25,
+    levelTorqueMax: 46,
     prepLiftSpeedForMaxQ: 2.0,
     qTimingWeight: 0.5,
     qCrispWeight: 0.5,
@@ -911,15 +1004,15 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     omegaFlipMax: 15,
     kp: 8,
     kd: 0.6,
-    tauMax: [1.2, 2.0, 3.0],
-    impulseMax: [0.08, 0.14, 0.2],
-    shuvImpulseMax: [0.4, 0.8, 1.2],
+    tauMax: [37, 62, 93],
+    impulseMax: [2.5, 4.3, 6.2],
+    shuvImpulseMax: [12.4, 24.8, 37.2],
     guideDecaySteps: 20,
     axisDominanceRatio: 1.15,
     flickPathMinLen: 0.02,
     flickSpeedForMaxS: 5.0,
     shuvOmegaMax: 9.0,
-    shuvTauMax: [5, 7, 10],
+    shuvTauMax: [155, 217, 310],
     quantizeConeDeg: [0, 45, 80],
     quantizeExtraDamp: [0, 0.5, 0.85],
     nameMinTurns: 0.4,
@@ -929,7 +1022,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     windowMs: 420,
     assistScale: [0.35, 0.55, 0.75],
     catchGain: 1.0,
-    angularImpulseMax: [0.75, 1.5, 2.5],
+    angularImpulseMax: [23, 46, 77],
     apexOnly: true,
   },
   land: {
@@ -937,7 +1030,33 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     cleanAssistBonusDeg: [0, 5, 10],
     thetaDirtyDeg: 70,
     dirtyAssistBonusDeg: [0, 0, 5],
+    headingCheckMinSpeed: 0.75,
+    headingCleanDeg: 30,
+    headingDirtyDeg: 75,
+    impactSpeedCleanMax: 5.5,
+    impactSpeedDirtyMax: 10,
     dirtySpeedScrub: 0.35,
+  },
+  transition: {
+    minSlopeDeg: 8,
+    minApproachSpeed: 2,
+    minSupportedSubsteps: 4,
+    lipDepartureConfirmSubsteps: 2,
+    // Local to a real uphill wheel contact and still below one Ctrl-stroke peak;
+    // enough to carry a 74 kg loaded board through a one-metre return bank.
+    pumpForceMax: 260,
+    pumpSpeedLimit: 6.8,
+    // The playable return lip is reached near 3.25 m/s; that earns ~2 m/s of
+    // bounded lift. A simultaneous authored ollie stacks naturally for vert air.
+    lipLaunchSpeedGain: 1.6,
+    lipLaunchDeltaSpeedMax: 2.4,
+    lipLaunchForwardShare: 0.18,
+    lipLaunchImpulseMax: 190,
+    landingMinAirborneSubsteps: 4,
+    landingAssistConeDeg: 28,
+    landingAlignRate: 5,
+    landingAngularDamping: 0.35,
+    landingAngularImpulseMax: 7,
   },
   air: {
     timeoutSteps: 240,
@@ -956,14 +1075,14 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     rSnap: [0.03, 0.24, 0.32],
     balanceLimit: 1.0,
     balanceGain: 1.6,
-    interruptImpulse: 6.0,
+    interruptImpulse: 6,
     candidateVolumeRadius: 0.75,
     recentPopSteps: 36,
     rideHeightFiftyFifty: 0.085,
     rideHeightBoardslide: 0.025,
-    latchLateralSpring: [0, 55, 90],
-    latchLateralDamp: 14,
-    latchLateralForceMax: 60,
+    latchLateralSpring: [0, 1705, 2790],
+    latchLateralDamp: 434,
+    latchLateralForceMax: 1860,
     tangentDrag: 0.9,
     speedEndSpeed: 0.5,
     balanceOffsetWeight: 3.2,
@@ -972,16 +1091,16 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     balanceSelfCenter: 2.2,
     balanceClampMax: 3.0,
     cleanBalanceBand: 0.45,
-    exitHopImpulse: 6.4,
-    slipLateralImpulse: 1.2,
-    dismountLiftImpulse: 1.5,
+    exitHopImpulse: 228,
+    slipLateralImpulse: 37.2,
+    dismountLiftImpulse: 46.5,
     relatchCooldownSteps: 20,
-    latchYawAlignGain: 6.0,
-    latchYawDamp: 3.0,
-    latchYawTorqueMax: 6.0,
-    latchRollAlignGain: 2.0,
-    latchRollDamp: 0.4,
-    latchRollTorqueMax: 1.0,
+    latchYawAlignGain: 186,
+    latchYawDamp: 93,
+    latchYawTorqueMax: 186,
+    latchRollAlignGain: 62,
+    latchRollDamp: 12.4,
+    latchRollTorqueMax: 31,
   },
   physics: {
     hz: 60,
@@ -990,11 +1109,15 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     boardWidth: 0.2,
     wheelbase: 0.43,
     boardMass: 2.4,
-    pushImpulse: 2.9,
-    maxGroundSpeed: 8.0,
-    steerYawRateMax: 10.0,
+    riderMass: 72,
+    physicsSubsteps: 2,
+    ccdSubsteps: 2,
+    pushImpulse: 44,
+    maxGroundSpeed: 6.5,
+    steerYawRateMax: 2.6,
     rollingFriction: 0.18,
-    interruptCollisionImpulse: 8.0,
+    interruptCollisionImpulse: 8,
+    contactReportImpulse: 1,
     interruptWindowSteps: 3,
     deckThickness: 0.05,
     truckHalfExtents: { x: 0.05, y: 0.03, z: 0.03 },
@@ -1007,7 +1130,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     wheelSuspensionStiffness: 240,
     wheelSuspensionCompression: 4.4,
     wheelSuspensionRelaxation: 5.2,
-    wheelMaxSuspensionForce: 80,
+    wheelMaxSuspensionForce: 900,
     wheelFrictionSlip: 4,
     wheelSideFrictionStiffness: 30,
     spawnHeight: 0.6,
@@ -1031,8 +1154,11 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
   },
   locomotion: {
     cruiseTargetSpeed: 5.5,
-    cruiseDriveForce: 20,
-    coastBrakeForce: 1.2,
+    cruiseDriveForce: 220,
+    accelerationStrokePeakForce: 710,
+    accelerationStrokeSteps: 20,
+    accelerationCadenceSteps: 34,
+    coastBrakeForce: 0,
     rideMotionMinSpeed: 0.04,
     rideMotionFullSpeed: 0.35,
     pushCooldownSteps: 12,
@@ -1041,15 +1167,19 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     steerInputDeadzone: 0.018,
     steerInputFullScale: 0.13,
     steerRateAtFull: 2.6,
-    steerHeadingBiasGain: 9.0,
+    steerHeadingBiasGain: 1.2,
     steerServoGain: 16.0,
-    steerMaxTorque: 28.0,
-    truckLeanToSteer: 1.4,
+    steerMaxTorque: 8.0,
+    truckLeanToSteer: 1.0,
+    truckLeanDeadzoneDeg: 1.5,
     truckSteerMaxDeg: 18,
     truckSteerSpeedFade: 0.08,
+    groundBalanceKp: 85,
+    groundBalanceKd: 12,
+    groundBalanceTorqueMax: 65,
     leanCarveGain: 1.4,
     leanRollGain: 0.6,
-    leanMaxRollTorque: 0.25,
+    leanMaxRollTorque: 8.0,
     padToBoardScale: 0.6,
     groundControlLogEvery: 15,
   },

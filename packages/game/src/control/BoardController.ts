@@ -8,7 +8,7 @@
  * "Impulses/torques clamps" applied by SimWorld, "Skipping Rapier" forbidden).
  *
  * Ground vocabulary implemented here (final-input-and-trick-spec §5):
- *  - Ride:   Ctrl is the only source of forward drive; release applies brakes.
+ *  - Ride:   Ctrl authors eased push strokes; release coasts physically.
  *  - Push:   both-planted kick (bothClickMeans 'push') → forward impulse.
  *  - Steer:  the absolute two-finger segment angle is the board heading.
  * Air control (M4/M5) is out of scope: no ground forces unless grounded.
@@ -33,6 +33,8 @@ function wrapPi(angle: number): number {
 
 export class BoardController {
   private lastPushStep = -1_000_000;
+  private accelerationWasHeld = false;
+  private accelerationStrokeEpoch = 0;
 
   constructor(
     private readonly loco: LocomotionConfig,
@@ -48,6 +50,7 @@ export class BoardController {
     step: number,
   ): GroundCommand {
     if (!grounded) {
+      this.accelerationWasHeld = false;
       return idleGroundCommand();
     }
 
@@ -64,13 +67,28 @@ export class BoardController {
     const seg = feet.segment;
     const driveAllowed =
       feet.bothPlanted && seg.valid && feet.accelerating === true;
-    cmd.brakeForce = driveAllowed ? 0 : this.loco.coastBrakeForce;
+    // Releasing Ctrl coasts. Normal rolling/bearing resistance lives in the
+    // physics model; it is not an implicit four-wheel brake command.
+    cmd.brakeForce = 0;
 
     // Ctrl is the only propulsion input. Pad travel is reserved for steering
     // and tricks, so swiping can never create confusing phantom speed.
-    if (feet.bothPlanted && seg.valid) {
-      cmd.driveForce = driveAllowed ? this.loco.cruiseDriveForce : 0;
+    if (feet.bothPlanted && seg.valid && driveAllowed) {
+      if (!this.accelerationWasHeld) this.accelerationStrokeEpoch = step;
+      const cadence = Math.max(1, Math.floor(this.loco.accelerationCadenceSteps));
+      const strokeSteps = Math.min(
+        cadence,
+        Math.max(1, Math.floor(this.loco.accelerationStrokeSteps)),
+      );
+      const phase = ((step - this.accelerationStrokeEpoch) % cadence + cadence) % cadence;
+      if (phase < strokeSteps) {
+        // Half-sine force envelope: no electric-motor step change, but an
+        // authored push that rises, peaks, and releases into a coast gap.
+        const t = (phase + 1) / (strokeSteps + 1);
+        cmd.driveForce = this.loco.accelerationStrokePeakForce * Math.sin(Math.PI * t);
+      }
     }
+    this.accelerationWasHeld = driveAllowed;
 
     // The directed tail→nose finger line is the requested board heading. Pad
     // Y grows toward the player, the opposite sign of world yaw in the side-on

@@ -8,7 +8,8 @@
  * physics body — BoardController turns FeetState into intents downstream.
  *
  * Coordinate pipeline (research/control-grammar §3, input-platform-spec §6):
- *   raw pad [0,1]²  --rotate(-padYawOffset about (0.5,0.5))-->  CALIBRATED space.
+ *   raw pad [0,1]² --physical aspect correction-->
+ *   isotropic pad units --rotate(-padYawOffset about (0.5,0.5))--> CALIBRATED.
  * Everything below works in calibrated space; the camera never affects mapping.
  *
  * Determinism (arch §4): gesture timing math uses ONLY differences between
@@ -153,6 +154,28 @@ export function rotateAboutCenter(x: number, y: number, deg: number): Vec2 {
     x: PAD_CENTER + dx * c - dy * s,
     y: PAD_CENTER + dx * s + dy * c,
   };
+}
+
+/**
+ * Convert separately normalized X/Y into isotropic physical-distance units.
+ * Coordinates remain centered at 0.5; the longer hardware axis may extend
+ * outside [0,1], which is intentional and never crosses the ContactFrame wire
+ * boundary. Missing/malformed metadata preserves legacy unit-square behavior.
+ */
+export function physicalizePadPoint(
+  x: number,
+  y: number,
+  physicalAspectRatio: unknown,
+): Vec2 {
+  const aspect = typeof physicalAspectRatio === 'number'
+    && Number.isFinite(physicalAspectRatio)
+    && physicalAspectRatio >= 0.25
+    && physicalAspectRatio <= 4
+      ? physicalAspectRatio
+      : 1;
+  return aspect >= 1
+    ? { x: PAD_CENTER + (x - PAD_CENTER) * aspect, y }
+    : { x, y: PAD_CENTER + (y - PAD_CENTER) / aspect };
 }
 
 /** Wrap an angle to (−π, π]. */
@@ -303,7 +326,12 @@ export class FootTracker {
     for (const c of frame.contacts) {
       if (!c.confidence) continue; // palm rejection (HID confidence)
       if (!c.tip) continue; // finger lifted → not a planted contact
-      const cal = rotateAboutCenter(c.x, c.y, -this.padYawOffset);
+      const physical = physicalizePadPoint(
+        c.x,
+        c.y,
+        frame.meta?.physicalAspectRatio,
+      );
+      const cal = rotateAboutCenter(physical.x, physical.y, -this.padYawOffset);
       pts.push({ id: c.id, x: cal.x, y: cal.y });
     }
 

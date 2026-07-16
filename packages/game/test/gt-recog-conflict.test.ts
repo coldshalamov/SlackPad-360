@@ -95,6 +95,20 @@ describe('GT-recog-conflict: recognition conflict table', () => {
     expect(g!.kind).toBe('flip');
   });
 
+  it('a straight flick returning along the same line is not sweep curvature', () => {
+    const c = new AirGestureClassifier(DEFAULT_SIM_CONFIG, 'regular');
+    feed(c, hold({ x: 0, y: 1.5 }, 5)); // outbound lateral flick opens kickflip
+
+    // Recentring reverses velocity by ~pi in one report. That is straight
+    // backtracking, not the sustained direction change of a shuv arc.
+    const g = feed(c, [{ x: 0, y: -1.5 }], 6);
+
+    expect(g).not.toBeNull();
+    expect(g!.kind).toBe('flip');
+    expect(g!.label).toBe('kickflip');
+    expect(c.replacements).toBe(0);
+  });
+
   it('hysteresis: a weak arc after a flick does NOT replace (margin gate)', () => {
     const c = new AirGestureClassifier(DEFAULT_SIM_CONFIG, 'regular');
     feed(c, hold({ x: 0, y: 4 }, 5)); // strong flick opens (kickflip)

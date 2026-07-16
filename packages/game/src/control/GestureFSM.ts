@@ -17,8 +17,9 @@
  * required — no teleport). Exits: hop reuses the pop path (grind→pop→air);
  * balance slip / foot lift / off-end drop to grind→air (land check resolves);
  * a low speed-end dismounts grind→ground; a hard collision grind→bail. While a
- * grind CANDIDATE is live in the air, air-shuv/flip + catch are suppressed
- * (phase exclusive; final-input-and-trick §3.1).
+ * grind CANDIDATE is live in the air, catch is suppressed but the authored
+ * post-pop sweep remains live so the player can turn into a boardslide. Once
+ * latched, grind is phase-exclusive with other air actions.
  *
  * The FSM consumes PLAIN DATA only (FeetState, arbitrated PopRecognitions,
  * BoardPose reads, the last-step contact impulse). It never touches the body:
@@ -48,8 +49,8 @@
  * Math.random.
  */
 
-import { TRICK_INTENT_VERSION } from '@slackpad/shared';
-import type { SimConfig, Stance, TrickIntentV1 } from '@slackpad/shared';
+import { DEFAULT_FLICK_SENSITIVITY, TRICK_INTENT_VERSION } from '@slackpad/shared';
+import type { SimConfig, Stance, TrickIntentV1, Vec3 } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { FeetSample, FeetState } from '../input/FootTracker';
 import type { BoardPose } from '../sim/SimWorld';
@@ -59,12 +60,17 @@ import { AirGestureClassifier, labelFor } from './AirGestureClassifier';
 import type { AirGesture, AirGestureKind } from './AirGestureClassifier';
 import { GrindSystem } from './GrindSystem';
 import type { GrindExitReason, GrindInputs, GrindSnapshot, GrindStepResult } from './GrindSystem';
+import { DEFAULT_TRICK_REGISTRY } from './TrickRegistry';
+import type { SeedAirGesture, SeedTrickId } from './TrickRegistry';
+import { TrickIntentResolver } from './TrickIntentResolver';
 
 export type GesturePhase = 'none' | 'ground' | 'pop' | 'air' | 'catch' | 'grind' | 'bail';
 
 export type FailReason =
   | 'over-rotation'
   | 'hard-impact'
+  | 'hard-landing'
+  | 'misaligned'
   | 'inverted'
   | 'timeout'
   | 'out-of-bounds'
@@ -102,6 +108,8 @@ export type FsmEvent =
       kind: 'land';
       cleanliness: 'clean' | 'dirty';
       thetaDeg: number;
+      headingErrorDeg: number;
+      impactSpeed: number;
       label: string | null;
       /** Signed measured rotation at land (for the M9 scorer). */
       flipRotations: number;
@@ -121,6 +129,10 @@ export interface FsmInputs {
   contactImpulse: number;
   /** Vertical-dominant contact impulse (floor/rail support, excludes walls). */
   supportContactImpulse?: number;
+  /** Off-axis contact impulse (walls/obstacles, excludes ride support). */
+  impactContactImpulse?: number;
+  /** Live load-weighted wheel-support normal; world-up when unavailable. */
+  supportNormal?: Vec3 | null;
   /** Nearest grindable rail readout (SimWorld.railProximity), or null (M6). */
   railProximity: RailProximity | null;
   step: number;
@@ -144,6 +156,14 @@ function msToSteps(ms: number, hz: number): number {
   return Math.max(1, Math.round((ms / 1000) * hz));
 }
 
+/**
+ * Enough room for the grounded pop envelope at common high input rates while
+ * keeping malformed device input from growing maneuver state without bound.
+ * The earliest post-retap evidence is the valuable part, so a full buffer
+ * rejects later samples instead of shifting the initial flick away.
+ */
+const POST_POP_SAMPLE_BUFFER_CAP = 64;
+
 export class GestureFSM {
   #phase: GesturePhase = 'none';
   #label: RecognitionLabelState | null = null;
@@ -157,6 +177,8 @@ export class GestureFSM {
   #catchWindowEndStep = 0;
   #caught = false;
   #bailStepsLeft = 0;
+  /** Last unsupported velocity, retained across the contact-solving landing step. */
+  #lastAirVelocity: Vec3 | null = null;
 
   // Previous-step foot plants for replant/lift edge detection.
   #prevNosePlanted = false;
@@ -167,6 +189,11 @@ export class GestureFSM {
 
   // --- M5 air-gesture recognition + rotation bookkeeping -------------------
   #airClassifier: AirGestureClassifier;
+  /**
+   * High-rate samples after the recognized tail/nose retap but before the
+   * board's 60 Hz state first reports airborne. Drained once on pop→air.
+   */
+  #postPopSamples: FeetSample[] = [];
   /** Signed accumulated roll about the board long axis (+Z) since takeoff, rad. */
   #rollAngle = 0;
   /** Signed accumulated yaw about board up (+Y) since takeoff, rad. */
@@ -174,6 +201,8 @@ export class GestureFSM {
 
   // --- M6 grind subsystem (owned like #airClassifier) ----------------------
   #grind: GrindSystem;
+  /** Data-driven semantic gate between recognizer labels and trick intent. */
+  #trickResolver: TrickIntentResolver<SeedTrickId, SeedAirGesture>;
   /** Grind result of the LAST update (air/grind only), for observe + assist. */
   #lastGrind: GrindStepResult | null = null;
 
@@ -185,12 +214,19 @@ export class GestureFSM {
     private readonly assistLevel: 0 | 1 | 2,
     private readonly stance: Stance,
     private readonly telemetry?: Telemetry,
+    flickSensitivity = DEFAULT_FLICK_SENSITIVITY,
   ) {
     const hz = config.physics.hz;
     this.airTrickWindowSteps = msToSteps(config.recognition.airTrickWindowMs, hz);
     this.catchWindowSteps = msToSteps(config.catch.windowMs, hz);
-    this.#airClassifier = new AirGestureClassifier(config, stance, telemetry);
+    this.#airClassifier = new AirGestureClassifier(config, stance, telemetry, flickSensitivity);
     this.#grind = new GrindSystem(config, assistLevel, telemetry);
+    this.#trickResolver = new TrickIntentResolver(DEFAULT_TRICK_REGISTRY, {
+      recognitionWindowSteps: this.airTrickWindowSteps,
+      airborneSequenceWindowSteps: config.air.timeoutSteps,
+      maxAirActions: 3,
+      minConfidence: config.recognition.cEnter,
+    });
   }
 
   /** Current phase (read by the KickArbiter gate and the checkpoint hash). */
@@ -238,6 +274,7 @@ export class GestureFSM {
     this.#phase = 'none';
     this.#bailStepsLeft = 0;
     this.#impulseWindow.length = 0;
+    this.#clearPostPopSamples();
     this.#airClassifier.reset();
     this.telemetry?.log({ type: 'bail', step, reason, flipRotations, shuvDegrees });
     this.telemetry?.log({ type: 'respawn', step });
@@ -278,9 +315,11 @@ export class GestureFSM {
         const pop = inp.pops[0];
         if (pop && inp.grounded) {
           this.#openPop(pop, inp.step);
+          this.#captureSamplesAfterRecognizedTap(inp, pop);
           events.push({ kind: 'pop', label: pop.label, q: pop.q });
         } else if (!inp.grounded) {
           // Lost the ground without a pop (bounce / rolled off something).
+          this.#clearPostPopSamples();
           this.#phase = 'none';
         }
         break;
@@ -288,17 +327,24 @@ export class GestureFSM {
 
       case 'pop': {
         if (this.#collisionInterrupt(inp, events)) break;
+        // The board can remain in the grounded band while its pop impulse
+        // unloads. Input arriving in that interval is already post-retap.
+        this.#appendPostPopSamples(inp.footSamples ?? []);
         if (!inp.grounded) {
           this.#phase = 'air';
           this.#airStartStep = inp.step;
           this.#apexSeen = false;
           this.#caught = false;
+          // Air recognition opens on this exact transition. The current input
+          // was appended above, so drain the buffer instead of reading it twice.
+          this.#classifyAir(inp, this.#takePostPopSamples());
         } else if (inp.step - this.#popStep > this.config.pop.groundLeaveTimeoutSteps) {
           // Blocked pop: the board never left the ground. Cancel the label —
           // a readable non-event, never a silent success.
           this.telemetry?.log({ type: 'popFizzled', step: inp.step, label: this.#label?.label ?? 'unknown' });
           events.push({ kind: 'popFizzled' });
           this.#label = null;
+          this.#clearPostPopSamples();
           this.#phase = 'ground';
         }
         break;
@@ -307,10 +353,11 @@ export class GestureFSM {
       case 'air': {
         this.#integrateRotation(inp);
         this.#trackApex(inp);
-        // Grind evaluation (airborne here): a soft-snap latch opens grind; a live
-        // candidate suppresses air-shuv/flip + catch so a boardslide approach is
-        // never misread as a shuv (phase exclusive, §3.1). Rails sit above the
-        // grounded band, so the latch never races the land check.
+        // Grind evaluation (airborne here): a soft-snap latch opens grind. A live
+        // candidate suppresses catch, but it must not suppress the player's
+        // post-pop sweep: that gesture is what physically turns the board into a
+        // boardslide. Rails sit above the grounded band, so the latch never races
+        // the land check.
         const gr = this.#grind.update(this.#grindInputs(inp, /*canLatch*/ true));
         this.#lastGrind = gr;
         if (gr.latchedThisStep) {
@@ -332,10 +379,14 @@ export class GestureFSM {
         }
         if (this.#collisionInterrupt(inp, events)) break;
         if (this.#airTimeout(inp, events)) break;
+        // A candidate is provisional and reclassified from the live board pose
+        // every step. Keep collecting authored trick intent while approaching;
+        // only the catch is phase-exclusive with a possible rail latch.
+        this.#classifyAir(inp);
         if (!gr.candidate) {
-          this.#classifyAir(inp);
           const hit = this.#catchAttempt(inp);
           if (hit) {
+            this.#trickResolver.closeAirActions();
             this.#caught = true;
             this.#phase = 'catch';
             events.push(this.#catchEvent(hit));
@@ -392,6 +443,14 @@ export class GestureFSM {
       this.telemetry?.log({ type: 'phaseChanged', step: inp.step, from, to: this.#phase });
     }
 
+    if (
+      (this.#phase === 'air' || this.#phase === 'catch') &&
+      !inp.grounded &&
+      (inp.supportContactImpulse ?? 0) <= 0
+    ) {
+      this.#lastAirVelocity = { ...inp.pose.lv };
+    }
+
     this.#prevNosePlanted = inp.feet.nose.planted;
     this.#prevTailPlanted = inp.feet.tail.planted;
 
@@ -417,7 +476,7 @@ export class GestureFSM {
       recentPop: inp.step - this.#popStep <= this.config.grind.recentPopSteps,
       // A recognised pop while grinding is an ollie-out hop.
       hopRequested: inp.pops.length > 0,
-      contactImpulse: inp.contactImpulse,
+      contactImpulse: this.#impactImpulse(inp),
       step: inp.step,
     };
   }
@@ -462,6 +521,7 @@ export class GestureFSM {
 
   /** Enter the air phase fresh (used by grind slip/drop exits). */
   #enterAir(step: number): void {
+    this.#clearPostPopSamples();
     this.#phase = 'air';
     this.#airStartStep = step;
     this.#apexSeen = false;
@@ -502,9 +562,16 @@ export class GestureFSM {
       stance: this.stance,
       source: { popStep: step, recognizedStep: null },
     };
+    this.#trickResolver.beginPop({
+      step,
+      popSide: pop.label === 'ollie' ? 'tail' : 'nose',
+      strength: pop.q,
+    });
     this.telemetry?.log({ type: 'trickIntent', step, intent: this.intent! });
     this.#lastFailReason = null; // a new attempt clears the old failure
     this.#impulseWindow.length = 0; // fresh maneuver, fresh interrupt window
+    this.#lastAirVelocity = null;
+    this.#clearPostPopSamples(); // fresh attempt: never reuse prior evidence
     this.#airClassifier.reset(); // fresh maneuver, fresh flick/sweep evidence
     this.#grind.reset(); // fresh maneuver, fresh grind candidate/latch (keeps cooldown)
     this.#rollAngle = 0;
@@ -514,15 +581,81 @@ export class GestureFSM {
     this.telemetry?.log({ type: 'popRecognized', step, label: pop.label, q: pop.q, confidence });
   }
 
-  /** Land check (final-physics §3.2 landing cones): θ = ∠(board-up, world-up). */
+  /** Land check: θ = angle between board-up and the contacted ride surface. */
   #landCheck(inp: FsmInputs, events: FsmEvent[]): void {
     const q = inp.pose.q;
-    // board-up = quat * (0,1,0); its world Y component (the cos of θ) is
-    // 1 − 2(qx² + qz²) for a unit quaternion.
-    const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
-    const cos = Math.max(-1, Math.min(1, upY));
+    const boardUp = {
+      x: 2 * (q.x * q.y - q.w * q.z),
+      y: 1 - 2 * (q.x * q.x + q.z * q.z),
+      z: 2 * (q.y * q.z + q.w * q.x),
+    };
+    const candidate = inp.supportNormal;
+    const normalLength = candidate
+      ? Math.hypot(candidate.x, candidate.y, candidate.z)
+      : 0;
+    const surfaceNormal = candidate && Number.isFinite(normalLength) && normalLength > 1e-8
+      ? {
+          x: candidate.x / normalLength,
+          y: candidate.y / normalLength,
+          z: candidate.z / normalLength,
+        }
+      : { x: 0, y: 1, z: 0 };
+    const alignment =
+      boardUp.x * surfaceNormal.x +
+      boardUp.y * surfaceNormal.y +
+      boardUp.z * surfaceNormal.z;
+    const cos = Math.max(-1, Math.min(1, alignment));
     const thetaDeg = (Math.acos(cos) * 180) / Math.PI;
     const land = this.config.land;
+    const approachVelocity = this.#lastAirVelocity ?? inp.pose.lv;
+    const normalVelocity =
+      approachVelocity.x * surfaceNormal.x +
+      approachVelocity.y * surfaceNormal.y +
+      approachVelocity.z * surfaceNormal.z;
+    const impactSpeed = Math.max(0, -normalVelocity);
+    const tangentVelocity = {
+      x: approachVelocity.x - surfaceNormal.x * normalVelocity,
+      y: approachVelocity.y - surfaceNormal.y * normalVelocity,
+      z: approachVelocity.z - surfaceNormal.z * normalVelocity,
+    };
+    const tangentSpeed = Math.hypot(
+      tangentVelocity.x,
+      tangentVelocity.y,
+      tangentVelocity.z,
+    );
+    const boardForward = {
+      x: 2 * (q.x * q.z + q.w * q.y),
+      y: 2 * (q.y * q.z - q.w * q.x),
+      z: 1 - 2 * (q.x * q.x + q.y * q.y),
+    };
+    const forwardIntoNormal =
+      boardForward.x * surfaceNormal.x +
+      boardForward.y * surfaceNormal.y +
+      boardForward.z * surfaceNormal.z;
+    const tangentForward = {
+      x: boardForward.x - surfaceNormal.x * forwardIntoNormal,
+      y: boardForward.y - surfaceNormal.y * forwardIntoNormal,
+      z: boardForward.z - surfaceNormal.z * forwardIntoNormal,
+    };
+    const tangentForwardLength = Math.hypot(
+      tangentForward.x,
+      tangentForward.y,
+      tangentForward.z,
+    );
+    let headingErrorDeg = 0;
+    if (
+      tangentSpeed >= land.headingCheckMinSpeed &&
+      tangentForwardLength > 1e-8
+    ) {
+      const headingCos = Math.abs(
+        (tangentVelocity.x * tangentForward.x +
+          tangentVelocity.y * tangentForward.y +
+          tangentVelocity.z * tangentForward.z) /
+        (tangentSpeed * tangentForwardLength),
+      );
+      // abs(dot) deliberately makes forward and switch/fakie equally valid.
+      headingErrorDeg = Math.acos(Math.max(-1, Math.min(1, headingCos))) * 180 / Math.PI;
+    }
     // Names come from the OUTCOME (measured board-state history), never from the
     // recognized intent — a flick whose rotation died early lands as what it
     // physically was (final-input-and-trick-spec §7; no silent success).
@@ -531,26 +664,52 @@ export class GestureFSM {
     const shuvDegrees = this.shuvDegrees;
 
     const finish = (cleanliness: 'clean' | 'dirty'): void => {
-      events.push({ kind: 'land', cleanliness, thetaDeg, label, flipRotations, shuvDegrees });
+      events.push({
+        kind: 'land',
+        cleanliness,
+        thetaDeg,
+        headingErrorDeg,
+        impactSpeed,
+        label,
+        flipRotations,
+        shuvDegrees,
+      });
       this.telemetry?.log({
         type: 'trickCompleted',
         step: inp.step,
         label,
         cleanliness,
         thetaDeg,
+        headingErrorDeg,
+        impactSpeed,
         flipRotations,
         shuvDegrees,
       });
       this.#label = null;
       this.#intent = null;
+      this.#lastAirVelocity = null;
+      this.#clearPostPopSamples();
       this.#phase = 'ground';
     };
 
     const cleanLimit = land.thetaCleanDeg + land.cleanAssistBonusDeg[this.assistLevel];
     const dirtyLimit = land.thetaDirtyDeg + land.dirtyAssistBonusDeg[this.assistLevel];
-    if (thetaDeg <= cleanLimit) finish('clean');
-    else if (thetaDeg <= dirtyLimit) finish('dirty');
-    else this.#bail(cos < 0 ? 'inverted' : 'over-rotation', inp.step, events);
+    const clean =
+      thetaDeg <= cleanLimit &&
+      headingErrorDeg <= land.headingCleanDeg &&
+      impactSpeed <= land.impactSpeedCleanMax;
+    const recoverable =
+      thetaDeg <= dirtyLimit &&
+      headingErrorDeg <= land.headingDirtyDeg &&
+      impactSpeed <= land.impactSpeedDirtyMax;
+    if (clean) finish('clean');
+    else if (recoverable) finish('dirty');
+    else if (cos < 0) this.#bail('inverted', inp.step, events);
+    else if (impactSpeed > land.impactSpeedDirtyMax) {
+      this.#bail('hard-landing', inp.step, events);
+    } else if (headingErrorDeg > land.headingDirtyDeg) {
+      this.#bail('misaligned', inp.step, events);
+    } else this.#bail('over-rotation', inp.step, events);
   }
 
   /**
@@ -587,7 +746,7 @@ export class GestureFSM {
       this.#impulseWindow.length = 0;
       return false;
     }
-    this.#impulseWindow.push(inp.contactImpulse);
+    this.#impulseWindow.push(this.#impactImpulse(inp));
     while (this.#impulseWindow.length > this.config.physics.interruptWindowSteps) {
       this.#impulseWindow.shift();
     }
@@ -599,6 +758,17 @@ export class GestureFSM {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Prefer the simulation's directional collision channel. The subtraction is
+   * a backwards-compatible fallback for focused FSM tests and older replays.
+   */
+  #impactImpulse(inp: FsmInputs): number {
+    return inp.impactContactImpulse ?? Math.max(
+      0,
+      inp.contactImpulse - (inp.supportContactImpulse ?? 0),
+    );
   }
 
   #airTimeout(inp: FsmInputs, events: FsmEvent[]): boolean {
@@ -617,6 +787,8 @@ export class GestureFSM {
     // Interrupt (§3.3): clear open labels/envelopes; physics continues.
     this.#label = null;
     this.#intent = null;
+    this.#lastAirVelocity = null;
+    this.#clearPostPopSamples();
     this.#grind.reset(); // a bail clears any grind candidate/latch too
     this.#lastFailReason = reason;
     this.#phase = 'bail';
@@ -626,6 +798,49 @@ export class GestureFSM {
   }
 
   // --- air-phase helpers -----------------------------------------------------
+
+  /**
+   * A shipping motion-tap pop resolves on the kicked role's replant. Retain
+   * only the suffix after that edge: lift/prep motion is not an airborne flick,
+   * even when Windows batches both sides of the retap into one sim step.
+   * Legacy clicks have no per-sample trigger marker, so they start buffering
+   * with the following step rather than guessing and admitting pre-pop input.
+   */
+  #captureSamplesAfterRecognizedTap(inp: FsmInputs, pop: PopRecognition): void {
+    const samples = inp.footSamples ?? [];
+    if (samples.length === 0) return;
+    const role = pop.label === 'ollie' ? 'tail' : 'nose';
+    const other = role === 'tail' ? 'nose' : 'tail';
+    let wasPlanted = role === 'tail' ? this.#prevTailPlanted : this.#prevNosePlanted;
+    for (let index = 0; index < samples.length; index += 1) {
+      const feet = samples[index]!.state;
+      const planted = feet[role].planted;
+      if (!wasPlanted && planted && feet[other].planted) {
+        // Rebinding normally zeroes velocity on the retap sample. Gesture
+        // evidence begins strictly after the sample that resolved the pop.
+        this.#appendPostPopSamples(samples.slice(index + 1));
+        return;
+      }
+      wasPlanted = planted;
+    }
+  }
+
+  #appendPostPopSamples(samples: readonly FeetSample[]): void {
+    const room = POST_POP_SAMPLE_BUFFER_CAP - this.#postPopSamples.length;
+    if (room <= 0 || samples.length === 0) return;
+    this.#postPopSamples.push(...samples.slice(0, room));
+  }
+
+  #takePostPopSamples(): FeetSample[] {
+    if (this.#postPopSamples.length === 0) return [];
+    const samples = this.#postPopSamples;
+    this.#postPopSamples = [];
+    return samples;
+  }
+
+  #clearPostPopSamples(): void {
+    this.#postPopSamples.length = 0;
+  }
 
   #trackApex(inp: FsmInputs): void {
     if (!this.#apexSeen && inp.pose.lv.y <= 0) {
@@ -691,9 +906,9 @@ export class GestureFSM {
    * label so ManeuverAssist can drive the per-step envelope. Flick-vs-steer
    * (§3.1) is resolved by construction: this only runs airborne, never on ground.
    */
-  #classifyAir(inp: FsmInputs): void {
+  #classifyAir(inp: FsmInputs, sampleOverride?: readonly FeetSample[]): void {
     if (!this.#label || inp.step > this.#label.expireStep) return;
-    const samples = inp.footSamples ?? [];
+    const samples = sampleOverride ?? inp.footSamples ?? [];
     let g: AirGesture | null = null;
     if (samples.length > 0) {
       for (const sample of samples) {
@@ -713,8 +928,21 @@ export class GestureFSM {
         tail: { planted: inp.feet.tail.planted, vel: inp.feet.tail.vel },
       });
     }
-    this.#label.air = g;
     if (g) {
+      // Registry resolution is the authoritative semantic gate. Gameplay V1
+      // deliberately submits only the first recognized air action; the
+      // resolver/registry can represent longer sequences, but enabling those
+      // later also requires discrete in-air gesture segmentation/reset.
+      if (this.#intent?.fallback) {
+        const resolution = this.#trickResolver.offerAirGesture({
+          gesture: g.label,
+          step: inp.step,
+          confidence: g.confidence,
+          intensity: g.intensity,
+        });
+        if (!resolution.accepted) return;
+      }
+      this.#label.air = g;
       const direction: TrickIntentV1['direction'] =
         g.label === 'kickflip'
           ? 'heelside'
@@ -743,6 +971,8 @@ export class GestureFSM {
         this.#intent?.confidence !== nextIntent.confidence;
       this.#intent = nextIntent;
       if (changed) this.telemetry?.log({ type: 'trickIntent', step: inp.step, intent: this.intent! });
+    } else {
+      this.#label.air = null;
     }
   }
 

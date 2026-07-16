@@ -32,6 +32,12 @@ import {
   type SkateWheelId,
   type SkateWheelObservation,
 } from './SkateboardContactSolver';
+import { positiveSubstepCount } from './simRates';
+import {
+  isRideableWheelSupport,
+  TransitionAssist,
+  type TransitionAssistAction,
+} from './TransitionAssist';
 
 /** Full rigid-body observation (position, orientation, linear/angular velocity). */
 export interface BoardPose {
@@ -52,6 +58,36 @@ export type WheelId = SkateWheelId;
 /** Fresh plain-data wheel telemetry. Physics handles never cross this boundary. */
 export interface WheelObservation extends SkateWheelObservation {}
 
+export interface PhysicsDiagnostics {
+  boardMass: number;
+  riderMass: number;
+  totalMass: number;
+  physicsSubsteps: number;
+  internalHz: number;
+  ccdEnabled: boolean;
+  activePopSubstepsRemaining: number;
+  centerOfMassLocal: Vec3;
+  inertia: Vec3;
+  /** Actual stability torque requested and applied before the last step, N·m. */
+  lastStepGroundBalanceTorque: Vec3;
+  /** Net linear pop impulse applied during the last step, N·s. */
+  lastStepPopLinearImpulse: Vec3;
+  /** Pop angular impulse applied about the physical nose/tail lever, N·m·s. */
+  lastStepPopAngularImpulse: Vec3;
+  /** Net transition pump/lip impulse applied during the last step, N·s. */
+  lastStepTransitionLinearImpulse: Vec3;
+  /** Transition landing angular impulse applied during the last step, N·m·s. */
+  lastStepTransitionAngularImpulse: Vec3;
+}
+
+interface PopEnvelope {
+  totalSubsteps: number;
+  nextSubstep: number;
+  jY: number;
+  kick: number;
+  popSide: 'tail' | 'nose';
+}
+
 /** Deterministic world-level recovery causes surfaced to the harness. */
 export type WorldRecoveryReason = 'out-of-bounds' | 'unrideable';
 
@@ -61,6 +97,44 @@ export interface WorldStepResult {
 
 /** Distance below the physical ground at which a malformed/stuck fall resets. */
 const KILL_DEPTH_BELOW_GROUND_M = 2;
+
+/**
+ * Contact-force events become ride support only when the physical wheel solve
+ * verifies the same surface. This prevents a rolled deck striking a wall (or
+ * an inverted deck striking a ceiling) from hiding in the landing channel.
+ * Near-vertical support additionally requires the stateful transition system,
+ * which distinguishes a continued ramp/landing from an arbitrary wall face.
+ */
+export function isVerifiedRideSupportForce(
+  force: Vec3,
+  supportNormal: Vec3 | null,
+  wheelContacts: number,
+  transitionSurface: boolean,
+  preContactVerticalVelocity = 0,
+): boolean {
+  const forceLength = Math.hypot(force.x, force.y, force.z);
+  if (!Number.isFinite(forceLength) || forceLength <= 1e-9) return false;
+  // A floor/ledge can hit the deck before two swept wheels report support.
+  // Pre-step velocity supplies the missing orientation: a descending body with
+  // a vertical contact is landing, while an ascending ceiling strike is not.
+  const verticalAlignment = Math.abs(force.y) / forceLength;
+  if (
+    verticalAlignment >= 0.75 &&
+    Number.isFinite(preContactVerticalVelocity) &&
+    preContactVerticalVelocity <= 0
+  ) return true;
+  if (wheelContacts < 2 || !supportNormal) return false;
+  const normalLength = Math.hypot(supportNormal.x, supportNormal.y, supportNormal.z);
+  if (!Number.isFinite(normalLength) || normalLength <= 1e-9) return false;
+  const nx = supportNormal.x / normalLength;
+  const ny = supportNormal.y / normalLength;
+  const nz = supportNormal.z / normalLength;
+  // Downward-facing normals are ceilings/undersides. Surfaces steeper than
+  // roughly 75° need the transition continuity/landing proof.
+  if (ny <= 0 || (ny < 0.25 && !transitionSurface)) return false;
+  const alignment = Math.abs(force.x * nx + force.y * ny + force.z * nz) / forceLength;
+  return alignment >= 0.55;
+}
 
 // --- Rapier init (module-level guard: init exactly once) --------------------
 let rapierInit: Promise<void> | null = null;
@@ -111,7 +185,7 @@ function applyAngularDelta(
   body: RigidBody,
   delta: Vec3,
   maxImpulse: number,
-): void {
+): Vec3 {
   const inertia = body.effectiveAngularInertia();
   let impulse = {
     x: inertia.m11 * delta.x + inertia.m12 * delta.y + inertia.m13 * delta.z,
@@ -120,12 +194,13 @@ function applyAngularDelta(
   };
   const magnitude = Math.hypot(impulse.x, impulse.y, impulse.z);
   const cap = Math.max(0, maxImpulse);
-  if (!Number.isFinite(magnitude) || magnitude <= 1e-9 || cap <= 0) return;
+  if (!Number.isFinite(magnitude) || magnitude <= 1e-9 || cap <= 0) return zero();
   if (magnitude > cap) {
     const scale = cap / magnitude;
     impulse = { x: impulse.x * scale, y: impulse.y * scale, z: impulse.z * scale };
   }
   body.applyTorqueImpulse(impulse, true);
+  return impulse;
 }
 
 export class SimWorld {
@@ -134,6 +209,7 @@ export class SimWorld {
   #world: World | null = null;
   #board: RigidBody | null = null;
   #contactSolver: SkateboardContactSolver | null = null;
+  #transitionAssist: TransitionAssist;
   #eventQueue: EventQueue | null = null;
   private stepCount = 0;
   private seed = 0;
@@ -150,16 +226,31 @@ export class SimWorld {
   #lastContactImpulse = 0;
   /** Vertical-dominant subset of the last contact impulse (floor/rail support). */
   #lastSupportContactImpulse = 0;
+  /** Off-axis subset of the last contact impulse (walls/obstacles, not support). */
+  #lastImpactContactImpulse = 0;
   /** Consecutive floor-supported steps with the deck outside the rideable cone. */
   #unrideableSupportSteps = 0;
   /** False while a real pop/air/catch/grind/bail outcome owns recovery. */
   #unrideableRecoveryEnabled = true;
+  /** Short force/impulse envelope that gives pop a physical contact duration. */
+  #activePop: PopEnvelope | null = null;
+  /** Stability torque queued by applyGroundForces for the next integration step. */
+  #pendingGroundBalanceTorque: Vec3 = zero();
+  #lastGroundBalanceTorque: Vec3 = zero();
+  #lastPopLinearImpulse: Vec3 = zero();
+  #lastPopAngularImpulse: Vec3 = zero();
+  #lastTransitionLinearImpulse: Vec3 = zero();
+  #lastTransitionAngularImpulse: Vec3 = zero();
+  /** Highest-priority transition action physically applied during the last step. */
+  #lastTransitionAssist: TransitionAssistAction | null = null;
 
   /** Pose snapshots for render interpolation (previous + current step). */
   private prevPose: RenderPose = { p: zero(), q: { x: 0, y: 0, z: 0, w: 1 } };
   private currPose: RenderPose = { p: zero(), q: { x: 0, y: 0, z: 0, w: 1 } };
 
-  constructor(private readonly config: SimConfig) {}
+  constructor(private readonly config: SimConfig) {
+    this.#transitionAssist = new TransitionAssist(config.transition);
+  }
 
   /** Idempotent one-time engine init. */
   init(): Promise<void> {
@@ -177,8 +268,10 @@ export class SimWorld {
     this.#unrideableRecoveryEnabled = true;
 
     const phys = this.config.physics;
+    const substeps = positiveSubstepCount(phys.physicsSubsteps);
     const world = new RAPIER.World(phys.gravity);
-    world.timestep = 1 / phys.hz;
+    world.timestep = 1 / (phys.hz * substeps);
+    world.maxCcdSubsteps = positiveSubstepCount(phys.ccdSubsteps);
 
     const rng = mulberry32(mixSeed(seed));
     const handle = getLevelBuilder(levelId)(RAPIER, world, this.config, rng);
@@ -191,6 +284,17 @@ export class SimWorld {
     this.#rails = handle.rails ? handle.rails.map((r) => ({ ...r })) : [];
     this.#bailStepsLeft = null;
     this.#lastContactImpulse = 0;
+    this.#lastSupportContactImpulse = 0;
+    this.#lastImpactContactImpulse = 0;
+    this.#activePop = null;
+    this.#pendingGroundBalanceTorque = zero();
+    this.#lastGroundBalanceTorque = zero();
+    this.#lastPopLinearImpulse = zero();
+    this.#lastPopAngularImpulse = zero();
+    this.#lastTransitionLinearImpulse = zero();
+    this.#lastTransitionAngularImpulse = zero();
+    this.#transitionAssist.reset();
+    this.#lastTransitionAssist = null;
     this.stepCount = 0;
     this.seed = seed;
     this.levelId = levelId;
@@ -204,35 +308,63 @@ export class SimWorld {
   step(): WorldStepResult {
     const world = this.requireWorld();
     const hz = this.config.physics.hz;
-    this.#contactSolver?.update(world, this.requireBoard(), 1 / hz);
-    // Query-wheel support is a physical point impulse, but it is not a Rapier
-    // collider contact event. Preserve it for first-strike landing judgment.
-    const wheelSupportImpulse = this.#contactSolver?.maxSupportImpulse ?? 0;
+    const substeps = positiveSubstepCount(this.config.physics.physicsSubsteps);
+    const substepDt = 1 / (hz * substeps);
     const queue = this.#eventQueue;
-    if (queue) {
-      world.step(queue);
-      // Observe (never alter) collision strength: max contact force over the
-      // step, converted to an impulse magnitude (N·s) at the fixed timestep so
-      // the FSM compares directly against physics.interruptCollisionImpulse.
-      let maxForce = 0;
-      let maxSupportForce = 0;
-      queue.drainContactForceEvents((ev) => {
-        const f = ev.maxForceMagnitude();
-        if (Number.isFinite(f) && f > maxForce) maxForce = f;
-        const total = ev.totalForce();
-        const vertical = Math.abs(total.y);
-        const horizontal = Math.hypot(total.x, total.z);
-        if (Number.isFinite(vertical) && vertical > horizontal * 0.7 && f > maxSupportForce) {
-          maxSupportForce = f;
-        }
-      });
-      this.#lastContactImpulse = maxForce / hz;
-      this.#lastSupportContactImpulse = Math.max(maxSupportForce / hz, wheelSupportImpulse);
-    } else {
-      world.step();
-      this.#lastContactImpulse = 0;
-      this.#lastSupportContactImpulse = wheelSupportImpulse;
+    let contactImpulse = 0;
+    let supportImpulse = 0;
+    let impactImpulse = 0;
+    this.#lastGroundBalanceTorque = { ...this.#pendingGroundBalanceTorque };
+    this.#pendingGroundBalanceTorque = zero();
+    this.#lastPopLinearImpulse = zero();
+    this.#lastPopAngularImpulse = zero();
+    this.#lastTransitionLinearImpulse = zero();
+    this.#lastTransitionAngularImpulse = zero();
+    this.#lastTransitionAssist = null;
+    for (let substep = 0; substep < substeps; substep++) {
+      this.#applyPopEnvelopeSubstep();
+      this.#contactSolver?.update(world, this.requireBoard(), substepDt);
+      this.#applyTransitionAssistSubstep(substepDt);
+      supportImpulse += this.#contactSolver?.maxSupportImpulse ?? 0;
+      if (queue) {
+        const preContactVerticalVelocity = this.requireBoard().linvel().y;
+        world.step(queue);
+        queue.drainContactForceEvents((ev) => {
+          const force = ev.maxForceMagnitude();
+          if (Number.isFinite(force)) contactImpulse += force * substepDt;
+          const total = ev.totalForce();
+          const directionMagnitude = Math.hypot(total.x, total.y, total.z);
+          if (Number.isFinite(force) && directionMagnitude > 1e-9) {
+            // A loaded skateboard produces large, correct forces when the deck,
+            // trucks, or wheels meet the ground. Those must drive landing feel,
+            // not the crash detector. Classify a contact as support when its
+            // force agrees with a live multi-wheel support plane. The remaining
+            // channel represents walls, ceilings, and obstacle strikes.
+            const solver = this.#contactSolver;
+            const transitionSurface =
+              this.#lastTransitionAssist?.kind === 'pump' ||
+              this.#lastTransitionAssist?.kind === 'landing';
+            const impulse = force * substepDt;
+            if (isVerifiedRideSupportForce(
+              total,
+              solver?.supportNormal ?? null,
+              solver?.contactCount ?? 0,
+              transitionSurface,
+              preContactVerticalVelocity,
+            )) {
+              supportImpulse += impulse;
+            } else {
+              impactImpulse += impulse;
+            }
+          }
+        });
+      } else {
+        world.step();
+      }
     }
+    this.#lastContactImpulse = contactImpulse;
+    this.#lastSupportContactImpulse = supportImpulse;
+    this.#lastImpactContactImpulse = impactImpulse;
     this.stepCount += 1;
 
     // --- Bail-respawn game rule (M4). Internal + deterministic: the countdown
@@ -273,6 +405,15 @@ export class SimWorld {
     body.setAngularDamping(phys.angularDamping);
     this.#bailStepsLeft = null;
     this.#unrideableSupportSteps = 0;
+    this.#activePop = null;
+    this.#pendingGroundBalanceTorque = zero();
+    this.#lastGroundBalanceTorque = zero();
+    this.#lastPopLinearImpulse = zero();
+    this.#lastPopAngularImpulse = zero();
+    this.#lastTransitionLinearImpulse = zero();
+    this.#lastTransitionAngularImpulse = zero();
+    this.#transitionAssist.reset();
+    this.#lastTransitionAssist = null;
   }
 
   getStep(): number {
@@ -302,21 +443,50 @@ export class SimWorld {
     };
   }
 
+  /** Plain-data physics configuration/state for traces and acceptance tests. */
+  physicsDiagnostics(): PhysicsDiagnostics {
+    const phys = this.config.physics;
+    const substeps = positiveSubstepCount(phys.physicsSubsteps);
+    const body = this.requireBoard();
+    const localCom = body.localCom();
+    const inertia = body.effectiveAngularInertia();
+    return {
+      boardMass: phys.boardMass,
+      riderMass: phys.riderMass,
+      totalMass: body.mass(),
+      physicsSubsteps: substeps,
+      internalHz: phys.hz * substeps,
+      ccdEnabled: body.isCcdEnabled(),
+      activePopSubstepsRemaining: this.#activePop
+        ? this.#activePop.totalSubsteps - this.#activePop.nextSubstep
+        : 0,
+      centerOfMassLocal: { x: localCom.x, y: localCom.y, z: localCom.z },
+      inertia: { x: inertia.m11, y: inertia.m22, z: inertia.m33 },
+      lastStepGroundBalanceTorque: { ...this.#lastGroundBalanceTorque },
+      lastStepPopLinearImpulse: { ...this.#lastPopLinearImpulse },
+      lastStepPopAngularImpulse: { ...this.#lastPopAngularImpulse },
+      lastStepTransitionLinearImpulse: { ...this.#lastTransitionLinearImpulse },
+      lastStepTransitionAngularImpulse: { ...this.#lastTransitionAngularImpulse },
+    };
+  }
+
   /**
-   * Rideable-ground read (M3). At least two real wheel rays must be in contact
-   * and the deck-up vector must remain inside the configured upright cone. A
-   * deck balanced on its side can touch the floor, but it is not a stance a
-   * rider can stand on or drive from.
+   * Rideable-support read (M3). At least two real wheels must be in contact and
+   * deck-up must align with world-up OR the live support normal. The latter is
+   * what keeps ground control active through steep transition/vert; a deck on
+   * its side on flat ground still has zero support-normal alignment.
    */
   isGrounded(): boolean {
     const body = this.requireBoard();
     const phys = this.config.physics;
     const q = body.rotation();
-    const deckUpY = 1 - 2 * (q.x * q.x + q.z * q.z);
-    return (
-      Number.isFinite(deckUpY) &&
-      deckUpY >= phys.ridableDeckUpDot &&
-      this.#wheelContactCount() >= 2
+    const deckUp = quatRotate(q, 0, 1, 0);
+    const supportNormal = this.#contactSolver?.supportNormal ?? null;
+    return isRideableWheelSupport(
+      deckUp,
+      supportNormal,
+      this.#wheelContactCount(),
+      phys.ridableDeckUpDot,
     );
   }
 
@@ -325,6 +495,12 @@ export class SimWorld {
     const solver = this.#contactSolver;
     if (!solver) throw new Error('SimWorld.reset() must run before use');
     return solver.observations();
+  }
+
+  /** Load-weighted world-space ride surface from the latest wheel solve. */
+  wheelSupportNormal(): Vec3 | null {
+    const normal = this.#contactSolver?.supportNormal ?? null;
+    return normal ? { ...normal } : null;
   }
 
   /**
@@ -362,6 +538,7 @@ export class SimWorld {
    * Must be called BEFORE step() so the impulses integrate this tick.
    */
   applyGroundForces(cmd: GroundCommand): void {
+    this.#pendingGroundBalanceTorque = zero();
     if (!cmd.active) {
       this.#setWheelEngineForce(0);
       this.#setWheelBrake(0);
@@ -372,7 +549,7 @@ export class SimWorld {
     const phys = this.config.physics;
     const loco = this.config.locomotion;
     const dt = 1 / phys.hz;
-    const mass = phys.boardMass;
+    const mass = phys.boardMass + phys.riderMass;
 
     const lv = body.linvel();
     const av = body.angvel();
@@ -407,20 +584,25 @@ export class SimWorld {
     // through the four physical wheels instead.
     let wheelDriveForce = 0;
     if (hasForward && loco.cruiseTargetSpeed > 1e-4) {
-      const drive = clampNum(cmd.driveForce, 0, loco.cruiseDriveForce);
+      const drive = clampNum(cmd.driveForce, 0, loco.accelerationStrokePeakForce);
       const scale = clampNum(1 - fwdSpeed / loco.cruiseTargetSpeed, 0, 1);
       wheelDriveForce = drive * scale;
     }
     this.#setWheelEngineForce(wheelDriveForce);
     this.#setWheelBrake(clampNum(cmd.brakeForce, 0, loco.coastBrakeForce));
 
-    // Wheel rays provide suspension contact while skateboard geometry owns
+    // Swept wheel volumes provide suspension contact while skateboard geometry owns
     // steering: actual deck lean pivots the two truck axles in opposite
     // directions, attenuated by speed and each axle's live suspension load.
     const frontLoad = this.#contactSolver?.frontLoad ?? 0;
     const rearLoad = this.#contactSolver?.rearLoad ?? 0;
-    const truckSteer = skateboardTruckSteering({
-      leanRad: Math.asin(clampNum(right.y, -1, 1)),
+    const rawLean = Math.asin(clampNum(right.y, -1, 1));
+    const leanDeadzone = loco.truckLeanDeadzoneDeg * Math.PI / 180;
+    const intentionalLean = Math.abs(rawLean) <= leanDeadzone
+      ? 0
+      : Math.sign(rawLean) * (Math.abs(rawLean) - leanDeadzone);
+    const leanSteer = skateboardTruckSteering({
+      leanRad: intentionalLean,
       speed: Math.hypot(lv.x, lv.z),
       frontLoad,
       rearLoad,
@@ -428,7 +610,46 @@ export class SimWorld {
       maxSteerRad: (loco.truckSteerMaxDeg * Math.PI) / 180,
       speedFade: loco.truckSteerSpeedFade,
     });
-    this.#setTruckSteering(truckSteer.front, truckSteer.rear);
+    let headingError = 0;
+    let commandedSteer = 0;
+    const horizontalSpeed = Math.hypot(lv.x, lv.z);
+    if (cmd.steerAngle != null && Number.isFinite(cmd.steerAngle)) {
+      const boardYaw = Math.atan2(fwd.x, fwd.z);
+      headingError = wrapPi(cmd.steerAngle - boardYaw);
+      if (horizontalSpeed >= loco.rideMotionFullSpeed) {
+        const desiredYawRate = clampNum(
+          headingError * loco.steerHeadingBiasGain,
+          -phys.steerYawRateMax,
+          phys.steerYawRateMax,
+        );
+        // Opposing front/rear trucks behave like symmetric four-wheel steer:
+        // δ = atan(yawRate * wheelbase / (2 * speed)). This keeps the physical
+        // truck model while preventing an 18° full-lock toy snap at cruise.
+        commandedSteer = Math.atan2(
+          desiredYawRate * phys.wheelbase,
+          2 * horizontalSpeed,
+        );
+      }
+    } else if (horizontalSpeed >= loco.rideMotionFullSpeed && Number.isFinite(cmd.targetYawRate)) {
+      commandedSteer = Math.atan2(cmd.targetYawRate * phys.wheelbase, horizontalSpeed);
+    }
+    const maxTruckSteer = loco.truckSteerMaxDeg * Math.PI / 180;
+    const yawRateSteerCap = horizontalSpeed >= loco.rideMotionFullSpeed
+      ? Math.atan2(phys.steerYawRateMax * phys.wheelbase, 2 * horizontalSpeed)
+      : maxTruckSteer;
+    const effectiveTruckSteerMax = Math.min(maxTruckSteer, yawRateSteerCap);
+    this.#setTruckSteering(
+      clampNum(
+        leanSteer.front + commandedSteer,
+        -effectiveTruckSteerMax,
+        effectiveTruckSteerMax,
+      ),
+      clampNum(
+        leanSteer.rear - commandedSteer,
+        -effectiveTruckSteerMax,
+        effectiveTruckSteerMax,
+      ),
+    );
 
     // --- Push pulse: one-shot impulse, momentum-capped at maxGroundSpeed ------
     if (hasForward) {
@@ -445,24 +666,31 @@ export class SimWorld {
       body.applyImpulse({ x: impulse.x, y: 0, z: impulse.z }, true);
     }
 
-    // --- Steering: the two-finger segment is a heading, not a throttle --------
-    // Absolute control contract: the calibrated tail→nose finger angle is the
-    // desired world board yaw. Initial placement is authoritative; there is no
-    // hidden anchor to the board's previous heading.
-    let headingRate = 0;
-    if (cmd.steerAngle != null && Number.isFinite(cmd.steerAngle)) {
-      const boardYaw = Math.atan2(fwd.x, fwd.z);
-      const headingError = wrapPi(cmd.steerAngle - boardYaw);
-      headingRate = loco.steerHeadingBiasGain * headingError;
+    // Rate-mode callers get a moving-only rider/truck yaw damper. Unlike the
+    // removed heading servo, it cannot rotate a stopped board toward an angle;
+    // it only rejects unintended spin (or tracks an explicit yaw rate) once
+    // the wheels are rolling. Absolute trackpad heading still acts through
+    // front/rear truck curvature above.
+    const deckUp = quatRotate(q, 0, 1, 0);
+    let yawImpulse = 0;
+    if (
+      cmd.steerAngle == null &&
+      horizontalSpeed >= loco.rideMotionFullSpeed &&
+      Number.isFinite(cmd.targetYawRate)
+    ) {
+      const yawRate = av.x * deckUp.x + av.y * deckUp.y + av.z * deckUp.z;
+      const targetYawRate = clampNum(
+        cmd.targetYawRate,
+        -phys.steerYawRateMax,
+        phys.steerYawRateMax,
+      );
+      const yawTorque = clampNum(
+        (targetYawRate - yawRate) * loco.steerServoGain,
+        -loco.steerMaxTorque,
+        loco.steerMaxTorque,
+      );
+      yawImpulse = yawTorque * dt;
     }
-    const targetYaw = clampNum(
-      cmd.targetYawRate + headingRate,
-      -phys.steerYawRateMax,
-      phys.steerYawRateMax,
-    );
-    const yawErr = targetYaw - av.y;
-    const yawTorque = clampNum(loco.steerServoGain * yawErr, -loco.steerMaxTorque, loco.steerMaxTorque);
-    const yawImpulse = yawTorque * dt;
 
     // --- Lean roll: small clamped torque about the board-forward axis ---------
     const rollTorque = clampNum(cmd.rollTorque, -loco.leanMaxRollTorque, loco.leanMaxRollTorque);
@@ -472,15 +700,55 @@ export class SimWorld {
     // wheelie the deck until its ray origins sink through the floor. Model the
     // planted rider's neutral fore/aft balance as an equal counter-pitch torque;
     // this changes no pose and leaves trick/air steps untouched (engine=0).
-    const drivenWheels = this.#contactSolver ? 4 : 0;
+    // The contact solver receives TOTAL drive force and distributes one quarter
+    // to each live wheel. Counter exactly the force actually delivered, not
+    // four copies of the total.
+    const drivenWheelFraction = (this.#contactSolver?.contactCount ?? 0) / 4;
     const enginePitchImpulse =
-      wheelDriveForce * drivenWheels * (phys.truckDropY + phys.truckHalfExtents.y) * dt;
+      wheelDriveForce * drivenWheelFraction *
+      (phys.truckDropY + phys.truckHalfExtents.y) * dt;
 
-    const tx = fwd.x * rollImpulse + right.x * enginePitchImpulse;
-    const ty = yawImpulse + fwd.y * rollImpulse + right.y * enginePitchImpulse;
-    const tz = fwd.z * rollImpulse + right.z * enginePitchImpulse;
+    const tx = fwd.x * rollImpulse + right.x * enginePitchImpulse + deckUp.x * yawImpulse;
+    const ty = fwd.y * rollImpulse + right.y * enginePitchImpulse + deckUp.y * yawImpulse;
+    const tz = fwd.z * rollImpulse + right.z * enginePitchImpulse + deckUp.z * yawImpulse;
     if (Number.isFinite(tx) && Number.isFinite(ty) && Number.isFinite(tz)) {
       body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
+    }
+
+    // The invisible rider/load proxy is not dead cargo. While at least two
+    // wheels support a rideable deck, a bounded physical PD torque balances
+    // the board to the live surface normal and damps roll/pitch wobble. Yaw is
+    // deliberately excluded: turning still comes only from truck curvature.
+    const surfaceNormal = this.#contactSolver?.supportNormal ?? null;
+    if (surfaceNormal && this.isGrounded()) {
+      const errorAxis = {
+        x: deckUp.y * surfaceNormal.z - deckUp.z * surfaceNormal.y,
+        y: deckUp.z * surfaceNormal.x - deckUp.x * surfaceNormal.z,
+        z: deckUp.x * surfaceNormal.y - deckUp.y * surfaceNormal.x,
+      };
+      const normalSpin =
+        av.x * surfaceNormal.x + av.y * surfaceNormal.y + av.z * surfaceNormal.z;
+      const tiltRate = {
+        x: av.x - surfaceNormal.x * normalSpin,
+        y: av.y - surfaceNormal.y * normalSpin,
+        z: av.z - surfaceNormal.z * normalSpin,
+      };
+      let balance = {
+        x: loco.groundBalanceKp * errorAxis.x - loco.groundBalanceKd * tiltRate.x,
+        y: loco.groundBalanceKp * errorAxis.y - loco.groundBalanceKd * tiltRate.y,
+        z: loco.groundBalanceKp * errorAxis.z - loco.groundBalanceKd * tiltRate.z,
+      };
+      const balanceMagnitude = Math.hypot(balance.x, balance.y, balance.z);
+      const balanceCap = Math.max(0, loco.groundBalanceTorqueMax);
+      if (balanceMagnitude > balanceCap && balanceMagnitude > 1e-9) {
+        const scale = balanceCap / balanceMagnitude;
+        balance = { x: balance.x * scale, y: balance.y * scale, z: balance.z * scale };
+      }
+      body.applyTorqueImpulse(
+        { x: balance.x * dt, y: balance.y * dt, z: balance.z * dt },
+        true,
+      );
+      this.#pendingGroundBalanceTorque = { ...balance };
     }
   }
 
@@ -496,6 +764,23 @@ export class SimWorld {
   /** Last vertical-dominant contact impulse: floor/rail support, not wall hits. */
   lastSupportContactImpulseMagnitude(): number {
     return this.#lastSupportContactImpulse;
+  }
+
+  /** Last off-axis contact impulse: walls/obstacles, excluding ride support. */
+  lastImpactContactImpulseMagnitude(): number {
+    return this.#lastImpactContactImpulse;
+  }
+
+  /** Last gameplay-step transition force request, copied for tests/observability. */
+  lastTransitionAssist(): TransitionAssistAction | null {
+    const action = this.#lastTransitionAssist;
+    return action
+      ? {
+          ...action,
+          linearImpulse: { ...action.linearImpulse },
+          angularDelta: { ...action.angularDelta },
+        }
+      : null;
   }
 
   /**
@@ -529,19 +814,16 @@ export class SimWorld {
         const legacyPitch = Math.abs(cmd.pitchTorqueImpulse ?? 0);
         const requestedKick = cmd.kickImpulse ?? legacyPitch / lever;
         const kick = clampNum(requestedKick, 0, pop.pitchTorqueImpulseMax / lever);
-        // A coupled lift + downward kick at the chosen end preserves the net
-        // vertical pop impulse while creating pitch through the real lever arm.
-        body.applyImpulse({ x: 0, y: jY + kick, z: 0 }, true);
-        if (kick > 0) {
-          const localZ = cmd.popSide === 'nose' ? lever : -lever;
-          const endOffset = quatRotate(q, 0, 0, localZ);
-          const com = body.worldCom();
-          body.applyImpulseAtPoint(
-            { x: 0, y: -kick, z: 0 },
-            { x: com.x + endOffset.x, y: com.y + endOffset.y, z: com.z + endOffset.z },
-            true,
-          );
-        }
+        // Queue a short half-sine actuation. The paired lift + downward kick
+        // still preserves net jY and creates pitch through the real lever arm,
+        // but no longer changes the board's entire velocity in one instant.
+        this.#activePop = {
+          totalSubsteps: Math.max(1, Math.floor(pop.actuationSubsteps)),
+          nextSubstep: 0,
+          jY,
+          kick,
+          popSide: cmd.popSide === 'nose' ? 'nose' : 'tail',
+        };
         break;
       }
       case 'ollieLevel': {
@@ -627,7 +909,7 @@ export class SimWorld {
       }
       case 'landScrub': {
         const scrub = clampNum(cmd.scrubFraction, 0, 0.9);
-        const m = phys.boardMass;
+        const m = phys.boardMass + phys.riderMass;
         body.applyImpulse({ x: -m * scrub * lv.x, y: 0, z: -m * scrub * lv.z }, true);
         break;
       }
@@ -655,7 +937,7 @@ export class SimWorld {
             balanceLateral: cmd.balanceLateral,
           },
           this.config.grind,
-          phys.boardMass,
+          phys.boardMass + phys.riderMass,
           phys.hz,
         );
         if (Number.isFinite(lin.x) && Number.isFinite(lin.z) && (lin.x !== 0 || lin.z !== 0)) {
@@ -718,7 +1000,104 @@ export class SimWorld {
       this.#world = null;
       this.#board = null;
       this.#contactSolver = null;
+      this.#activePop = null;
+      this.#transitionAssist.reset();
+      this.#lastTransitionAssist = null;
+      this.#pendingGroundBalanceTorque = zero();
+      this.#lastGroundBalanceTorque = zero();
+      this.#lastPopLinearImpulse = zero();
+      this.#lastPopAngularImpulse = zero();
+      this.#lastTransitionLinearImpulse = zero();
+      this.#lastTransitionAngularImpulse = zero();
     }
+  }
+
+  /** Apply one bounded transition request before Rapier integrates this substep. */
+  #applyTransitionAssistSubstep(dt: number): void {
+    const body = this.requireBoard();
+    const solver = this.#contactSolver;
+    if (!solver) return;
+    const q = body.rotation();
+    const boardUp = quatRotate(q, 0, 1, 0);
+    const action = this.#transitionAssist.update({
+      supported: this.isGrounded(),
+      supportNormal: solver.supportNormal,
+      boardUp,
+      velocity: body.linvel(),
+      angularVelocity: body.angvel(),
+      dt,
+      totalMass: body.mass(),
+    });
+
+    const impulse = action.linearImpulse;
+    if (
+      Number.isFinite(impulse.x) &&
+      Number.isFinite(impulse.y) &&
+      Number.isFinite(impulse.z) &&
+      (impulse.x !== 0 || impulse.y !== 0 || impulse.z !== 0)
+    ) {
+      body.applyImpulse(impulse, true);
+      this.#lastTransitionLinearImpulse.x += impulse.x;
+      this.#lastTransitionLinearImpulse.y += impulse.y;
+      this.#lastTransitionLinearImpulse.z += impulse.z;
+    }
+    const appliedAngularImpulse = action.angularImpulseMax > 0
+      ? applyAngularDelta(body, action.angularDelta, action.angularImpulseMax)
+      : zero();
+    this.#lastTransitionAngularImpulse.x += appliedAngularImpulse.x;
+    this.#lastTransitionAngularImpulse.y += appliedAngularImpulse.y;
+    this.#lastTransitionAngularImpulse.z += appliedAngularImpulse.z;
+
+    if (
+      action.kind !== 'none' &&
+      (!this.#lastTransitionAssist ||
+        transitionActionPriority(action.kind) >=
+          transitionActionPriority(this.#lastTransitionAssist.kind))
+    ) {
+      this.#lastTransitionAssist = {
+        ...action,
+        linearImpulse: { ...action.linearImpulse },
+        angularDelta: { ...action.angularDelta },
+      };
+    }
+  }
+
+  /** Deliver one normalized half-sine slice of the queued pop impulse. */
+  #applyPopEnvelopeSubstep(): void {
+    const envelope = this.#activePop;
+    if (!envelope) return;
+    const n = envelope.totalSubsteps;
+    const index = envelope.nextSubstep;
+    let weightSum = 0;
+    for (let i = 0; i < n; i++) {
+      weightSum += Math.sin(Math.PI * (i + 1) / (n + 1));
+    }
+    const weight = Math.sin(Math.PI * (index + 1) / (n + 1)) / weightSum;
+    const body = this.requireBoard();
+    const kick = envelope.kick * weight;
+
+    body.applyImpulse(
+      { x: 0, y: (envelope.jY + envelope.kick) * weight, z: 0 },
+      true,
+    );
+    this.#lastPopLinearImpulse.y += envelope.jY * weight;
+    if (kick > 0) {
+      const lever = Math.max(0.1, this.config.physics.boardLength * 0.42);
+      const q = body.rotation();
+      const localZ = envelope.popSide === 'nose' ? lever : -lever;
+      const endOffset = quatRotate(q, 0, 0, localZ);
+      const com = body.worldCom();
+      body.applyImpulseAtPoint(
+        { x: 0, y: -kick, z: 0 },
+        { x: com.x + endOffset.x, y: com.y + endOffset.y, z: com.z + endOffset.z },
+        true,
+      );
+      this.#lastPopAngularImpulse.x += endOffset.z * kick;
+      this.#lastPopAngularImpulse.z -= endOffset.x * kick;
+    }
+
+    envelope.nextSubstep += 1;
+    if (envelope.nextSubstep >= envelope.totalSubsteps) this.#activePop = null;
   }
 
   private readRenderPose(): RenderPose {
@@ -778,15 +1157,22 @@ export class SimWorld {
     const p = body.translation();
     const q = body.rotation();
     const lv = body.linvel();
-    const deckUpY = 1 - 2 * (q.x * q.x + q.z * q.z);
+    const deckUp = quatRotate(q, 0, 1, 0);
+    // Preserve the old "misoriented deck" recovery condition while allowing
+    // a steep board that is genuinely aligned to transition support.
+    const rideableOrientation = isRideableWheelSupport(
+      deckUp,
+      this.#contactSolver?.supportNormal ?? null,
+      2,
+      phys.ridableDeckUpDot,
+    );
     const supportedHeight = phys.boardLength * 0.55;
     const supportedAndUnrideable =
       Number.isFinite(p.y) &&
       Number.isFinite(lv.y) &&
-      Number.isFinite(deckUpY) &&
       p.y <= supportedHeight &&
       Math.abs(lv.y) < 0.75 &&
-      deckUpY < phys.ridableDeckUpDot;
+      !rideableOrientation;
 
     this.#unrideableSupportSteps = supportedAndUnrideable
       ? this.#unrideableSupportSteps + 1
@@ -815,6 +1201,15 @@ function wrapPi(angle: number): number {
   while (x > Math.PI) x -= Math.PI * 2;
   while (x <= -Math.PI) x += Math.PI * 2;
   return x;
+}
+
+function transitionActionPriority(kind: TransitionAssistAction['kind']): number {
+  switch (kind) {
+    case 'lip-launch': return 3;
+    case 'landing': return 2;
+    case 'pump': return 1;
+    case 'none': return 0;
+  }
 }
 
 /** Rotate the vector (x,y,z) by quaternion q. Returns a plain Vec3. */

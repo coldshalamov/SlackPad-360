@@ -20,7 +20,8 @@
 
 import {
   CONTACT_FRAME_SCHEMA_VERSION,
-  CONTROL_TRACE_VERSION,
+  CONTROL_TRACE_V3_VERSION,
+  DEFAULT_FLICK_SENSITIVITY,
   DEFAULT_INPUT_PROFILE,
   DEFAULT_SIM_CONFIG,
   REPLAY_VERSION,
@@ -37,8 +38,11 @@ import type {
   ReplayHeader,
   SessionTrace,
   SimConfig,
-  ControlTraceEventV2,
+  ControlTraceEventV3,
+  SkateAssistObservationV1,
+  SkatePhysicsObservationV1,
   TrickIntentV1,
+  Vec3,
 } from "@slackpad/shared";
 import { SimWorld } from "../sim/SimWorld";
 import type { BoardPose, RenderPose } from "../sim/SimWorld";
@@ -56,7 +60,10 @@ import { DEFAULT_LEVEL_ID } from "../sim/levels/index";
 export type ProfileProvider = () => InputProfile;
 
 /** Pinned versions recorded in replay headers (must match package.json). */
-export const GAME_VERSION = "0.1.0";
+// Replay compatibility version, not the npm package version. Any deterministic
+// control/physics change must move this so an older recording fails loudly
+// instead of producing a plausible-looking divergent run.
+export const GAME_VERSION = "0.2.0";
 export const RAPIER_VERSION = "0.19.3";
 
 /** Pose hashing precision: round to 1e-6 before hashing (micrometer / µquat). */
@@ -65,6 +72,18 @@ const HASH_QUANT = 1_000_000;
 /** Digest seed for the consumed-frame input digest (FNV offset basis, hex). */
 const INPUT_DIGEST_SEED = "811c9dc5";
 
+const DIAGNOSTIC_EPSILON = 1e-9;
+
+function magnitude(value: Vec3): number {
+  return Math.hypot(value.x, value.y, value.z);
+}
+
+function normalizedStrength(actual: number, configuredMaximum: number): number {
+  if (!Number.isFinite(actual) || actual <= 0) return 0;
+  if (!Number.isFinite(configuredMaximum) || configuredMaximum <= 0) return 0;
+  return Math.min(1, actual / configuredMaximum);
+}
+
 /** A frame the agent may inject; `source` is optional and defaults to 'agent'. */
 export type InjectableFrame = Omit<ContactFrame, "source"> & {
   source?: ContactFrameSource;
@@ -72,6 +91,27 @@ export type InjectableFrame = Omit<ContactFrame, "source"> & {
 
 /** Optional renderer-supplied screenshot capability (arch §3.4). */
 export type ScreenshotProvider = () => Promise<string | null> | string | null;
+
+/** Read-only truth chain for diagnosing finger-to-board mapping in live play. */
+export interface ControlDiagnostics {
+  contacts: {
+    nose: { id: number | null; planted: boolean; pad: { x: number; y: number } };
+    tail: { id: number | null; planted: boolean; pad: { x: number; y: number } };
+  };
+  requestedHeadingRad: number | null;
+  actualHeadingRad: number;
+  headingErrorRad: number | null;
+  popSide: 'nose' | 'tail' | null;
+  noseOverTailMeters: number;
+  popPolarityOk: boolean | null;
+}
+
+function wrapRadians(angle: number): number {
+  let out = angle;
+  while (out > Math.PI) out -= Math.PI * 2;
+  while (out <= -Math.PI) out += Math.PI * 2;
+  return out;
+}
 
 /**
  * Stable checkpoint hash over quantized board pose + maneuver phase + the
@@ -109,6 +149,7 @@ export class AgentHarness {
   #fsm: GestureFSM;
   #assist: ManeuverAssist;
   #feetState: FeetState | null = null;
+  #lastRequestedHeadingRad: number | null = null;
 
   #assistLevel: 0 | 1 | 2;
   #lastInputSource: ContactFrameSource | null = null;
@@ -122,7 +163,7 @@ export class AgentHarness {
   #recordHeader: ReplayHeader | null = null;
   #recordedFrames: Array<{ step: number; frame: ContactFrame }> = [];
   #recordedCheckpoints: ReplayCheckpoint[] = [];
-  #recordedControlEvents: ControlTraceEventV2[] = [];
+  #recordedControlEvents: ControlTraceEventV3[] = [];
 
   #screenshotProvider: ScreenshotProvider | null = null;
 
@@ -227,6 +268,7 @@ export class AgentHarness {
       this.#telemetry,
     );
     this.#feetState = null;
+    this.#lastRequestedHeadingRad = null;
   }
 
   #makeFootTracker(): FootTracker {
@@ -257,6 +299,7 @@ export class AgentHarness {
       this.#assistLevel,
       this.#profile.stance,
       this.#telemetry,
+      this.#profile.flickSensitivity ?? DEFAULT_FLICK_SENSITIVITY,
     );
   }
 
@@ -319,6 +362,7 @@ export class AgentHarness {
     this.#boardController = this.#makeBoardController();
     this.#kickArbiter = this.#makeKickArbiter();
     this.#feetState = null;
+    this.#lastRequestedHeadingRad = null;
     this.#lastInputSource = null;
     this.#telemetry.log({
       type: "inputReleased",
@@ -443,7 +487,7 @@ export class AgentHarness {
       })),
       checkpoints: this.#recordedCheckpoints.map((c) => ({ ...c })),
       controlTrace: {
-        version: CONTROL_TRACE_VERSION,
+        version: CONTROL_TRACE_V3_VERSION,
         profile: structuredClone(this.#profile),
         events: structuredClone(this.#recordedControlEvents),
       },
@@ -572,6 +616,49 @@ export class AgentHarness {
     return this.#inputHub;
   }
 
+  /**
+   * Exposes signs and role assignment that screenshots cannot prove. This is
+   * intentionally derived from the live recognizer + rigid body and has no
+   * authority to mutate either one.
+   */
+  controlDiagnostics(): ControlDiagnostics {
+    const pose = this.#world.boardPose();
+    const q = pose.q;
+    const actualHeadingRad = Math.atan2(
+      2 * (q.x * q.z + q.w * q.y),
+      1 - 2 * (q.x * q.x + q.y * q.y),
+    );
+    const requestedHeadingRad = this.#lastRequestedHeadingRad;
+    const noseOverTailMeters =
+      this.#config.physics.boardLength * 2 * (q.y * q.z - q.w * q.x);
+    const popSide = this.#fsm.intent?.popSide ?? null;
+    const polarityThreshold = 0.005;
+    const popPolarityOk = popSide == null || Math.abs(noseOverTailMeters) < polarityThreshold
+      ? null
+      : popSide === 'tail'
+        ? noseOverTailMeters > 0
+        : noseOverTailMeters < 0;
+    const foot = (role: 'nose' | 'tail') => {
+      const state = this.#feetState?.[role];
+      return {
+        id: state?.contactId ?? null,
+        planted: state?.planted ?? false,
+        pad: { x: state?.pos.x ?? 0.5, y: state?.pos.y ?? 0.5 },
+      };
+    };
+    return {
+      contacts: { nose: foot('nose'), tail: foot('tail') },
+      requestedHeadingRad,
+      actualHeadingRad,
+      headingErrorRad: requestedHeadingRad == null
+        ? null
+        : wrapRadians(requestedHeadingRad - actualHeadingRad),
+      popSide,
+      noseOverTailMeters,
+      popPolarityOk,
+    };
+  }
+
   // --- Core single-step path (shared by step() and replay()) -------------
   #advance(): void {
     const consumeStep = this.#world.getStep();
@@ -604,6 +691,120 @@ export class AgentHarness {
     const newStep = this.#world.getStep();
     if (this.#recording) {
       const pose = this.#world.boardPose();
+      const diagnostics = this.#world.physicsDiagnostics();
+      const wheelNames = {
+        'nose-left': 'frontLeft',
+        'nose-right': 'frontRight',
+        'tail-left': 'rearLeft',
+        'tail-right': 'rearRight',
+      } as const;
+      const assists: SkateAssistObservationV1[] = [];
+
+      const stabilityTorque = diagnostics.lastStepGroundBalanceTorque;
+      const stabilityMagnitude = magnitude(stabilityTorque);
+      if (stabilityMagnitude > DIAGNOSTIC_EPSILON) {
+        assists.push({
+          kind: 'stability',
+          active: true,
+          strength: normalizedStrength(
+            stabilityMagnitude,
+            this.#config.locomotion.groundBalanceTorqueMax,
+          ),
+          torqueNm: { ...stabilityTorque },
+          torqueImpulseNms: {
+            x: stabilityTorque.x / this.#config.physics.hz,
+            y: stabilityTorque.y / this.#config.physics.hz,
+            z: stabilityTorque.z / this.#config.physics.hz,
+          },
+          reason: 'loaded-rider surface alignment',
+        });
+      }
+
+      const popLinearImpulse = diagnostics.lastStepPopLinearImpulse;
+      const popAngularImpulse = diagnostics.lastStepPopAngularImpulse;
+      const popLinearMagnitude = magnitude(popLinearImpulse);
+      const popAngularMagnitude = magnitude(popAngularImpulse);
+      if (
+        popLinearMagnitude > DIAGNOSTIC_EPSILON ||
+        popAngularMagnitude > DIAGNOSTIC_EPSILON
+      ) {
+        assists.push({
+          kind: 'pop',
+          active: true,
+          strength: Math.max(
+            normalizedStrength(popLinearMagnitude, this.#config.pop.jMax),
+            normalizedStrength(
+              popAngularMagnitude,
+              this.#config.pop.pitchTorqueImpulseMax,
+            ),
+          ),
+          impulseNs: { ...popLinearImpulse },
+          torqueImpulseNms: { ...popAngularImpulse },
+          reason: 'physical nose/tail pop envelope',
+        });
+      }
+
+      const transition = this.#world.lastTransitionAssist();
+      const transitionLinearImpulse = diagnostics.lastStepTransitionLinearImpulse;
+      const transitionAngularImpulse = diagnostics.lastStepTransitionAngularImpulse;
+      const transitionLinearMagnitude = magnitude(transitionLinearImpulse);
+      const transitionAngularMagnitude = magnitude(transitionAngularImpulse);
+      if (
+        transition &&
+        transition.kind !== 'none' &&
+        (transitionLinearMagnitude > DIAGNOSTIC_EPSILON ||
+          transitionAngularMagnitude > DIAGNOSTIC_EPSILON)
+      ) {
+        const linearMaximum = transition.kind === 'pump'
+          ? this.#config.transition.pumpForceMax / this.#config.physics.hz
+          : this.#config.transition.lipLaunchImpulseMax;
+        assists.push({
+          kind: 'transition',
+          active: true,
+          strength: Math.max(
+            normalizedStrength(transitionLinearMagnitude, linearMaximum),
+            normalizedStrength(
+              transitionAngularMagnitude,
+              this.#config.transition.landingAngularImpulseMax,
+            ),
+          ),
+          impulseNs: { ...transitionLinearImpulse },
+          torqueImpulseNms: { ...transitionAngularImpulse },
+          reason: transition.kind,
+        });
+      }
+
+      const physics: SkatePhysicsObservationV1 = {
+        version: 1,
+        body: {
+          boardMassKg: diagnostics.boardMass,
+          riderProxyMassKg: diagnostics.riderMass,
+          centerOfMassLocalM: { ...diagnostics.centerOfMassLocal },
+          inertiaKgM2: { ...diagnostics.inertia },
+        },
+        solver: {
+          totalMassKg: diagnostics.totalMass,
+          physicsSubsteps: diagnostics.physicsSubsteps,
+          internalHz: diagnostics.internalHz,
+          ccdEnabled: diagnostics.ccdEnabled,
+        },
+        wheelContacts: this.#world.wheelObservations().map((wheel) => ({
+          wheel: wheelNames[wheel.id],
+          grounded: wheel.inContact,
+          ...(wheel.contactPoint ? { point: { ...wheel.contactPoint } } : {}),
+          ...(wheel.contactNormal ? { normal: { ...wheel.contactNormal } } : {}),
+          normalLoadN: wheel.normalLoad,
+          suspensionCompressionM: wheel.suspensionCompression,
+          longitudinalSlipMps: wheel.longitudinalSlip,
+          lateralSlipMps: wheel.lateralSlip,
+        })),
+        contactImpulses: {
+          totalNs: this.#world.lastContactImpulseMagnitude(),
+          supportNs: this.#world.lastSupportContactImpulseMagnitude(),
+          impactNs: this.#world.lastImpactContactImpulseMagnitude(),
+        },
+        assists,
+      };
       this.#recordedControlEvents.push({
         kind: "sim",
         step: newStep,
@@ -615,6 +816,7 @@ export class AgentHarness {
         },
         phase: this.#fsm.phase,
         intent: this.#fsm.intent,
+        physics,
       });
     }
     if (
@@ -670,6 +872,9 @@ export class AgentHarness {
     const contactImpulse = this.#world.lastContactImpulseMagnitude();
     const supportContactImpulse =
       this.#world.lastSupportContactImpulseMagnitude();
+    const impactContactImpulse =
+      this.#world.lastImpactContactImpulseMagnitude();
+    const supportNormal = this.#world.wheelSupportNormal();
     const railProximity = this.#world.railProximity();
     // Impact observability (deterministic — derived from sim state only).
     // Normal rolling stays well under 0.5 N·s per step; landings + wall hits
@@ -699,6 +904,8 @@ export class AgentHarness {
       pose,
       contactImpulse,
       supportContactImpulse,
+      impactContactImpulse,
+      supportNormal,
       railProximity,
       step,
     });
@@ -740,6 +947,7 @@ export class AgentHarness {
       groundControlActive,
       step,
     );
+    this.#lastRequestedHeadingRad = cmd.steerAngle;
     this.#world.applyGroundForces(cmd);
     for (const mc of maneuverCmds) this.#world.applyManeuver(mc);
 

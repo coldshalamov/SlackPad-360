@@ -6,11 +6,12 @@ import {
 } from '@slackpad/shared';
 import type {
   AssistPreset,
-  ControlTraceV2,
+  ControlTraceV3,
   InputProfile,
   TrickIntentV1,
 } from '@slackpad/shared';
 import { AgentHarness } from '../src/agent/AgentHarness';
+import { PadDriver, scriptOllie } from './helpers/maneuver';
 
 describe('control rebuild public contracts', () => {
   it('exposes the three named assist presets with Classic as the default', () => {
@@ -41,7 +42,7 @@ describe('control rebuild public contracts', () => {
     expect(intent).not.toHaveProperty('torque');
   });
 
-  it('records the active profile and a version-2 control trace', async () => {
+  it('records the active profile and a version-3 control trace with physics observability', async () => {
     const profile: InputProfile = {
       ...DEFAULT_INPUT_PROFILE,
       stance: 'goofy',
@@ -81,10 +82,41 @@ describe('control rebuild public contracts', () => {
     const trace = harness.stopRecording();
 
     expect(trace.header.profile).toEqual(profile);
-    const controlTrace: ControlTraceV2 | undefined = trace.controlTrace;
-    expect(controlTrace?.version).toBe(2);
+    const controlTrace: ControlTraceV3 | undefined = trace.controlTrace?.version === 3
+      ? trace.controlTrace
+      : undefined;
+    expect(controlTrace?.version).toBe(3);
     expect(controlTrace?.profile).toEqual(profile);
     expect(controlTrace?.events.some((event) => event.kind === 'sim')).toBe(true);
+    expect(controlTrace?.events).toContainEqual(expect.objectContaining({
+      kind: 'sim',
+      physics: expect.objectContaining({
+        version: 1,
+        body: expect.objectContaining({ boardMassKg: DEFAULT_SIM_CONFIG.physics.boardMass }),
+        solver: {
+          totalMassKg: expect.any(Number),
+          physicsSubsteps: DEFAULT_SIM_CONFIG.physics.physicsSubsteps,
+          internalHz:
+            DEFAULT_SIM_CONFIG.physics.hz * DEFAULT_SIM_CONFIG.physics.physicsSubsteps,
+          ccdEnabled: true,
+        },
+        contactImpulses: {
+          totalNs: expect.any(Number),
+          supportNs: expect.any(Number),
+          impactNs: expect.any(Number),
+        },
+        wheelContacts: expect.arrayContaining([
+          expect.objectContaining({ wheel: 'frontLeft' }),
+          expect.objectContaining({ wheel: 'rearRight' }),
+        ]),
+      }),
+    }));
+    const recordedSolver = controlTrace?.events.find((event) => event.kind === 'sim')
+      ?.physics?.solver;
+    expect(recordedSolver?.totalMassKg).toBeCloseTo(
+      DEFAULT_SIM_CONFIG.physics.boardMass + DEFAULT_SIM_CONFIG.physics.riderMass,
+      4,
+    );
     expect(controlTrace?.events).toContainEqual(expect.objectContaining({
       kind: 'control',
       step: 0,
@@ -110,6 +142,53 @@ describe('control rebuild public contracts', () => {
         target: { x: 4, y: 5, z: 6 },
       },
     });
+  });
+
+  it('records only assists that physically acted, with their measured impulses', async () => {
+    const idleHarness = new AgentHarness();
+    await idleHarness.reset(0xc0119, 'flat-dev');
+    idleHarness.startRecording();
+    idleHarness.step(1);
+    const idleTrace = idleHarness.stopRecording();
+    if (idleTrace.controlTrace?.version !== 3) throw new Error('expected ControlTrace V3');
+    const idleAssists = idleTrace.controlTrace.events.flatMap((event) =>
+      event.kind === 'sim' ? event.physics?.assists ?? [] : [],
+    );
+    expect(idleAssists).toEqual([]);
+
+    const popHarness = new AgentHarness();
+    await popHarness.reset(0xc0120, 'flat-dev');
+    popHarness.startRecording();
+    popHarness.step(60);
+    const driver = new PadDriver(popHarness);
+    scriptOllie(driver);
+    const popTrace = driver.harness.stopRecording();
+    if (popTrace.controlTrace?.version !== 3) throw new Error('expected ControlTrace V3');
+    const assists = popTrace.controlTrace.events.flatMap((event) =>
+      event.kind === 'sim' ? event.physics?.assists ?? [] : [],
+    );
+    const pop = assists.find((assist) => assist.kind === 'pop');
+
+    expect(pop).toEqual(expect.objectContaining({
+      active: true,
+      strength: expect.any(Number),
+      impulseNs: expect.objectContaining({ y: expect.any(Number) }),
+      torqueImpulseNms: expect.objectContaining({
+        x: expect.any(Number),
+        z: expect.any(Number),
+      }),
+    }));
+    expect(Math.hypot(
+      pop?.impulseNs?.x ?? 0,
+      pop?.impulseNs?.y ?? 0,
+      pop?.impulseNs?.z ?? 0,
+    )).toBeGreaterThan(0);
+    expect(Math.hypot(
+      pop?.torqueImpulseNms?.x ?? 0,
+      pop?.torqueImpulseNms?.y ?? 0,
+      pop?.torqueImpulseNms?.z ?? 0,
+    )).toBeGreaterThan(0);
+    expect(assists.every((assist) => assist.active)).toBe(true);
   });
 
   it('replays with the recorded calibration and assist preset, not the receiver profile', async () => {

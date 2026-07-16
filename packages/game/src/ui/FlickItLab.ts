@@ -1,9 +1,11 @@
-import type {
-  AssistPreset,
-  LabeledAttemptV1,
-  ReplayCheckpoint,
-  SessionTrace,
-  TrickIntentV1,
+import {
+  FLICK_SENSITIVITY_MAX,
+  FLICK_SENSITIVITY_MIN,
+  type AssistPreset,
+  type LabeledAttemptV1,
+  type ReplayCheckpoint,
+  type SessionTrace,
+  type TrickIntentV1,
 } from '@slackpad/shared';
 
 export type LabTrickLabel = TrickIntentV1['label'];
@@ -43,9 +45,10 @@ export class FlickItLabController {
     if (!this.#recording) throw new Error('No Flick-It Lab attempt is recording.');
     const trace = this.actions.endCapture();
     this.#recording = false;
-    const intents = trace.controlTrace?.events
-      .filter((event): event is Extract<typeof event, { kind: 'intent' }> => event.kind === 'intent') ?? [];
-    const recognizedIntent = intents.at(-1)?.intent;
+    let recognizedIntent: TrickIntentV1 | undefined;
+    for (const event of trace.controlTrace?.events ?? []) {
+      if (event.kind === 'intent') recognizedIntent = event.intent;
+    }
     const recognized = recognizedIntent?.label ?? 'none';
     const attempt: LabeledAttemptV1 = {
       expected: this.#expected,
@@ -87,6 +90,8 @@ export class FlickItLabController {
 export interface FlickItLabUiActions {
   getPreset: () => AssistPreset;
   setPreset: (preset: AssistPreset) => void;
+  getSensitivity: () => number;
+  setSensitivity: (sensitivity: number) => void;
   calibrate: () => boolean;
 }
 
@@ -155,6 +160,36 @@ export class FlickItLab {
       });
       presets.appendChild(button);
     }
+
+    const sensitivity = document.createElement('label');
+    Object.assign(sensitivity.style, {
+      display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 8px',
+      alignItems: 'center', marginTop: '10px', color: 'rgba(220,235,240,.88)',
+    });
+    const sensitivityTitle = document.createElement('span');
+    sensitivityTitle.textContent = 'Flick sensitivity';
+    const sensitivityValue = document.createElement('output');
+    const sensitivityRange = document.createElement('input');
+    sensitivityRange.type = 'range';
+    sensitivityRange.min = String(FLICK_SENSITIVITY_MIN);
+    sensitivityRange.max = String(FLICK_SENSITIVITY_MAX);
+    sensitivityRange.step = '0.05';
+    sensitivityRange.value = String(uiActions.getSensitivity());
+    sensitivityRange.setAttribute('aria-label', 'Flick sensitivity');
+    sensitivityRange.style.gridColumn = '1 / -1';
+    sensitivityRange.style.width = '100%';
+    const showSensitivity = (value: number): void => {
+      sensitivityValue.textContent = `${value.toFixed(2)}×`;
+    };
+    showSensitivity(Number(sensitivityRange.value));
+    sensitivityRange.addEventListener('input', () => {
+      const value = Number(sensitivityRange.value);
+      this.uiActions.setSensitivity(value);
+      showSensitivity(value);
+      this.setStatus(`Flick sensitivity: ${value.toFixed(2)}×`);
+    });
+    sensitivity.append(sensitivityTitle, sensitivityValue, sensitivityRange);
+
     const calibrate = makeButton('Calibrate current two-finger line');
     calibrate.style.width = '100%';
     calibrate.style.marginTop = '7px';
@@ -168,7 +203,7 @@ export class FlickItLab {
     const status = document.createElement('div');
     Object.assign(status.style, { marginTop: '10px', minHeight: '34px', lineHeight: '1.4', color: 'rgba(220,235,240,.8)' });
     status.textContent = `Ready · preset ${uiActions.getPreset()}`;
-    root.append(title, select, buttons, presets, calibrate, status);
+    root.append(title, select, buttons, presets, sensitivity, calibrate, status);
     container.appendChild(root);
     this.#root = root;
     this.#status = status;

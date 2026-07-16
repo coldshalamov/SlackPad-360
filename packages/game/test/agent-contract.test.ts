@@ -34,6 +34,7 @@ const HARNESS_ALLOWLIST = [
   'interpolatedRenderPose',
   'getTelemetry',
   'getInputHub',
+  'controlDiagnostics',
 ];
 
 const OBSERVE_KEYS = [

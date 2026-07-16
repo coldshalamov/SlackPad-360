@@ -4,6 +4,7 @@ import { AgentHarness } from '../src/agent/AgentHarness';
 import { SimWorld } from '../src/sim/SimWorld';
 import {
   eventsOf,
+  cruiseUntilZ,
   NOSE_POS,
   PadDriver,
   scriptOllie,
@@ -39,7 +40,12 @@ describe('flat-dev world recovery', () => {
     let foundSideContact = false;
     for (let i = 0; i < 180; i++) {
       if (i < 24) {
-        world.applyManeuver({ kind: 'flipTorque', axis: 'long', omegaTarget: 12, tauMax: 8 });
+        world.applyManeuver({
+          kind: 'flipTorque',
+          axis: 'long',
+          omegaTarget: 12,
+          tauMax: DEFAULT_SIM_CONFIG.flip.tauMax[2],
+        });
       }
       world.step();
       const pose = world.boardPose();
@@ -62,7 +68,12 @@ describe('flat-dev world recovery', () => {
 
     let tipped = false;
     for (let i = 0; i < 180; i++) {
-      world.applyManeuver({ kind: 'flipTorque', axis: 'long', omegaTarget: 12, tauMax: 8 });
+      world.applyManeuver({
+        kind: 'flipTorque',
+        axis: 'long',
+        omegaTarget: 12,
+        tauMax: DEFAULT_SIM_CONFIG.flip.tauMax[2],
+      });
       world.step();
       const pose = world.boardPose();
       const deckUpY = 1 - 2 * (pose.q.x * pose.q.x + pose.q.z * pose.q.z);
@@ -100,7 +111,7 @@ describe('flat-dev world recovery', () => {
     await harness.reset(12345, 'grind-lab');
     harness.step(60);
     const d = new PadDriver(harness);
-    d.cruise(70);
+    cruiseUntilZ(d, 4.8);
     scriptOllie(d, {});
 
     let sawGrind = false;

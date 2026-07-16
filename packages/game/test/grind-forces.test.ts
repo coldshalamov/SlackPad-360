@@ -13,7 +13,7 @@ import type { GrindLatchParams } from '../src/sim/grindForces';
 
 const G = DEFAULT_SIM_CONFIG.grind;
 const HZ = DEFAULT_SIM_CONFIG.physics.hz;
-const MASS = DEFAULT_SIM_CONFIG.physics.boardMass;
+const MASS = DEFAULT_SIM_CONFIG.physics.boardMass + DEFAULT_SIM_CONFIG.physics.riderMass;
 
 // Rail along +Z: tangent +Z, perpendicular +X.
 const AXIS = { x: 0, y: 0, z: 1 };
@@ -162,6 +162,26 @@ describe('grindLatchImpulse — yaw alignment', () => {
 });
 
 describe('grindLatchImpulse — positional (latched only)', () => {
+  it('preserves the configured distinction between L1 and L2 lateral spring assists', () => {
+    const state = {
+      q: yawQ(0),
+      lv: { x: 0, y: 0, z: 0 },
+      av: { x: 0, y: 0, z: 0 },
+    };
+    const l1 = grindLatchImpulse(
+      state,
+      params({ lateralOffset: 0.001, springGain: G.latchLateralSpring[1] }),
+      G, MASS, HZ,
+    );
+    const l2 = grindLatchImpulse(
+      state,
+      params({ lateralOffset: 0.001, springGain: G.latchLateralSpring[2] }),
+      G, MASS, HZ,
+    );
+
+    expect(Math.abs(l2.lin.x)).toBeGreaterThan(Math.abs(l1.lin.x) * 1.5);
+  });
+
   it('a latched board off-centre gets a RESTORING lateral impulse toward the centre-line', () => {
     const r = grindLatchImpulse(
       { q: yawQ(0), lv: { x: 0, y: 0, z: 3 }, av: { x: 0, y: 0, z: 0 } },
