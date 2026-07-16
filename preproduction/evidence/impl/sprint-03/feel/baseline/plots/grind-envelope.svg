@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 716 304" font-family="monospace" font-size="12">
+<rect x="0" y="0" width="716" height="304" fill="white"/>
+<text x="84" y="18" font-size="14">grind latch envelope — approach speed × angle (L1)</text>
+<text x="114" y="36">-30°</text>
+<text x="202" y="36">-20°</text>
+<text x="290" y="36">-10°</text>
+<text x="378" y="36">0°</text>
+<text x="466" y="36">10°</text>
+<text x="554" y="36">20°</text>
+<text x="642" y="36">30°</text>
+<text x="8" y="71">2.00 m/s</text>
+<text x="8" y="117">2.75 m/s</text>
+<text x="8" y="163">3.50 m/s</text>
+<text x="8" y="209">4.25 m/s</text>
+<text x="8" y="255">5.00 m/s</text>
+<rect x="86" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="92" y="71" fill="white">50-50</text>
+<rect x="174" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="180" y="71" fill="white">50-50</text>
+<rect x="262" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="268" y="71" fill="white">50-50</text>
+<rect x="350" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="356" y="71" fill="white">50-50</text>
+<rect x="438" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="444" y="71" fill="white">50-50</text>
+<rect x="526" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="532" y="71" fill="white">50-50</text>
+<rect x="614" y="46" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="620" y="71" fill="white">50-50</text>
+<rect x="86" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="92" y="117" fill="white">50-50</text>
+<rect x="174" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="180" y="117" fill="white">50-50</text>
+<rect x="262" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="268" y="117" fill="white">50-50</text>
+<rect x="350" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="356" y="117" fill="white">50-50</text>
+<rect x="438" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="444" y="117" fill="white">50-50</text>
+<rect x="526" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="532" y="117" fill="white">50-50</text>
+<rect x="614" y="92" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="620" y="117" fill="white">50-50</text>
+<rect x="86" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="92" y="163" fill="white">50-50</text>
+<rect x="174" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="180" y="163" fill="white">50-50</text>
+<rect x="262" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="268" y="163" fill="white">50-50</text>
+<rect x="350" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="356" y="163" fill="white">50-50</text>
+<rect x="438" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="444" y="163" fill="white">50-50</text>
+<rect x="526" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="532" y="163" fill="white">50-50</text>
+<rect x="614" y="138" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="620" y="163" fill="white">50-50</text>
+<rect x="86" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="92" y="209" fill="white">50-50</text>
+<rect x="174" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="180" y="209" fill="white">50-50</text>
+<rect x="262" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="268" y="209" fill="white">50-50</text>
+<rect x="350" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="356" y="209" fill="white">50-50</text>
+<rect x="438" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="444" y="209" fill="white">50-50</text>
+<rect x="526" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="532" y="209" fill="white">50-50</text>
+<rect x="614" y="184" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="620" y="209" fill="white">50-50</text>
+<rect x="86" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="92" y="255" fill="white">50-50</text>
+<rect x="174" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="180" y="255" fill="white">50-50</text>
+<rect x="262" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="268" y="255" fill="white">50-50</text>
+<rect x="350" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="356" y="255" fill="white">50-50</text>
+<rect x="438" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="444" y="255" fill="white">50-50</text>
+<rect x="526" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="532" y="255" fill="white">50-50</text>
+<rect x="614" y="230" width="84" height="42" fill="#2ca02c" fill-opacity="0.75"/>
+<text x="620" y="255" fill="white">50-50</text>
+</svg>

@@ -29,6 +29,15 @@ import {
 } from '../test/feel/scenarios';
 import { runNavProbes } from '../test/feel/probes';
 import type { NavProbes, ProbeResult } from '../test/feel/probes';
+import { trickBattery } from '../test/feel/trick-scenarios';
+import type { TrickLabel, TrickRunResult } from '../test/feel/trick-scenarios';
+import {
+  envelopeCell,
+  envelopeMap,
+  grindHoldProbe,
+  grindRecoveryProbe,
+} from '../test/feel/grind-scenarios';
+import type { EnvelopeMapResult } from '../test/feel/grind-scenarios';
 import type {
   FlickRunResult,
   PopRunResult,
@@ -308,7 +317,7 @@ function pitchPlot(title: string, run: PopRunResult, noseUpSign: 1 | -1): string
 // Gates
 // ---------------------------------------------------------------------------
 
-export type GateGroup = 'steer' | 'pop' | 'nav';
+export type GateGroup = 'steer' | 'pop' | 'nav' | 'trick' | 'grind';
 
 export interface FeelGate {
   id: string;
@@ -319,13 +328,13 @@ export interface FeelGate {
   threshold: number;
   pass: boolean;
   /** Sprint stage whose exit this gate belongs to. */
-  stage: 'S2' | 'S4';
+  stage: 'S2' | 'S4' | 'T2' | 'T3';
 }
 
 function gate(
   id: string,
   group: GateGroup,
-  stage: 'S2' | 'S4',
+  stage: FeelGate['stage'],
   description: string,
   value: number | null,
   op: FeelGate['op'],
@@ -388,6 +397,76 @@ function navMetrics(nav: NavProbes): Record<string, unknown> {
   };
 }
 
+function quantile(xs: number[], q: number): number | null {
+  if (xs.length === 0) return null;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.floor(q * sorted.length));
+  return sorted[idx]!;
+}
+
+function landedRate(runs: TrickRunResult[]): number {
+  const landed = runs.filter((r) => r.outcome === 'clean' || r.outcome === 'dirty').length;
+  return landed / Math.max(1, runs.length);
+}
+
+function caughtLandedCount(runs: TrickRunResult[]): number {
+  return runs.filter((r) => r.caught && (r.outcome === 'clean' || r.outcome === 'dirty')).length;
+}
+
+function trickRows(runs: TrickRunResult[]): Array<Record<string, unknown>> {
+  return runs.map((r) => ({
+    seed: r.seed,
+    assist: r.assistLevel,
+    recogLagMs: round(r.recogLagMs, 2),
+    torqueLagMs: round(r.torqueLagMs, 2),
+    completionTurns: round(r.completionTurns),
+    completionDeg: round(r.completionDeg, 1),
+    catchResidualDeg: round(r.catchResidualDeg, 2),
+    catchResidual4Deg: round(r.catchResidual4Deg, 2),
+    caught: r.caught,
+    recLabel: r.recLabel,
+    label: r.label,
+    outcome: r.outcome,
+    bailReason: r.bailReason,
+  }));
+}
+
+/** Latch-success heatmap (green latched / red missed), speed rows × angle cols. */
+function envelopeSvg(map: EnvelopeMapResult): string {
+  const cellW = 88;
+  const cellH = 46;
+  const left = 84;
+  const top = 44;
+  const W = left + map.angles.length * cellW + 16;
+  const H = top + map.speeds.length * cellH + 30;
+  const parts: string[] = [];
+  parts.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="monospace" font-size="12">`,
+  );
+  parts.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="white"/>`);
+  parts.push(`<text x="${left}" y="18" font-size="14">grind latch envelope — approach speed × angle (L1)</text>`);
+  map.angles.forEach((a, i) => {
+    parts.push(`<text x="${left + i * cellW + cellW / 2 - 14}" y="${top - 8}">${a}°</text>`);
+  });
+  map.speeds.forEach((s, i) => {
+    parts.push(`<text x="8" y="${top + i * cellH + cellH / 2 + 4}">${s.toFixed(2)} m/s</text>`);
+  });
+  map.cells.forEach((row, si) => {
+    row.forEach((cell, ai) => {
+      const x = left + ai * cellW;
+      const y = top + si * cellH;
+      const fill = cell.latched ? '#2ca02c' : cell.popped ? '#d62728' : '#999999';
+      parts.push(
+        `<rect x="${x + 2}" y="${y + 2}" width="${cellW - 4}" height="${cellH - 4}" fill="${fill}" fill-opacity="0.75"/>`,
+      );
+      const tag = cell.latched ? (cell.family === 'boardslide' ? 'BS' : '50-50') : cell.popped ? 'miss' : 'no-pop';
+      parts.push(`<text x="${x + 8}" y="${y + cellH / 2 + 4}" fill="white">${tag}</text>`);
+    });
+  });
+  parts.push('</svg>');
+  return parts.join('\n');
+}
+
 export async function runFeelReport(): Promise<FeelReportBundle> {
   // --- Scenarios (fixed seeds; the numbers ARE the API — never reseed casually)
   const turnPlus = await steerTurn(1, 0x5702a);
@@ -400,6 +479,43 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
   const nollies = await popBattery('nollie', 20, 0x0110e);
   const flicks = await flickBattery(10, 0xf11c0);
   const nav = await runNavProbes();
+
+  // --- Sprint 03 T0: trick batteries -------------------------------------
+  const kickflips = await trickBattery('kickflip', 20, 0x7a100, 1);
+  const shuvs = await trickBattery('bs-shuv', 20, 0x7a200, 1);
+  const rateLabels: TrickLabel[] = ['kickflip', 'heelflip', 'bs-shuv', 'fs-shuv'];
+  const rateBatteries: Record<string, TrickRunResult[]> = {};
+  for (const label of rateLabels) {
+    for (const level of [0, 1, 2] as const) {
+      rateBatteries[`${label}@L${level}`] = await trickBattery(
+        label,
+        8,
+        0x7b000 + rateLabels.indexOf(label) * 256 + level * 32,
+        level,
+      );
+    }
+  }
+
+  // --- Sprint 03 T0: grind envelope + probes -----------------------------
+  const grindMap = await envelopeMap(1);
+  // Central cells (valid speed, near-envelope angles): the T3 latch gate runs
+  // 10 seeds on the middle of the map.
+  const centralRuns = [] as Array<{ latched: boolean }>;
+  for (let i = 0; i < 10; i++) {
+    centralRuns.push(await envelopeCell(0, 3.5, 0x9f100 + i, 1));
+  }
+  const grindHold = await grindHoldProbe(0x9f200, 1);
+  const recovery = await grindRecoveryProbe(0x9f300, 1);
+
+  // --- Bail histogram across every battery --------------------------------
+  const bailHistogram: Record<string, number> = {};
+  const addBail = (reason: string | null): void => {
+    if (!reason) return;
+    bailHistogram[reason] = (bailHistogram[reason] ?? 0) + 1;
+  };
+  for (const runs of [kickflips, shuvs, ...Object.values(rateBatteries)]) {
+    for (const r of runs) addBail(r.outcome === 'bail' ? (r.bailReason ?? 'unknown') : null);
+  }
 
   // --- Steering metrics
   const lagPlus = crossCorrLag(
@@ -444,6 +560,35 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
 
   const flickRecognized = flicks.filter((f) => f.recLabel === 'kickflip').length;
 
+  // --- Sprint 03 trick metrics --------------------------------------------
+  const recogLags = kickflips
+    .concat(shuvs)
+    .map((r) => r.recogLagMs)
+    .filter((v): v is number => v != null);
+  const torqueLags = kickflips
+    .concat(shuvs)
+    .map((r) => r.torqueLagMs)
+    .filter((v): v is number => v != null);
+  const trickRecogLagMs =
+    recogLags.length === kickflips.length + shuvs.length ? max(recogLags) : null;
+  const trickTorqueLagMs =
+    torqueLags.length === kickflips.length + shuvs.length ? max(torqueLags) : null;
+  const flipCompletions = kickflips
+    .map((r) => r.completionTurns)
+    .filter((v): v is number => v != null);
+  const shuvCompletions = shuvs
+    .map((r) => r.completionDeg)
+    .filter((v): v is number => v != null);
+  const catchResiduals = kickflips
+    .concat(shuvs)
+    .map((r) => r.catchResidualDeg)
+    .filter((v): v is number => v != null);
+  const catchResiduals4 = kickflips
+    .concat(shuvs)
+    .map((r) => r.catchResidual4Deg)
+    .filter((v): v is number => v != null);
+  const centralLatched = centralRuns.filter((r) => r.latched).length;
+
   // --- Gates (evaluated always; ENFORCED per group by the caller)
   const gates: FeelGate[] = [
     gate('steer.lagMs', 'steer', 'S2', 'finger→board yaw lag (45° @200°/s, worst dir)', steerLagMs, '<', 50),
@@ -454,6 +599,14 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
     gate('pop.bails', 'pop', 'S4', 'ollie battery bail count', ollieCounts.bail!, '==', 0),
     gate('nav.slalom', 'nav', 'S2', '5-gate slalom, closed-loop wrist-range bot', nav.slalom.success ? 1 : 0, '==', 1),
     gate('nav.pivot90', 'nav', 'S2', 'standstill 90° in ≤1.5 s (two grips)', nav.pivot90.success ? 1 : 0, '==', 1),
+    gate('trick.recogLagMs', 'trick', 'T2', 'gesture start → recognized, worst of kickflip+shuv batteries', trickRecogLagMs, '<=', 50),
+    gate('trick.torqueLagMs', 'trick', 'T2', 'recognized → on-axis ω response, worst of batteries', trickTorqueLagMs, '<=', 33.4),
+    gate('trick.kickflipBattery', 'trick', 'T2', 'caught+landed of 10 kickflips at L1 (first 10 of battery)', caughtLandedCount(kickflips.slice(0, 10)), '>=', 9),
+    gate('trick.shuvBattery', 'trick', 'T2', 'caught+landed of 10 bs-shuvs at L1 (first 10 of battery)', caughtLandedCount(shuvs.slice(0, 10)), '>=', 8),
+    gate('trick.catchResidualP90Deg', 'trick', 'T2', 'p90 deck tilt one step after catch (L1 batteries)', quantile(catchResiduals, 0.9), '<=', 8),
+    gate('grind.centralLatch', 'grind', 'T3', 'central envelope cell latches, of 10 seeds at L1', centralLatched, '>=', 10),
+    gate('grind.holdSeconds', 'grind', 'T3', 'neutral-input balance hold on the straight ledge', grindHold.holdSeconds, '>=', 3),
+    gate('grind.recoveryOk', 'grind', 'T3', 'slip → cooldown respected → rideable recovery', recovery.slipped && recovery.cooldownRespected && recovery.recovered ? 1 : 0, '==', 1),
   ];
 
   const cfg = DEFAULT_SIM_CONFIG;
@@ -517,6 +670,50 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
         counts: outcomeCounts(flicks),
       },
       nav: navMetrics(nav),
+      trick: {
+        recogLagMs: round(trickRecogLagMs, 2),
+        recogLagMedianMs: round(median(recogLags), 2),
+        torqueLagMs: round(trickTorqueLagMs, 2),
+        flipCompletion: {
+          target: 1,
+          min: round(flipCompletions.length ? Math.min(...flipCompletions) : null),
+          median: round(median(flipCompletions)),
+          max: round(max(flipCompletions)),
+          n: flipCompletions.length,
+        },
+        shuvCompletionDeg: {
+          target: DEFAULT_SIM_CONFIG.recognition.shuvTargetDeg,
+          min: round(shuvCompletions.length ? Math.min(...shuvCompletions) : null, 1),
+          median: round(median(shuvCompletions), 1),
+          max: round(max(shuvCompletions), 1),
+          n: shuvCompletions.length,
+        },
+        catchResidualP90Deg: round(quantile(catchResiduals, 0.9), 2),
+        catchResidualMedianDeg: round(median(catchResiduals), 2),
+        catchResidual4P90Deg: round(quantile(catchResiduals4, 0.9), 2),
+        catchResidual4MedianDeg: round(median(catchResiduals4), 2),
+        batteryRate: Object.fromEntries(
+          Object.entries(rateBatteries).map(([key, runs]) => [key, round(landedRate(runs))]),
+        ),
+      },
+      grind: {
+        envelope: {
+          angles: grindMap.angles,
+          speeds: grindMap.speeds,
+          latched: grindMap.cells.map((row) => row.map((c) => (c.latched ? 1 : 0))),
+          families: grindMap.cells.map((row) => row.map((c) => c.family ?? '-')),
+        },
+        centralLatchOf10: centralLatched,
+        holdSeconds: grindHold.holdSeconds,
+        holdExitReason: grindHold.exitReason,
+        recovery: {
+          slipped: recovery.slipped,
+          cooldownRespected: recovery.cooldownRespected,
+          recovered: recovery.recovered,
+          exitReason: recovery.exitReason,
+        },
+      },
+      bailHistogram,
     },
     batteries: {
       ollie: batteryRows(ollies, 1),
@@ -528,6 +725,8 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
         outcome: f.outcome,
         flipRotations: round(f.flipRotations),
       })),
+      kickflipL1: trickRows(kickflips),
+      bsShuvL1: trickRows(shuvs),
     },
     gates,
   };
@@ -543,6 +742,7 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
     }),
     'ollie-pitch.svg': pitchPlot('ollie #1: pitch vs reference silhouette', ollies[0]!, 1),
     'nollie-pitch.svg': pitchPlot('nollie #1: pitch vs mirrored reference', nollies[0]!, -1),
+    'grind-envelope.svg': envelopeSvg(grindMap),
   };
 
   return { report, markdown: renderMarkdown(report), svgs };
@@ -599,6 +799,25 @@ function renderMarkdown(report: Record<string, unknown>): string {
     lines.push(`| nav.${name} | ${success ? 'PASS' : 'fail'} | ${fmt(timeSec)} | ${JSON.stringify(detail)} |`);
   }
   lines.push('');
+  lines.push('## Tricks (Sprint 03)');
+  lines.push('');
+  lines.push('| metric | value |');
+  lines.push('| --- | --- |');
+  for (const [k, v] of Object.entries(m.trick!)) {
+    lines.push(`| trick.${k} | ${typeof v === 'object' ? JSON.stringify(v) : fmt(v)} |`);
+  }
+  lines.push('');
+  lines.push('## Grind (Sprint 03)');
+  lines.push('');
+  lines.push('| metric | value |');
+  lines.push('| --- | --- |');
+  const grindM = m.grind as Record<string, unknown>;
+  lines.push(`| grind.centralLatchOf10 | ${fmt(grindM.centralLatchOf10)} |`);
+  lines.push(`| grind.holdSeconds | ${fmt(grindM.holdSeconds)} (exit: ${fmt(grindM.holdExitReason)}) |`);
+  lines.push(`| grind.recovery | ${JSON.stringify(grindM.recovery)} |`);
+  lines.push(`| grind.envelope | see plots/grind-envelope.svg |`);
+  lines.push(`| bail.histogram | ${JSON.stringify(m.bailHistogram)} |`);
+  lines.push('');
   lines.push('## Config echo');
   lines.push('');
   lines.push('| key | value |');
@@ -613,6 +832,7 @@ function renderMarkdown(report: Record<string, unknown>): string {
   lines.push('- plots/steer-pivot.svg — standstill pivot');
   lines.push('- plots/steer-ratchet.svg — 2×45° re-grip staircase');
   lines.push('- plots/ollie-pitch.svg / nollie-pitch.svg — pitch vs reference silhouette');
+  lines.push('- plots/grind-envelope.svg — latch success over approach speed × angle');
   lines.push('');
   return lines.join('\n');
 }
