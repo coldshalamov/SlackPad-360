@@ -12,9 +12,17 @@ import {
   ASSIST_LEVEL_BY_PRESET,
   ASSIST_PRESET_BY_LEVEL,
   DEFAULT_INPUT_PROFILE,
+  DEFAULT_POP_PITCH_PRESET,
+  POP_PITCH_PRESETS,
   normalizeInputProfile,
 } from '@slackpad/shared';
-import type { AssistLevel, AssistPreset, InputProfile, Stance } from '@slackpad/shared';
+import type {
+  AssistLevel,
+  AssistPreset,
+  InputProfile,
+  PopPitchPreset,
+  Stance,
+} from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 
 // v6 adds player-facing flick sensitivity and moves yaw calibration into the
@@ -94,6 +102,18 @@ export class ProfileStore {
 
   setFlickSensitivity(sensitivity: number): void {
     this.update({ flickSensitivity: sensitivity });
+  }
+
+  setPopPitchPreset(popPitchPreset: PopPitchPreset): void {
+    this.update({ popPitchPreset });
+  }
+
+  cyclePopPitchPreset(): PopPitchPreset {
+    const current = this.profile.popPitchPreset ?? DEFAULT_POP_PITCH_PRESET;
+    const index = POP_PITCH_PRESETS.indexOf(current);
+    const next = POP_PITCH_PRESETS[(index + 1) % POP_PITCH_PRESETS.length]!;
+    this.setPopPitchPreset(next);
+    return next;
   }
 
   toggleSwapFeet(): void {

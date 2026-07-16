@@ -43,6 +43,51 @@ export const DEFAULT_FLICK_SENSITIVITY = 1;
  */
 export type KickAttribution = "motionTap" | "buttonSide" | "plantMask";
 
+/** Authored ollie/nollie pitch-silhouette presets (Sprint 02 S4). */
+export type PopPitchPreset = "crisp" | "floaty" | "aggressive";
+export const POP_PITCH_PRESETS: readonly PopPitchPreset[] = [
+  "crisp",
+  "floaty",
+  "aggressive",
+];
+export const DEFAULT_POP_PITCH_PRESET: PopPitchPreset = "crisp";
+
+/**
+ * Ballistic flight-step estimate for a pop of vertical impulse jY on the
+ * loaded body: 2·(jY/m)/g seconds at the fixed step rate. The authored pitch
+ * silhouette plays over THIS window so a small pop levels off by its own
+ * (earlier) apex instead of landing mid-silhouette nose-high. ONE
+ * implementation shared by ManeuverAssist and the feel report.
+ */
+export function popFlightSteps(jY: number, totalMassKg: number, hz: number): number {
+  const seconds = (2 * (jY / Math.max(1e-6, totalMassKg))) / 9.81;
+  return Math.max(12, Math.min(80, Math.round(seconds * hz)));
+}
+
+/**
+ * Sample a [tNorm, valueDeg] control-point curve, piecewise-linear, clamped to
+ * its ends. ONE implementation shared by the runtime tracker and the feel
+ * report so the instrument can never drift from the performance.
+ */
+export function samplePitchCurve(
+  curve: ReadonlyArray<readonly [number, number]>,
+  tNorm: number,
+): number {
+  if (curve.length === 0) return 0;
+  const t = Math.max(0, Math.min(1, tNorm));
+  let prev = curve[0]!;
+  for (const point of curve) {
+    if (t <= point[0]) {
+      const [t0, v0] = prev;
+      const [t1, v1] = point;
+      if (t1 === t0) return v1;
+      return v0 + ((t - t0) / (t1 - t0)) * (v1 - v0);
+    }
+    prev = point;
+  }
+  return curve[curve.length - 1]![1];
+}
+
 export interface InputProfile {
   stance: Stance;
   /** Degrees; hand approach angle mapping pad axes → board local. */
@@ -62,6 +107,12 @@ export interface InputProfile {
   kickAttribution: KickAttribution;
   /** Treat OS tap-to-click primary edges as kicks. */
   tapToClickIsKick: boolean;
+  /**
+   * Selected ollie/nollie pitch-silhouette preset (Sprint 02 S4). Lives on
+   * the PROFILE (not SimConfig) so replay headers capture it — a recorded
+   * trace replays under the preset it was performed with.
+   */
+  popPitchPreset?: PopPitchPreset;
   accessibility: {
     reducedMotion: boolean;
     highContrastHud: boolean;
@@ -78,6 +129,7 @@ export const DEFAULT_INPUT_PROFILE: InputProfile = deepFreezeConfig({
   bothClickMeans: "ollie",
   kickAttribution: "motionTap",
   tapToClickIsKick: false,
+  popPitchPreset: DEFAULT_POP_PITCH_PRESET,
   accessibility: {
     reducedMotion: false,
     highContrastHud: false,
@@ -137,6 +189,12 @@ export function normalizeInputProfile(value: unknown): InputProfile {
         : base.kickAttribution,
     tapToClickIsKick:
       typeof raw.tapToClickIsKick === "boolean" ? raw.tapToClickIsKick : base.tapToClickIsKick,
+    popPitchPreset:
+      raw.popPitchPreset === "crisp" ||
+      raw.popPitchPreset === "floaty" ||
+      raw.popPitchPreset === "aggressive"
+        ? raw.popPitchPreset
+        : DEFAULT_POP_PITCH_PRESET,
     accessibility: {
       reducedMotion:
         typeof accessibility.reducedMotion === "boolean"
@@ -245,13 +303,42 @@ export interface PopConfig {
   pitchTorqueScale: number;
   /** Hard clamp on the pop pitch torque impulse magnitude, N·m·s (SimWorld). */
   pitchTorqueImpulseMax: number;
-  /** Assisted ollie/nollie pitch target at the end of the snap phase. */
-  noseUpTargetDeg: number;
-  /** Steps to hold the visible nose-up/nose-down target after takeoff. */
-  snapHoldSteps: number;
-  /** Step by which the front-foot guide has levelled the board for landing. */
-  levelEndSteps: number;
-  /** Pitch PD gains and torque clamp for the force-based levelling phase. */
+  /**
+   * Authored pitch silhouettes (Sprint 02 S4, reviews/03 Stage 2): nose-up
+   * degrees over the maneuver's own normalized timeline as [tNorm, pitchDeg]
+   * control points, piecewise-linear. This SHAPE — strike, sharp rise, level
+   * by apex, slight nose-down into descent — is what makes an ollie read as
+   * an ollie. Nollie mirrors the sign; amplitude scales with q/baseQuality
+   * (constant for motionTap). Taste keys: tune freely, no code involved.
+   */
+  pitchCurves: Readonly<Record<PopPitchPreset, ReadonlyArray<readonly [number, number]>>>;
+  /**
+   * FALLBACK silhouette timeline, steps. At each pop the live timeline is
+   * `popFlightSteps(jY, …)` — the flight that pop ballistically buys — so a
+   * small pop levels off by its own earlier apex; this value only covers the
+   * (unreachable in practice) case of a pop with no recorded jY. Landing
+   * early truncates the performance rather than time-stretching it.
+   */
+  curveDurationSteps: number;
+  /** Safety clamp on any commanded curve pitch target, deg (above all presets). */
+  pitchTargetClampDeg: number;
+  /**
+   * Torque-authority FLOOR [0,1] of the pitch tracker in the pop's earliest
+   * steps, while a flick could still reclassify the maneuver (the pop is
+   * provisionally a base ollie/nollie there — full authority would perturb
+   * the tuned flip entries). Sized to the M5-era guide strength.
+   */
+  curveWindowAuthority: number;
+  /**
+   * Authority ramps linearly from the floor to 1 between these two maneuver
+   * ages (steps since pop). In-recipe flicks recognize by ~11–13 steps, so the
+   * ramp restores full silhouette authority right after the practical flick
+   * era while the formal 550 ms recognition window stays open for late human
+   * flicks (which then hand off from a curve-tracked, more-level deck).
+   */
+  curveAuthorityRampStartStep: number;
+  curveAuthorityRampEndStep: number;
+  /** Pitch PD gains and torque clamp for the force-based curve tracker. */
   levelKp: number;
   levelKd: number;
   levelTorqueMax: number;
@@ -916,6 +1003,11 @@ export interface CameraConfig {
    * stays invisible.
    */
   restDeadbandM: number;
+  /**
+   * One-frame downward camera dip on a recognized pop, m (the tail-strike
+   * accent, Sprint 02 S4). Presentation only; 0 disables.
+   */
+  popNudgeM: number;
   /** Max camera angular slew rate, deg/s (orientation slerp clamp, spec §6). */
   maxAngularRateDeg: number;
 
@@ -1023,13 +1115,55 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     // a basic ollie somersault like a weightless toy.
     pitchTorqueScale: 0.04,
     pitchTorqueImpulseMax: 15.5,
-    noseUpTargetDeg: 24,
-    snapHoldSteps: 7,
-    levelEndSteps: 30,
-    // PD gains scale with the board+rider pitch inertia.
-    levelKp: 186,
-    levelKd: 25,
-    levelTorqueMax: 46,
+    // Authored around two physical constraints: (1) the pop actuation
+    // delivers its momentum over the first ~2 steps, so the onset is
+    // S-shaped; (2) while the post-pop flick-recognition window is open the
+    // tracker runs at REDUCED authority (curveWindowAuthority — a strong
+    // servo there would contaminate every flip, which is provisionally an
+    // 'ollie' until the flick classifies), so the rise crests just after the
+    // window closes (~10 steps ≈ 170 ms) where full authority takes over.
+    // floaty = slower rise, longer hold; aggressive = snappier, higher peak.
+    pitchCurves: {
+      // 'crisp' is CALIBRATED from the measured natural pop under the
+      // authority ramp (two seeds agreed to 0.2°): the tracker's job is to
+      // ENFORCE this silhouette against disturbances and to realize the
+      // preset contrasts, not to fight the pop's own ballistics during the
+      // ambiguity window.
+      crisp: [
+        [0, 0], [0.05, 1.4], [0.1, 3.7], [0.15, 6.6], [0.2, 10.2], [0.25, 14.3],
+        [0.32, 19.8], [0.39, 22.7], [0.46, 21.1], [0.56, 13.9], [0.66, 6.7],
+        [0.78, 0.4], [0.95, -4.2], [1, -4],
+      ],
+      floaty: [
+        [0, 0], [0.05, 1.2], [0.1, 3.6], [0.15, 6.6], [0.2, 10], [0.28, 14.5],
+        [0.42, 19], [0.55, 17.5], [0.68, 10], [0.8, 4], [0.92, 0], [1, -2],
+      ],
+      aggressive: [
+        [0, 0], [0.05, 1.8], [0.1, 5], [0.15, 9.4], [0.2, 14.5], [0.25, 19],
+        [0.3, 25], [0.4, 22], [0.5, 12], [0.62, 4], [0.75, -1], [0.9, -4], [1, -5],
+      ],
+    },
+    curveDurationSteps: 40,
+    pitchTargetClampDeg: 32,
+    /**
+     * Torque-authority fraction of the pitch tracker while the post-pop
+     * flick/sweep recognition window is still open. Low so a pop that turns
+     * out to be a kickflip was never fought by the base silhouette; sized to
+     * reproduce the M5-era guide's early influence (≈46 N·m of 420) so
+     * uncaught/flip flights keep their tuned ballistics. Full authority
+     * resumes the moment the maneuver is committed.
+     */
+    curveWindowAuthority: 0.11,
+    curveAuthorityRampStartStep: 13,
+    curveAuthorityRampEndStep: 18,
+    // PD gains scale with the board+rider pitch inertia (~4 kg·m²). The
+    // torque clamp must cover the authored strike rise (~26° in 4–5 steps
+    // needs ~1.9 rad/s of pitch rate built in ~2 steps ≈ 230+ N·m) or the
+    // tracker starves exactly like the audited yaw servo did; levelKd is the
+    // rate-feedforward gain, so it carries the curve-following authority.
+    levelKp: 520,
+    levelKd: 78,
+    levelTorqueMax: 420,
     prepLiftSpeedForMaxQ: 2.0,
     qTimingWeight: 0.5,
     qCrispWeight: 0.5,
@@ -1250,6 +1384,7 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     headingRateDegPerSec: 240,
     headingDeadbandDeg: 2,
     restDeadbandM: 0.05,
+    popNudgeM: 0.035,
     maxAngularRateDeg: 150,
     occlusionRadius: 0.25,
     occlusionMinDistance: 0.8,

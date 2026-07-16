@@ -603,6 +603,35 @@
       "previewPath": null,
       "rejectionReason": null,
       "notes": "Procedurally authored via packages/asset-pipeline (IMPL-004: Blender unavailable). Staged under assets/generated/authored/staged/; NOT promoted to assets/runtime/. Awaiting shot-rubric visual review before promotion."
+    },
+    {
+      "id": "pop-tail-strike-sfx",
+      "description": "Pop tail-strike accent one-shot (impactWood_medium_000 from Kenney Impact Sounds), promoted for the Sprint 02 S4 ollie performance. Mapping NON-FINAL: M9 owns the full audio pass (event-map.json).",
+      "sourceUrl": "https://kenney.nl/assets/impact-sounds",
+      "exactAssetPage": "https://kenney.nl/assets/impact-sounds",
+      "author": "Kenney",
+      "license": "CC0 1.0 Universal",
+      "spdx": "CC0-1.0",
+      "retrievalDate": "2026-07-10",
+      "originalFilename": "Audio/impactWood_medium_000.ogg (from kenney_impact-sounds.zip)",
+      "checksum": "sha256:1723a9fd25103ed41af06054814e84e65f4a772bac86ab2dc927da93d9592ff5",
+      "sha256": "1723a9fd25103ed41af06054814e84e65f4a772bac86ab2dc927da93d9592ff5",
+      "allowedUses": [
+        "commercial",
+        "modify",
+        "redistribute",
+        "no-attribution-required"
+      ],
+      "attributionRequirement": "none (attribution appreciated)",
+      "modificationStatus": "unmodified (renamed only)",
+      "runtimeIntent": "shipping",
+      "reviewStatus": "approved",
+      "reviewNotes": "CC0 verified via parent kenney-impact-sounds entry; auditioned against event-map.json pop analysis (peak −1.03 dB, 0.333 s transient). SFX MAPPING LABELLED NON-FINAL per SPRINT-02-FEEL-GOAL S4.",
+      "parentAsset": "kenney-impact-sounds",
+      "path": "assets/runtime/audio/pop-tail-strike.ogg",
+      "localPath": "assets/runtime/audio/pop-tail-strike.ogg",
+      "licenseSidecar": "assets/source/vendor/kenney-impact-sounds/LICENSE",
+      "sourceSidecar": "assets/source/vendor/kenney-impact-sounds/SOURCE.md"
     }
   ]
 }

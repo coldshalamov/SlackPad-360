@@ -859,22 +859,29 @@ export class SimWorld {
         };
         break;
       }
-      case 'ollieLevel': {
+      case 'pitchCurve': {
         const right = quatRotate(q, 1, 0, 0);
         const forward = quatRotate(q, 0, 0, 1);
         const currentPitch = Math.asin(clampNum(forward.y, -1, 1));
         const target = clampNum(
           cmd.targetPitch,
-          -pop.noseUpTargetDeg * Math.PI / 180,
-          pop.noseUpTargetDeg * Math.PI / 180,
+          -pop.pitchTargetClampDeg * Math.PI / 180,
+          pop.pitchTargetClampDeg * Math.PI / 180,
         );
         const pitchRate = av.x * right.x + av.y * right.y + av.z * right.z;
         // Positive rotation about board-right lowers the nose, so pitch error
-        // and torque have opposite signs in this axis convention.
+        // and torque have opposite signs in this axis convention; the authored
+        // nose-up rate feedforward therefore enters negated onto the same axis.
+        const targetRate = Number.isFinite(cmd.targetPitchRate) ? cmd.targetPitchRate : 0;
+        const authority = Number.isFinite(cmd.authorityScale)
+          ? clampNum(cmd.authorityScale, 0, 1)
+          : 1;
+        const tauMax = pop.levelTorqueMax * authority;
         const tau = clampNum(
-          -pop.levelKp * (target - currentPitch) - pop.levelKd * pitchRate,
-          -pop.levelTorqueMax,
-          pop.levelTorqueMax,
+          -pop.levelKp * (target - currentPitch) -
+            pop.levelKd * (pitchRate + targetRate),
+          -tauMax,
+          tauMax,
         );
         const imp = tau / phys.hz;
         body.applyTorqueImpulse({ x: right.x * imp, y: right.y * imp, z: right.z * imp }, true);
@@ -917,9 +924,28 @@ export class SimWorld {
       case 'catch': {
         const factor = clampNum(cmd.angularFactor, 0, 1);
         const damp = 1 - factor;
+        // While the authored ollie/nollie silhouette is still playing, damp
+        // only the RESIDUAL spin orthogonal to board-right so the S4
+        // performance's level/descent keeps playing through the catch
+        // (assists must never fight the performance, reviews/03 §2.2).
+        // Reclassified flips/shuvs damp all axes exactly as before.
+        let pitchExempt = { x: 0, y: 0, z: 0 };
+        if (cmd.preservePitch === true) {
+          const right = quatRotate(q, 1, 0, 0);
+          const pitchComponent = av.x * right.x + av.y * right.y + av.z * right.z;
+          pitchExempt = {
+            x: right.x * pitchComponent,
+            y: right.y * pitchComponent,
+            z: right.z * pitchComponent,
+          };
+        }
         applyAngularDelta(
           body,
-          { x: -av.x * damp, y: -av.y * damp, z: -av.z * damp },
+          {
+            x: -(av.x - pitchExempt.x) * damp,
+            y: -(av.y - pitchExempt.y) * damp,
+            z: -(av.z - pitchExempt.z) * damp,
+          },
           cmd.maxTorqueImpulse ?? this.config.catch.angularImpulseMax[2],
         );
         break;

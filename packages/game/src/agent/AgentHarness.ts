@@ -245,6 +245,7 @@ export class AgentHarness {
       this.#config,
       this.#assistLevel,
       this.#telemetry,
+      this.#profile.popPitchPreset,
     );
   }
 
@@ -267,9 +268,34 @@ export class AgentHarness {
       this.#config,
       this.#assistLevel,
       this.#telemetry,
+      this.#profile.popPitchPreset,
     );
     this.#feetState = null;
     this.#lastRequestedHeadingRad = null;
+  }
+
+  /**
+   * Re-read the profile provider and rebuild the recognizer/controller stack
+   * WITHOUT resetting the world — the sanctioned path for live taste switches
+   * (e.g. the S4 pitch-preset hotkey). Refused while recording: a mid-trace
+   * profile change could never replay faithfully (the header pins ONE
+   * profile), so it must never silently corrupt a session trace.
+   */
+  reinstallProfile(): boolean {
+    if (this.#recording) {
+      this.#telemetry.log({
+        type: 'profileReinstallRefused',
+        reason: 'recording',
+        step: this.#world.getStep(),
+      });
+      return false;
+    }
+    this.#installProfile(this.#snapshotProfile());
+    this.#telemetry.log({
+      type: 'profileReinstalled',
+      step: this.#world.getStep(),
+    });
+    return true;
   }
 
   #makeFootTracker(): FootTracker {

@@ -22,6 +22,7 @@ import {
 } from '@slackpad/shared';
 import { AgentHarness } from './agent/AgentHarness';
 import { GameLoop } from './app/GameLoop';
+import { PopSfx } from './app/PopSfx';
 import { GameRenderer } from './render/GameRenderer';
 import { DebugHud } from './render/DebugHud';
 import { runSelfCheck, visualCheck } from './render/selfCheck';
@@ -64,7 +65,19 @@ async function boot(): Promise<void> {
     vignetteMs: config.presentation.bailVignetteMs,
     respawnFadeMs: config.presentation.respawnFadeMs,
     mode: underHost ? 'player' : 'debug',
+    // S4 preset readout — visible in BOTH modes so the HUMAN_TEST session can
+    // cycle silhouettes with P and see which one is live.
+    extraStatus: () => `pitch [P] ${profileStore.get().popPitchPreset ?? 'crisp'}`,
   });
+
+  // S4 tail-strike accents: one CC0 wood-hit one-shot (mapping NON-FINAL — M9
+  // owns the real audio pass) + a one-frame camera dip on every recognized pop.
+  const popSfx = new PopSfx(harness.getTelemetry());
+  const unsubscribePopNudge = harness.getTelemetry().subscribe((event) => {
+    if (event.type === 'popRecognized') renderer.cameraRig.popNudge();
+  });
+  void popSfx;
+  void unsubscribePopNudge;
 
   // Native host bridge: when running inside the WebView2 GameForm, REAL trackpad
   // frames stream in through the SAME InputHub. In a plain browser this is inert
@@ -100,10 +113,23 @@ async function boot(): Promise<void> {
     });
     return resetPromise;
   };
+  let previousProfile = profileStore.get();
   profileStore.subscribe(() => {
     const profile = profileStore.get();
     renderer.cameraRig.setReducedMotion(profile.accessibility.reducedMotion);
     controlGuide?.setProfile(profile);
+    // A pitch-preset-ONLY change hot-applies through reinstallProfile (no
+    // world reset — the S4 hotkey must not respawn the board mid-session).
+    // Any other profile edit keeps the established reset-to-apply semantics.
+    const presetOnly =
+      profile.popPitchPreset !== previousProfile.popPitchPreset &&
+      JSON.stringify({ ...profile, popPitchPreset: null }) ===
+        JSON.stringify({ ...previousProfile, popPitchPreset: null });
+    previousProfile = profile;
+    if (presetOnly) {
+      harness.reinstallProfile();
+      return;
+    }
     void resetWorld();
   });
 
@@ -187,8 +213,12 @@ async function boot(): Promise<void> {
   });
 
   window.addEventListener('keydown', (event) => {
-    if (event.repeat || event.key.toLowerCase() !== 'v') return;
-    renderer.cameraRig.toggleViewMode();
+    if (event.repeat) return;
+    const key = event.key.toLowerCase();
+    if (key === 'v') renderer.cameraRig.toggleViewMode();
+    // S4: cycle the authored ollie pitch silhouette live (crisp → floaty →
+    // aggressive); the DebugHud readout shows the active preset.
+    if (key === 'p') profileStore.cyclePopPitchPreset();
   });
 
   loop.start();

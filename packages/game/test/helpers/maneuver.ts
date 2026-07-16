@@ -159,6 +159,7 @@ export async function settledProfiled(
     assistLevel?: 0 | 1 | 2;
     levelId?: string;
     kickAttribution?: 'motionTap' | 'buttonSide' | 'plantMask';
+    popPitchPreset?: 'crisp' | 'floaty' | 'aggressive';
   } = {},
 ): Promise<PadDriver> {
   const h = new AgentHarness(DEFAULT_SIM_CONFIG, () => ({
@@ -169,6 +170,7 @@ export async function settledProfiled(
     bothClickMeans: 'push',
     kickAttribution: opts.kickAttribution ?? 'motionTap',
     tapToClickIsKick: true,
+    popPitchPreset: opts.popPitchPreset ?? 'crisp',
     accessibility: { reducedMotion: false, highContrastHud: false },
   }));
   await h.reset(seed, opts.levelId ?? 'flat-dev');

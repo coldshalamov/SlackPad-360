@@ -10,7 +10,13 @@
  * vitest on test/feel/feel-report.test.ts with FEEL_REPORT_DIR set).
  */
 
-import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
+import {
+  DEFAULT_INPUT_PROFILE,
+  DEFAULT_POP_PITCH_PRESET,
+  DEFAULT_SIM_CONFIG,
+  popFlightSteps,
+  samplePitchCurve,
+} from '@slackpad/shared';
 import { GAME_VERSION, RAPIER_VERSION } from '../src/agent/AgentHarness';
 import {
   dualPlantHold,
@@ -34,40 +40,24 @@ const HZ = DEFAULT_SIM_CONFIG.physics.hz;
 const DT_MS = 1000 / HZ;
 
 /**
- * Canonical ollie pitch silhouette (nose-up deg over normalized maneuver
- * time), per reviews/03 §Stage 2: strike → sharp rise, hold, level by apex,
- * slightly nose-down into descent. S4 promotes this exact curve to config as
- * the `crisp` preset default; the report then reads the ACTIVE preset instead.
- * Keeping the S0 reference identical to the S4 default makes the
- * baseline→after RMS delta apples-to-apples.
+ * The ACTIVE authored pitch silhouette: config pop.pitchCurves under the
+ * default profile's preset — the exact curve the runtime tracker plays (S4).
+ * The 'crisp' control points are byte-identical to the S0 reference, so the
+ * committed baseline RMS stays comparable.
  */
-export const REFERENCE_PITCH_CURVE_CRISP: ReadonlyArray<readonly [number, number]> = [
-  [0, 0],
-  [0.1, 26],
-  [0.3, 24],
-  [0.55, 8],
-  [0.8, 0],
-  [1, -4],
-];
-
-export function sampleCurve(
-  curve: ReadonlyArray<readonly [number, number]>,
-  tNorm: number,
-): number {
-  const t = Math.max(0, Math.min(1, tNorm));
-  let prev = curve[0]!;
-  for (const point of curve) {
-    if (t <= point[0]) {
-      const [t0, v0] = prev;
-      const [t1, v1] = point;
-      if (t1 === t0) return v1;
-      const f = (t - t0) / (t1 - t0);
-      return v0 + f * (v1 - v0);
-    }
-    prev = point;
-  }
-  return curve[curve.length - 1]![1];
-}
+const ACTIVE_PITCH_PRESET =
+  DEFAULT_INPUT_PROFILE.popPitchPreset ?? DEFAULT_POP_PITCH_PRESET;
+const ACTIVE_PITCH_CURVE =
+  DEFAULT_SIM_CONFIG.pop.pitchCurves[ACTIVE_PITCH_PRESET];
+// The batteries pop via motionTap (constant q), so the runtime's per-pop
+// silhouette timeline is a constant too — mirror it exactly.
+const CURVE_DURATION_STEPS = popFlightSteps(
+  DEFAULT_SIM_CONFIG.pop.jMin +
+    DEFAULT_SIM_CONFIG.pop.baseQuality *
+      (DEFAULT_SIM_CONFIG.pop.jMax - DEFAULT_SIM_CONFIG.pop.jMin),
+  DEFAULT_SIM_CONFIG.physics.boardMass + DEFAULT_SIM_CONFIG.physics.riderMass,
+  DEFAULT_SIM_CONFIG.physics.hz,
+);
 
 // ---------------------------------------------------------------------------
 // Metric math
@@ -158,15 +148,43 @@ export function achievedYawDeg(samples: SteerSample[], fromIndex: number): numbe
   return Math.abs(last.yawDeg - base.yawDeg);
 }
 
-/** RMS of measured nose-up pitch vs the reference curve over the maneuver. */
+/**
+ * GATED metric (S4): RMS of measured nose-up pitch vs the ACTIVE authored
+ * curve on the curve's OWN timeline — tNorm = (step − kick)/curveDurationSteps
+ * — exactly how the runtime tracker plays it (landing early truncates the
+ * performance; it never time-stretches). Samples run kick → min(resolve,
+ * kick + duration).
+ */
 export function silhouetteRmsDeg(run: PopRunResult, noseUpSign: 1 | -1): number | null {
+  if (run.resolveStep == null || run.resolveStep <= run.kickStep) return null;
+  const end = Math.min(run.resolveStep, run.kickStep + CURVE_DURATION_STEPS);
+  const errs: number[] = [];
+  for (const s of run.pitchSamples) {
+    if (s.step < run.kickStep || s.step > end) continue;
+    const tNorm = (s.step - run.kickStep) / CURVE_DURATION_STEPS;
+    const ref = noseUpSign * samplePitchCurve(ACTIVE_PITCH_CURVE, tNorm);
+    errs.push(s.pitchDeg - ref);
+  }
+  if (errs.length === 0) return null;
+  return Math.sqrt(mean(errs.map((e) => e * e)));
+}
+
+/**
+ * LEGACY S0 metric definition (kick→land normalization) kept verbatim so the
+ * committed untouched-build baseline (16.9° RMS) stays directly comparable in
+ * the S6 delta table.
+ */
+export function silhouetteRmsLandNormDeg(
+  run: PopRunResult,
+  noseUpSign: 1 | -1,
+): number | null {
   if (run.resolveStep == null || run.resolveStep <= run.kickStep) return null;
   const span = run.resolveStep - run.kickStep;
   const errs: number[] = [];
   for (const s of run.pitchSamples) {
     if (s.step < run.kickStep || s.step > run.resolveStep) continue;
     const tNorm = (s.step - run.kickStep) / span;
-    const ref = noseUpSign * sampleCurve(REFERENCE_PITCH_CURVE_CRISP, tNorm);
+    const ref = noseUpSign * samplePitchCurve(ACTIVE_PITCH_CURVE, tNorm);
     errs.push(s.pitchDeg - ref);
   }
   if (errs.length === 0) return null;
@@ -269,19 +287,20 @@ function steerPlot(title: string, result: SteerScenarioResult): string {
 }
 
 function pitchPlot(title: string, run: PopRunResult, noseUpSign: 1 | -1): string {
-  const span = Math.max(1, (run.resolveStep ?? run.kickStep + 1) - run.kickStep);
   const measured = run.pitchSamples
     .filter((s) => s.step >= run.kickStep)
     .map((s) => ({ x: (s.step - run.kickStep) * DT_MS, y: s.pitchDeg }));
   const reference = run.pitchSamples
-    .filter((s) => s.step >= run.kickStep && s.step <= run.kickStep + span)
+    .filter((s) => s.step >= run.kickStep && s.step <= run.kickStep + CURVE_DURATION_STEPS)
     .map((s) => ({
       x: (s.step - run.kickStep) * DT_MS,
-      y: noseUpSign * sampleCurve(REFERENCE_PITCH_CURVE_CRISP, (s.step - run.kickStep) / span),
+      y:
+        noseUpSign *
+        samplePitchCurve(ACTIVE_PITCH_CURVE, (s.step - run.kickStep) / CURVE_DURATION_STEPS),
     }));
   return svgPlot(title, 't since kick (ms)', 'nose-up pitch (deg)', [
     { label: 'measured pitch', color: '#d62728', points: measured },
-    { label: 'reference silhouette (crisp)', color: '#1f77b4', points: reference },
+    { label: `authored silhouette (${ACTIVE_PITCH_PRESET})`, color: '#1f77b4', points: reference },
   ]);
 }
 
@@ -342,6 +361,9 @@ function batteryRows(runs: PopRunResult[], noseUpSign: 1 | -1): Array<Record<str
     latencyMs: round(r.latencyMs, 2),
     heightM: round(r.heightM),
     airtimeSec: round(r.airtimeSec),
+    thetaDeg: round(r.thetaDeg, 2),
+    impactSpeedMps: round(r.impactSpeedMps, 2),
+    headingErrDeg: round(r.headingErrDeg, 2),
     silhouetteRmsDeg: round(silhouetteRmsDeg(r, noseUpSign)),
   }));
 }
@@ -410,6 +432,9 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
   const ollieRms = ollies
     .map((r) => silhouetteRmsDeg(r, 1))
     .filter((v): v is number => v != null);
+  const ollieRmsLegacy = ollies
+    .map((r) => silhouetteRmsLandNormDeg(r, 1))
+    .filter((v): v is number => v != null);
   const ollieCounts = outcomeCounts(ollies);
   const nollieCounts = outcomeCounts(nollies);
   const nollieLatencies = nollies.map((r) => r.latencyMs).filter((v): v is number => v != null);
@@ -470,8 +495,14 @@ export async function runFeelReport(): Promise<FeelReportBundle> {
         latencyMs: round(popLatencyMs, 2),
         latencyMedianMs: round(median(ollieLatencies), 2),
         liftoffFailures: ollies.length - ollieLatencies.length,
+        silhouettePreset: ACTIVE_PITCH_PRESET,
         silhouetteRmsDeg: round(popRms),
         silhouetteRmsMedianDeg: round(median(ollieRms)),
+        // Legacy S0 kick→land normalization — comparable to the committed
+        // untouched-build baseline (16.9°).
+        silhouetteRmsLandNormDeg: round(
+          ollieRmsLegacy.length === ollies.length ? max(ollieRmsLegacy) : null,
+        ),
       },
       land: {
         cleanRate: round(cleanRate),

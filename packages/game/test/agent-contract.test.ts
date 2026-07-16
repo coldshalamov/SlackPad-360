@@ -21,6 +21,9 @@ const HARNESS_ALLOWLIST = [
   'reset',
   'injectContactFrame',
   'releaseInputs',
+  // S4: sanctioned live profile reinstall (pitch-preset hotkey). Refused
+  // while recording; grants no sim/body access.
+  'reinstallProfile',
   'step',
   'observe',
   'startRecording',

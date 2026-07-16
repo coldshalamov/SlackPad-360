@@ -19,7 +19,7 @@ const OUT_DIR = process.env.FEEL_REPORT_DIR;
 const GATE_GROUPS = (process.env.FEEL_GATES ?? '')
   .split(',')
   .map((s) => s.trim())
-  .filter((s): s is GateGroup => s === 'steer' || s === 'pop');
+  .filter((s): s is GateGroup => s === 'steer' || s === 'pop' || s === 'nav');
 
 describe.skipIf(!OUT_DIR)('feel report (S0)', () => {
   it(

@@ -21,7 +21,8 @@
  * respawns via its internal game rule).
  */
 
-import type { SimConfig, Vec3 } from '@slackpad/shared';
+import { DEFAULT_POP_PITCH_PRESET, popFlightSteps, samplePitchCurve } from '@slackpad/shared';
+import type { PopPitchPreset, SimConfig, Vec3 } from '@slackpad/shared';
 import type { Telemetry } from '../telemetry/Telemetry';
 import type { FsmResult } from './GestureFSM';
 import type { ManeuverCommand } from './ManeuverCommand';
@@ -49,11 +50,17 @@ function zero(): Vec3 {
 export class ManeuverAssist {
   private readonly state: AssistState;
   private lastImpulseAttemptId: string | null = null;
+  /** Quality of the most recent pop (silhouette amplitude scale). */
+  private popQ: number | undefined;
+  /** Silhouette timeline of the most recent pop, steps (scales with jY). */
+  private curveSteps: number | undefined;
 
   constructor(
     private readonly config: SimConfig,
     assistLevel: 0 | 1 | 2,
     private readonly telemetry?: Telemetry,
+    /** Active authored pitch-silhouette preset (profile-owned, S4). */
+    private readonly pitchPreset: PopPitchPreset = DEFAULT_POP_PITCH_PRESET,
   ) {
     this.state = {
       phase: 'none',
@@ -110,6 +117,16 @@ export class ManeuverAssist {
             kickImpulse: pitchTorqueImpulse / lever,
           });
           s.impulseQueued = { x: 0, y: jY, z: 0 };
+          // The silhouette amplitude scales with this pop's quality (constant
+          // for motionTap — intensity is a gated experiment, reviews/03 §2.2)
+          // and its TIMELINE scales with the flight this jY ballistically
+          // buys, so a small pop levels off by its own earlier apex.
+          this.popQ = q;
+          this.curveSteps = popFlightSteps(
+            jY,
+            this.config.physics.boardMass + this.config.physics.riderMass,
+            this.config.physics.hz,
+          );
           break;
         }
         case 'catch': {
@@ -119,6 +136,10 @@ export class ManeuverAssist {
             kind: 'catch',
             angularFactor: 1 - gain,
             maxTorqueImpulse: cat.angularImpulseMax[s.assistLevel],
+            // Spare the authored pitch performance for the base pop only; a
+            // reclassified flip/shuv catch damps all axes exactly as in M5.
+            preservePitch:
+              result.label?.label === 'ollie' || result.label?.label === 'nollie',
           });
           // Quantize (spec §3.4): EXTRA on-axis damping when the completed
           // rotation at catch sits inside this level's cone of a whole trick
@@ -186,23 +207,49 @@ export class ManeuverAssist {
       s.omegaTarget = zero();
     }
 
-    // A basic ollie is a snap-and-level sequence, not a vertical translation.
-    // Hold a readable pitch briefly, then physically torque the deck back to
-    // level before landing. Flip/shuv torque remains orthogonal and can compose.
+    // The BASE ollie/nollie is a PERFORMANCE (reviews/03 Stage 2): play the
+    // authored pitch silhouette — strike, sharp rise, level by apex, slight
+    // nose-down into descent — anchored at the POP step and tracked by the
+    // SimWorld PD, spanning pop → air → catch (level/descent play through
+    // the catch). Once a flick reclassifies the trick, the silhouette HANDS
+    // OFF: servoing pitch against a deck spinning 10+ rad/s about the flip
+    // axis couples gyroscopically into yaw/pitch chaos (measured: 55° pitch,
+    // 31° heading error), so flips/shuvs keep their tuned M5 endgame —
+    // ballistic pitch, catch damping, quantize. Nollie mirrors the sign;
+    // amplitude scales with pop quality (constant for motionTap).
+    const intent = result.intent;
     const baseLabel = result.label?.label;
-    const guidePlanted = baseLabel === 'nollie' ? feet?.tail.planted : feet?.nose.planted;
+    const guidePlanted =
+      intent?.base === 'nollie' ? feet?.tail.planted : feet?.nose.planted;
     if (
-      result.phase === 'air' &&
+      intent &&
       (baseLabel === 'ollie' || baseLabel === 'nollie') &&
-      guidePlanted
+      guidePlanted &&
+      (result.phase === 'pop' || result.phase === 'air' || result.phase === 'catch')
     ) {
-      const age = Math.max(0, step - result.label!.openStep);
-      const hold = Math.max(0, pop.snapHoldSteps);
-      const end = Math.max(hold + 1, pop.levelEndSteps);
-      const levelT = age <= hold ? 0 : Math.min(1, (age - hold) / (end - hold));
-      const sign = baseLabel === 'ollie' ? 1 : -1;
-      const targetPitch = sign * (pop.noseUpTargetDeg * Math.PI / 180) * (1 - levelT);
-      cmds.push({ kind: 'ollieLevel', targetPitch });
+      const age = Math.max(0, step - intent.source.popStep);
+      const duration = Math.max(1, this.curveSteps ?? pop.curveDurationSteps);
+      const tNorm = Math.min(1, age / duration);
+      const tNext = Math.min(1, (age + 1) / duration);
+      const curve = pop.pitchCurves[this.pitchPreset] ?? pop.pitchCurves.crisp;
+      const amplitude = (this.popQ ?? pop.baseQuality) / Math.max(1e-6, pop.baseQuality);
+      const sign = intent.base === 'ollie' ? 1 : -1;
+      const scale = (sign * amplitude * Math.PI) / 180;
+      const targetPitch = scale * samplePitchCurve(curve, tNorm);
+      const targetPitchRate =
+        scale *
+        (samplePitchCurve(curve, tNext) - samplePitchCurve(curve, tNorm)) *
+        this.config.physics.hz;
+      // Authority floor while a flick could still plausibly reclassify this
+      // pop, ramping to full right after the practical flick era so the base
+      // performance is tracked but tuned flip entries are never perturbed.
+      const floor = Math.max(0, Math.min(1, pop.curveWindowAuthority));
+      const rampStart = Math.max(0, pop.curveAuthorityRampStartStep);
+      const rampEnd = Math.max(rampStart + 1, pop.curveAuthorityRampEndStep);
+      const rampT = Math.max(0, Math.min(1, (age - rampStart) / (rampEnd - rampStart)));
+      const windowOpen = step <= result.label!.expireStep;
+      const authorityScale = windowOpen ? floor + (1 - floor) * rampT : 1;
+      cmds.push({ kind: 'pitchCurve', targetPitch, targetPitchRate, authorityScale });
     }
 
     // Per-step grind latch (M6; spec §4). Flush the GrindSystem's clamped

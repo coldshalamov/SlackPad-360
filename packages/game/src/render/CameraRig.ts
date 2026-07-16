@@ -91,6 +91,8 @@ export class CameraRig {
   #headingInitialized = false;
   /** Hysteresis state: following the live heading vs holding the frame. */
   #headingFollowing = false;
+  /** One-frame pop-nudge dip queued for the next update, m. */
+  #pendingNudgeM = 0;
   #bailOrbit = 0;
   #lastMode: ShotMode = "chase";
   #viewMode: CameraViewMode = "route";
@@ -161,6 +163,16 @@ export class CameraRig {
   /** Static meshes the occlusion spring-arm may sphere-cast against. */
   setOccluders(meshes: THREE.Object3D[]): void {
     this.#occluders = meshes;
+  }
+
+  /**
+   * One-frame tail-strike accent (Sprint 02 S4): dip the camera by
+   * `camera.popNudgeM` on the next frame and let the position spring recover.
+   * Presentation only; `reducedMotion` disables it.
+   */
+  popNudge(): void {
+    if (this.#reducedMotion) return;
+    this.#pendingNudgeM = this.#cfg.popNudgeM;
   }
 
   /** Map a maneuver phase to a shot mode. */
@@ -377,6 +389,13 @@ export class CameraRig {
         dt,
         this.#smoothed,
       );
+    }
+
+    // One-frame tail-strike dip: applied to the smoothed pose, so the spring
+    // pulls the camera back over the following frames.
+    if (this.#pendingNudgeM > 0) {
+      this.#smoothed.y -= this.#pendingNudgeM;
+      this.#pendingNudgeM = 0;
     }
 
     // --- Occlusion spring-arm (sphere-cast shorten) ------------------------

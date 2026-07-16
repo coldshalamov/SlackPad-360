@@ -48,6 +48,14 @@ const MOUNTS: Mount[] = [
     dir: join(REPO_ROOT, 'assets', 'generated', 'textures', 'concrete'),
     copy: ['Color.jpg', 'NormalGL.jpg', 'Roughness.jpg', 'AmbientOcclusion.jpg'],
   },
+  {
+    // S4 tail-strike accent — the one VALIDATED runtime audio file (catalog id
+    // pop-tail-strike-sfx, CC0). Unlike the staged mounts above, runtime/ is
+    // the reviewed shipping tree.
+    prefix: '/runtime-audio/',
+    dir: join(REPO_ROOT, 'assets', 'runtime', 'audio'),
+    copy: ['pop-tail-strike.ogg'],
+  },
 ];
 
 const CONTENT_TYPES: Record<string, string> = {

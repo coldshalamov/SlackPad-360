@@ -369,6 +369,10 @@ export interface PopRunResult {
   label: string | null;
   heightM: number;
   airtimeSec: number;
+  /** Landing classification inputs from trickCompleted (null when unresolved). */
+  thetaDeg: number | null;
+  impactSpeedMps: number | null;
+  headingErrDeg: number | null;
   /** Nose-up pitch per step from the kick to resolution (or timeout). */
   pitchSamples: PitchSample[];
 }
@@ -464,6 +468,10 @@ async function measuredPop(kind: 'ollie' | 'nollie', seed: number, rand: () => n
     label,
     heightM: maxY - y0,
     airtimeSec: airSteps / HZ,
+    thetaDeg: trick && bailStep <= trickStep ? ((trick.thetaDeg as number) ?? null) : null,
+    impactSpeedMps: trick && bailStep <= trickStep ? ((trick.impactSpeed as number) ?? null) : null,
+    headingErrDeg:
+      trick && bailStep <= trickStep ? ((trick.headingErrorDeg as number) ?? null) : null,
     pitchSamples,
   };
 }

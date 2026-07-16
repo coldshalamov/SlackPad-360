@@ -33,6 +33,8 @@ export interface DebugHudOptions {
   vignetteMs?: number;
   respawnFadeMs?: number;
   mode?: HudMode;
+  /** Optional extra status line (e.g. the S4 pitch-preset readout). */
+  extraStatus?: () => string;
 }
 
 export type HudMode = 'player' | 'debug';
@@ -67,7 +69,8 @@ export class DebugHud {
   #lastTrick = '—';
   #lastBailReason = '—';
   readonly #unsubscribe: () => void;
-  readonly #opts: Required<DebugHudOptions>;
+  readonly #opts: Required<Omit<DebugHudOptions, 'extraStatus'>>;
+  readonly #extraStatus?: () => string;
 
   constructor(container: HTMLElement, telemetry: Telemetry, opts: DebugHudOptions = {}) {
     this.#opts = {
@@ -77,6 +80,7 @@ export class DebugHud {
       respawnFadeMs: opts.respawnFadeMs ?? 250,
       mode: opts.mode ?? 'debug',
     };
+    this.#extraStatus = opts.extraStatus;
     const bgAlpha = this.#opts.highContrast ? 0.9 : 0.62;
     const chipBg = `rgba(12,16,22,${bgAlpha})`;
 
@@ -264,7 +268,9 @@ export class DebugHud {
     this.#phaseText.style.color = color;
     this.#phaseText.textContent = `${obs.phase.toUpperCase()}${obs.label ? ` · ${obs.label}` : ''}`;
 
-    this.#stats.textContent = hudStatsText(obs, this.#opts.mode);
+    const extra = this.#extraStatus?.();
+    this.#stats.textContent =
+      hudStatsText(obs, this.#opts.mode) + (extra ? `\n${extra}` : '');
     this.#trickChip.textContent = `trick ${this.#lastTrick}`;
     this.#failChip.textContent = `fail ${obs.lastFailReason ?? '—'}`;
     if (this.#opts.mode === 'player') {

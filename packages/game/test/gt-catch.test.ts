@@ -5,7 +5,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SIM_CONFIG } from '@slackpad/shared';
-import { eventsOf, lastEventOf, NOSE_POS, scriptOllie, settledProfiled, TAIL_POS } from './helpers/maneuver';
+import { SimWorld } from '../src/sim/SimWorld';
+import {
+  eventsOf,
+  lastEventOf,
+  NOSE_POS,
+  scriptOllie,
+  settledProfiled,
+  TAIL_POS,
+} from './helpers/maneuver';
 import type { FootInput } from './helpers/maneuver';
 
 interface CatchRun {
@@ -104,27 +112,54 @@ describe('GT-catch: assisted hold and optional L0 manual catch', () => {
     }
   });
 
-  it('assisted auto-catch applies the configured angular damping factor', async () => {
-    const d = await settledProfiled(0xca7c8, { assistLevel: 1, kickAttribution: 'motionTap' });
-    d.cruise(90);
-    scriptOllie(d);
-    let before: number | null = null;
-    let after: number | null = null;
-    for (let i = 0; i < 160 && after == null; i++) {
-      const obs = d.harness.observe();
-      const count = eventsOf(d.harness, 'catch').length;
-      before = Math.hypot(obs.board.av.x, obs.board.av.y, obs.board.av.z);
-      d.drive({ nose: NOSE_POS, tail: TAIL_POS });
-      if (eventsOf(d.harness, 'catch').length > count) {
-        const av = d.harness.observe().board.av;
-        after = Math.hypot(av.x, av.y, av.z);
-      }
+  it('the catch executor applies the commanded angular factor (and spares pitch only when told)', async () => {
+    // S4 semantics: a base-ollie catch spares the board-right (pitch) axis —
+    // the authored silhouette keeps playing through the catch — while every
+    // other axis (and every axis of a flip/shuv catch, preservePitch=false)
+    // damps by exactly the commanded factor. The old pipeline measurement of
+    // total |av| across an ollie catch no longer isolates the factor (the
+    // live performance and quantize compose), so pin the executor directly:
+    // build a known roll spin physically, then catch it.
+    const world = new SimWorld(structuredClone(DEFAULT_SIM_CONFIG));
+    await world.reset(0xca7c8, 'flat-dev');
+    for (let i = 0; i < 90; i++) world.step();
+    // Pop airborne first — grounded wheels resist roll and would mask the
+    // factor — then build the roll spin in the air.
+    world.applyManeuver({
+      kind: 'pop',
+      jY: DEFAULT_SIM_CONFIG.pop.jMin +
+        DEFAULT_SIM_CONFIG.pop.baseQuality *
+          (DEFAULT_SIM_CONFIG.pop.jMax - DEFAULT_SIM_CONFIG.pop.jMin),
+      popSide: 'tail',
+      kickImpulse: 0,
+    });
+    for (let i = 0; i < 8; i++) world.step();
+    for (let i = 0; i < 3; i++) {
+      world.applyManeuver({
+        kind: 'flipTorque',
+        axis: 'long',
+        omegaTarget: 8,
+        tauMax: DEFAULT_SIM_CONFIG.flip.tauMax[2],
+      });
+      world.step();
     }
-    expect(before).not.toBeNull();
-    expect(after).not.toBeNull();
-    const expected = 1 - DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[1];
-    expect(after! / before!).toBeGreaterThan(expected - 0.12);
-    expect(after! / before!).toBeLessThan(expected + 0.12);
+    const before = world.boardPose().av;
+    const beforeMag = Math.hypot(before.x, before.y, before.z);
+    expect(beforeMag).toBeGreaterThan(1);
+    const factor = 1 -
+      DEFAULT_SIM_CONFIG.catch.catchGain * DEFAULT_SIM_CONFIG.catch.assistScale[1];
+    world.applyManeuver({
+      kind: 'catch',
+      angularFactor: factor,
+      maxTorqueImpulse: 1000, // isolate the factor from the impulse clamp
+      preservePitch: false,
+    });
+    world.step();
+    const after = world.boardPose().av;
+    const afterMag = Math.hypot(after.x, after.y, after.z);
+    // One integration step adds gravity/contact noise; keep a modest band.
+    expect(afterMag / beforeMag).toBeGreaterThan(factor - 0.12);
+    expect(afterMag / beforeMag).toBeLessThan(factor + 0.12);
   });
 
   it('L0 does not auto-catch a held stance, but a post-apex socket replant catches', async () => {

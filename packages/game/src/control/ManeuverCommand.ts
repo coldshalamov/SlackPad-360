@@ -10,7 +10,7 @@ import type { Vec3 } from '@slackpad/shared';
 
 export type ManeuverCommand =
   | PopManeuverCommand
-  | OllieLevelManeuverCommand
+  | PitchCurveManeuverCommand
   | FlipImpulseManeuverCommand
   | FlipTorqueManeuverCommand
   | CatchManeuverCommand
@@ -38,14 +38,28 @@ export interface PopManeuverCommand {
 }
 
 /**
- * Per-step physical pitch guide for a basic ollie/nollie. It targets a clear
- * snap angle early in flight, then ramps to level. SimWorld applies only a
- * clamped PD torque about the live board-right axis; no pose is written.
+ * Per-step physical pitch guide for a basic ollie/nollie (Sprint 02 S4): the
+ * target is one sample of the AUTHORED pitch silhouette (config
+ * pop.pitchCurves, active preset from the profile) on the curve's own
+ * timeline. SimWorld applies only a clamped PD torque about the live
+ * board-right axis; no pose is written.
  */
-export interface OllieLevelManeuverCommand {
-  kind: 'ollieLevel';
+export interface PitchCurveManeuverCommand {
+  kind: 'pitchCurve';
   /** Signed target pitch, rad. Positive raises the nose. */
   targetPitch: number;
+  /**
+   * Authored curve slope at this sample, rad/s nose-up — the rate feedforward
+   * that lets the tracker FOLLOW the silhouette instead of trailing it by the
+   * PD time constant (same lesson as the S2 yaw servo).
+   */
+  targetPitchRate: number;
+  /**
+   * Torque-authority fraction [0,1] this step (reduced while the flick
+   * recognition window is open so a would-be flip is never fought). SimWorld
+   * clamps it to [0,1] and scales its torque clamp by it.
+   */
+  authorityScale: number;
 }
 
 /** One-shot physical angular impulse that starts a recognized flip or shuv. */
@@ -84,6 +98,14 @@ export interface CatchManeuverCommand {
   kind: 'catch';
   angularFactor: number;
   maxTorqueImpulse?: number;
+  /**
+   * True only while the authored ollie/nollie pitch silhouette is still
+   * playing (S4): the catch then spares the board-right (pitch) component so
+   * the performance's level/descent segments aren't halved every step. Flip/
+   * shuv catches leave this false — their pitch is residual, not authored,
+   * and must damp like everything else.
+   */
+  preservePitch?: boolean;
 }
 
 /**
