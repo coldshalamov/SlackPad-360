@@ -412,6 +412,19 @@ export interface FlipConfig {
    */
   quantizeConeDeg: [number, number, number];
   /**
+   * Clamp of the shuv ROLL-LEVEL attitude PD as a fraction of the flip torque
+   * budget, per assist level (Sprint 03 T2). A shuv's authored orientation is
+   * FLAT roll, but Euler coupling (yaw × pitch products landing on the
+   * featherweight roll axis) leaks 12–20° of genuine tilt by the catch — the
+   * leveler holds the deck flat through the WHOLE maneuver (pop→air→catch).
+   * 0 at L0 (pure physics by contract).
+   */
+  shuvRollDampFrac: [number, number, number];
+  /** Roll-level attitude gain, N·m/rad (roll inertia ≈ 0.25 kg·m²). */
+  rollLevelKp: number;
+  /** Roll-level rate gain, N·m/(rad/s). */
+  rollLevelKd: number;
+  /**
    * Fraction of the on-axis spin removed at catch when inside the quantize cone,
    * per assist level. Applied ON TOP of the base catch damping, only about the
    * trick axis. L0 is 0 by construction. L2 > L1 (stronger snap).
@@ -444,6 +457,17 @@ export interface CatchConfig {
    * When false any mid-air replant into a catch volume catches.
    */
   apexOnly: boolean;
+  /**
+   * The held-stance AUTO-catch (L1/L2) waits for the assisted flip envelope
+   * to carry the rotation to at least this fraction of a full turn before
+   * catching — never freezing the deck grip-tape-down. The residual the
+   * catch leaves is ≈ (1 − this) × 360°, so it is the direct knob behind
+   * trick.catchResidualDeg (Sprint 03 T2). Manual volume catches (the L0
+   * path, or an explicit replant) stay unguarded by design.
+   */
+  flipCompletionMin: number;
+  /** Same wait for shuvs, as a fraction of recognition.shuvTargetDeg. */
+  shuvCompletionFrac: number;
 }
 
 export interface LandConfig {
@@ -1182,6 +1206,9 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     flickSpeedForMaxS: 5.0,
     shuvOmegaMax: 9.0,
     shuvTauMax: [155, 217, 310],
+    shuvRollDampFrac: [0, 0.8, 0.9],
+    rollLevelKp: 12,
+    rollLevelKd: 1.4,
     quantizeConeDeg: [0, 45, 80],
     quantizeExtraDamp: [0, 0.5, 0.85],
     nameMinTurns: 0.4,
@@ -1193,6 +1220,8 @@ export const DEFAULT_SIM_CONFIG: SimConfig = deepFreezeConfig({
     catchGain: 1.0,
     angularImpulseMax: [23, 46, 77],
     apexOnly: true,
+    flipCompletionMin: 0.94,
+    shuvCompletionFrac: 0.85,
   },
   land: {
     thetaCleanDeg: 25,

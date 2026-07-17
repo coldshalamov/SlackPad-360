@@ -903,6 +903,30 @@ export class SimWorld {
         );
         break;
       }
+      case 'rollLevel': {
+        // Shuv roll leveler (Sprint 03 T2): clamped attitude PD about
+        // board-long holding the deck's roll flat. Roll angle is world-up
+        // expressed in the body frame (lateral component); pure torque, no
+        // pose writes — the clamp is the authority bound.
+        const flip = this.config.flip;
+        const longAxis = quatRotate(q, 0, 0, 1);
+        const ubX = 2 * (q.x * q.y + q.w * q.z);
+        const ubY = 1 - 2 * (q.x * q.x + q.z * q.z);
+        const rollAngle = Math.atan2(ubX, ubY);
+        const rollRate = av.x * longAxis.x + av.y * longAxis.y + av.z * longAxis.z;
+        const tauMax = clampNum(cmd.tauMax, 0, Math.max(flip.tauMax[2], 1));
+        const tau = clampNum(
+          -flip.rollLevelKp * rollAngle - flip.rollLevelKd * rollRate,
+          -tauMax,
+          tauMax,
+        );
+        const imp = tau / phys.hz;
+        body.applyTorqueImpulse(
+          { x: longAxis.x * imp, y: longAxis.y * imp, z: longAxis.z * imp },
+          true,
+        );
+        break;
+      }
       case 'flipTorque': {
         // Per-step flip/shuv PD torque about a board-local axis (spec §3.2).
         // The axis is resolved to world from the LIVE orientation, the live

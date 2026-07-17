@@ -46,10 +46,15 @@ export interface TrickRunResult {
   /** Signed completion at resolution: turns (flips) / degrees (shuvs). */
   completionTurns: number | null;
   completionDeg: number | null;
-  /** Deck tilt vs world-up one step after the catch event, deg. */
+  /**
+   * GATED: roll off-level (trick-axis residual, pitch-invariant) one step
+   * after the catch event, deg.
+   */
   catchResidualDeg: number | null;
-  /** Deck tilt vs world-up four steps (~67 ms) after the catch event, deg. */
+  /** Same roll residual four steps (~67 ms) after the catch, deg. */
   catchResidual4Deg: number | null;
+  /** Full deck tilt (pitch+roll) one step after catch — informational. */
+  catchTiltDeg: number | null;
   caught: boolean;
   recLabel: string | null;
   label: string | null;
@@ -61,6 +66,23 @@ function deckTiltDeg(q: { x: number; y: number; z: number; w: number }): number 
   // World-up component of the deck normal: acos clamps handle noise.
   const upY = 1 - 2 * (q.x * q.x + q.z * q.z);
   return (Math.acos(Math.max(-1, Math.min(1, upY))) * 180) / Math.PI;
+}
+
+/**
+ * ROLL off-level, deg ∈ [0, 180] — the residual about the FLIP axis, computed
+ * in the BOARD frame: express world-up in body coordinates (u_b = q⁻¹·ŷ) and
+ * take its lateral component. Pitch-invariant AND yaw-invariant: a pitched
+ * deck mid-shuv reads 0 (the authored pitch silhouette and the yaw envelope
+ * are supposed to be there); only genuine rail-to-rail tilt registers, 180 at
+ * grip-tape-down mid-flip.
+ */
+function rollOffLevelDeg(q: { x: number; y: number; z: number; w: number }): number {
+  // u_b = q⁻¹ · (0,1,0): apply the transposed rotation matrix to world-up
+  // (second ROW of R(q)).
+  const { x, y, z, w } = q;
+  const ubX = 2 * (x * y + w * z);
+  const ubY = 1 - 2 * (x * x + z * z);
+  return Math.abs((Math.atan2(ubX, ubY) * 180) / Math.PI);
 }
 
 /** ω projected on the trick axis (flips: board-long; shuvs: deck-up). */
@@ -101,6 +123,15 @@ export async function measuredTrick(
   const catchAfter = opts.catchAfterApexSteps ?? (isShuv ? 8 : 6);
   const axis: 'long' | 'up' = isShuv ? 'up' : 'long';
 
+  // Input style is trick- and assist-appropriate:
+  // - FLIPS at L1/L2: competent play holds BOTH fingers (the tail flicks from
+  //   its planted position) and the auto-catch waits for trick completion —
+  //   the completion-wait is exactly what the residual gate measures.
+  // - SHUVS: the canonical M5 grammar lifts the front finger during the arc
+  //   (a both-planted arc's first frame reads as a lateral FLICK and
+  //   misclassifies) and replants to catch.
+  // - L0 always uses the explicit manual replant (its only catch by design).
+  const heldStance = assistLevel > 0 && !isShuv;
   const d = await settledProfiled(seed, { assistLevel });
   const h = d.harness;
   d.cruise(90);
@@ -114,6 +145,7 @@ export async function measuredTrick(
   const omegaByStep = new Map<number, number>();
   let catchResidualDeg: number | null = null;
   let catchResidual4Deg: number | null = null;
+  let catchTiltDeg: number | null = null;
   let catchStepSeen: number | null = null;
 
   for (let i = 0; i < 240; i++) {
@@ -129,14 +161,15 @@ export async function measuredTrick(
       catchResidualDeg == null &&
       obs.step === catchStepSeen + 1
     ) {
-      catchResidualDeg = deckTiltDeg(obs.board.q);
+      catchResidualDeg = rollOffLevelDeg(obs.board.q);
+      catchTiltDeg = deckTiltDeg(obs.board.q);
     }
     if (
       catchStepSeen != null &&
       catchResidual4Deg == null &&
       obs.step === catchStepSeen + 4
     ) {
-      catchResidual4Deg = deckTiltDeg(obs.board.q);
+      catchResidual4Deg = rollOffLevelDeg(obs.board.q);
     }
 
     const done = lastEventOf(h, 'trickCompleted') ?? lastEventOf(h, 'bail');
@@ -155,10 +188,13 @@ export async function measuredTrick(
         y: Math.min(0.98, Math.max(0.02, tailBase.y + scripted.y - TAIL_POS.y)),
       };
     }
-    if (!nosePlanted && apexStep != null && obs.step >= apexStep + catchAfter) {
+    if (!heldStance && !nosePlanted && apexStep != null && obs.step >= apexStep + catchAfter) {
       nosePlanted = true;
     }
-    d.drive({ nose: nosePlanted ? d.logicalNoseBase() : null, tail });
+    d.drive({
+      nose: heldStance || nosePlanted ? d.logicalNoseBase() : null,
+      tail,
+    });
   }
 
   const rec = eventsOf(h, 'flipRecognized').concat(eventsOf(h, 'shuvRecognized'))[0];
@@ -202,6 +238,7 @@ export async function measuredTrick(
     completionDeg: outcomeEv ? ((outcomeEv.shuvDegrees as number) ?? null) : null,
     catchResidualDeg,
     catchResidual4Deg,
+    catchTiltDeg,
     caught: eventsOf(h, 'catch').length > 0,
     recLabel: rec ? (rec.label as string) : null,
     label: trick ? (trick.label as string) : null,

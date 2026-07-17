@@ -423,6 +423,7 @@ function trickRows(runs: TrickRunResult[]): Array<Record<string, unknown>> {
     completionDeg: round(r.completionDeg, 1),
     catchResidualDeg: round(r.catchResidualDeg, 2),
     catchResidual4Deg: round(r.catchResidual4Deg, 2),
+    catchTiltDeg: round(r.catchTiltDeg, 2),
     caught: r.caught,
     recLabel: r.recLabel,
     label: r.label,

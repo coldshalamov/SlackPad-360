@@ -97,6 +97,10 @@ describe('quantize-assist: catch-time flip snap by level', () => {
     expect(DEFAULT_SIM_CONFIG.flip.quantizeExtraDamp[0]).toBe(0);
   });
 
+  it('L0 shuv roll-leveler term is literally 0 (pure physics by construction, T2)', () => {
+    expect(DEFAULT_SIM_CONFIG.flip.shuvRollDampFrac[0]).toBe(0);
+  });
+
   it('L0 fires no quantize; L1 and L2 DO (cone-gated) — snap grows with level in config', async () => {
     // L1/L2 auto-catch near completion; L0 uses this only for its manual path.
     const CATCH = 10;

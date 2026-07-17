@@ -11,6 +11,7 @@ import type { Vec3 } from '@slackpad/shared';
 export type ManeuverCommand =
   | PopManeuverCommand
   | PitchCurveManeuverCommand
+  | RollLevelManeuverCommand
   | FlipImpulseManeuverCommand
   | FlipTorqueManeuverCommand
   | CatchManeuverCommand
@@ -60,6 +61,18 @@ export interface PitchCurveManeuverCommand {
    * clamps it to [0,1] and scales its torque clamp by it.
    */
   authorityScale: number;
+}
+
+/**
+ * Attitude PD holding the deck's ROLL flat during a shuv (Sprint 03 T2): the
+ * shuv's authored orientation is yaw envelope + pitch silhouette + FLAT roll,
+ * and Euler coupling otherwise leaks real tilt onto the light roll axis.
+ * SimWorld applies a clamped torque about board-long; never a pose write.
+ */
+export interface RollLevelManeuverCommand {
+  kind: 'rollLevel';
+  /** Torque clamp, N·m (0 disables — the L0 contract). */
+  tauMax: number;
 }
 
 /** One-shot physical angular impulse that starts a recognized flip or shuv. */

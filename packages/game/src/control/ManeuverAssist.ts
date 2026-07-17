@@ -252,6 +252,23 @@ export class ManeuverAssist {
       cmds.push({ kind: 'pitchCurve', targetPitch, targetPitchRate, authorityScale });
     }
 
+    // A shuv's authored orientation includes FLAT roll: hold it with a small
+    // attitude PD through the WHOLE maneuver (pop → air → catch — the yaw ×
+    // pitch Euler coupling otherwise leaks 12–20° of genuine tilt onto the
+    // light roll axis by the catch). Two carve-outs: L0's clamp fraction is 0
+    // by contract, and the leveler releases as soon as a grind CANDIDATE
+    // appears — a shuv that is really a boardslide entry belongs to the grind
+    // capture, whose settle the leveler otherwise hardens into a collision.
+    if (
+      intent?.family === 'shuv' &&
+      !result.grind?.candidate &&
+      (result.phase === 'pop' || result.phase === 'air' || result.phase === 'catch')
+    ) {
+      const rollTauMax =
+        flip.tauMax[s.assistLevel] * flip.shuvRollDampFrac[s.assistLevel];
+      if (rollTauMax > 0) cmds.push({ kind: 'rollLevel', tauMax: rollTauMax });
+    }
+
     // Per-step grind latch (M6; spec §4). Flush the GrindSystem's clamped
     // soft-snap command while grinding (and the one-shot lateral kick a balance
     // slip carries), and mirror the rail frame into AssistState.grindAxis/

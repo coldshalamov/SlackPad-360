@@ -113,8 +113,8 @@ describe('grind integration (grind-lab 50-50)', () => {
     // pop while the front finger is lifted, then replant while there is still
     // enough flight for the front-foot guide to level the deck onto the ledge.
     // Catch timing recalibrated 12 → 16 for the S2 steering/grip physics and
-    // 16 → 20 for the S4 pop silhouette (each shifts the residual-spin phase
-    // at catch).
+    // 16 → 20 for the S4 pop silhouette and 20 → 22 for the T2 shuv roll
+    // leveler (each shifts the residual-spin phase at catch).
     // KNOWN FRAGILITY (pre-dates S2, confirmed on the old build too): the
     // boardslide entry tolerates only a narrow pose/spin envelope before the
     // slide's contact spikes past interruptCollisionImpulse — Sprint 03's
@@ -132,7 +132,7 @@ describe('grind integration (grind-lab 50-50)', () => {
       const tail = gestureFrame > 0
         ? gesturePos('shuv-bs', gestureFrame, 0.1, 6)
         : TAIL_POS;
-      const nose = airStart !== null && o.step >= airStart + 20 ? NOSE_POS : null;
+      const nose = airStart !== null && o.step >= airStart + 22 ? NOSE_POS : null;
       d.drive({ nose, tail });
       const after = h.observe();
       if (after.phase === 'grind' && after.grind?.family === 'boardslide') {

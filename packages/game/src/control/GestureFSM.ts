@@ -882,9 +882,16 @@ export class GestureFSM {
       const gesture = this.#label?.air;
       if (!gesture) return 'both';
       // Never freeze a flip while the grip tape faces the floor. Wait for the
-      // assisted envelope to carry it near a complete turn, then catch/damp.
-      if (gesture.kind === 'flip' && Math.abs(this.flipRotations) >= 0.94) return 'both';
-      if (gesture.kind === 'shuv' && Math.abs(this.shuvDegrees) >= this.config.recognition.shuvTargetDeg * 0.85) {
+      // assisted envelope to carry it near a complete turn, then catch/damp
+      // (thresholds are config — the direct knob behind catchResidualDeg).
+      if (gesture.kind === 'flip' && Math.abs(this.flipRotations) >= cfg.flipCompletionMin) {
+        return 'both';
+      }
+      if (
+        gesture.kind === 'shuv' &&
+        Math.abs(this.shuvDegrees) >=
+          this.config.recognition.shuvTargetDeg * cfg.shuvCompletionFrac
+      ) {
         return 'both';
       }
     }
