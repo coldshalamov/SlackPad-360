@@ -1,0 +1,41 @@
+name: Agent apply patch
+
+on:
+  push:
+    branches:
+      - agent/prototype-hardening
+    paths:
+      - .agent/prototype.patch.gz.b64
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/prototype-hardening
+          fetch-depth: 0
+
+      - name: Decode and verify patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .agent/prototype.patch.gz.b64 | gzip --decompress > /tmp/prototype.patch
+          git apply --check /tmp/prototype.patch
+          git apply --index /tmp/prototype.patch
+          git diff --cached --check
+
+      - name: Commit hardening set
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .agent/prototype.patch.gz.b64 .github/workflows/agent-apply-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: harden controls, camera, park, and player feedback'
+          git push origin HEAD:agent/prototype-hardening

@@ -1,0 +1,92 @@
+name: Agent validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-game:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate research deliverables
+        run: node research/probes/validate-deliverables.mjs
+
+      - name: Validate research follow-up
+        run: node research/probes/validate-followup.mjs
+
+      - name: Validate implementation package
+        run: node preproduction/probes/validate-final.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit, property, and golden tests
+        run: npm test
+
+      - name: Regenerate golden reports
+        run: npm run goldens
+
+      - name: Build and validate authored assets
+        env:
+          RUN_ASSET_PIPELINE: '1'
+        run: npx vitest run packages/asset-pipeline
+
+      - name: Build production game
+        run: npm run build
+
+      - name: Record bundle inventory
+        shell: bash
+        run: |
+          mkdir -p agent-artifacts
+          find packages/game/dist -type f -printf '%s %p\n' | sort -nr > agent-artifacts/bundle-inventory.txt
+          du -sh packages/game/dist > agent-artifacts/dist-size.txt
+
+      - name: Upload production game
+        uses: actions/upload-artifact@v4
+        with:
+          name: slackpad-game-dist
+          path: packages/game/dist
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload validation inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: slackpad-validation-inventory
+          path: agent-artifacts
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-host:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore host
+        run: dotnet restore host/SlackPad.sln
+
+      - name: Test host
+        run: dotnet test host/SlackPad.sln --configuration Release --no-restore
